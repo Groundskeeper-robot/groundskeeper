@@ -177,3 +177,15 @@ def _in_repo(path: str) -> bool:
 def test_paths_in_agent_docs_exist(doc):
     missing = [m for m in PATH_REF.findall(read(doc)) if "*" not in m and "<" not in m and not _in_repo(m)]
     assert not missing, f"{rel(doc)} names paths that don't exist: {missing}. Fix the doc in the same PR."
+
+
+def test_brand_tokens_match_the_css():
+    """brand/tokens.json documents the palette; web/style.css is what the panel uses. They must not drift apart."""
+    import json
+    css = read(ROOT / "web" / "style.css").split("@media")[0]
+    dark = {k: v.lower() for k, v in re.findall(r"--([\w-]+):\s*(#[0-9A-Fa-f]{3,8})", css)}
+    tokens = json.loads(read(ROOT / "brand" / "tokens.json"))["color"]["tokens"]
+    differ = [(t["name"], v, dark[t["name"]]) for t in tokens
+              for v in [(t["value"]["dark"] if isinstance(t["value"], dict) else t["value"]).lower()]
+              if t["name"] in dark and v != dark[t["name"]]]
+    assert not differ, f"brand/tokens.json and web/style.css disagree (name, tokens, css): {differ}"

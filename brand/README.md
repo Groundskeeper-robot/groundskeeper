@@ -15,6 +15,8 @@ back-and-forth mowing path on the turf tile, ending at the robot dot.
 | `icons/` | The panel's nav icons as standalone SVGs, inked `#8BD49A` |
 | `social/` | 1200 × 630 link-preview card (PNG, SVG source) |
 | `source/` | The generator (`make_brand.py`) and PNG renderer (`render.mjs`) |
+| `GUIDELINES.md` | The brand book: name, voice, logo use, colour, type, spacing, icons, motion |
+| `tokens.json` | Colour, type, spacing and radius tokens (the same values as `web/style.css`) |
 
 Pick a logo file by its ground: `-on-dark` for the dark theme, `-on-light` for light. Below 24 px use the small
 mark. Keep a quarter of the mark's height clear on every side.

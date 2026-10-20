@@ -1,6 +1,7 @@
 # web/: the front end
 
-Local rules for the UI. The top-level `AGENTS.md` comes first; the design rules are in `docs/dev/ui-design.md`.
+Local rules for the UI. The top-level `AGENTS.md` comes first; the design rules are in `docs/dev/ui-design.md`, and
+the name, logo, voice and palette in `brand/GUIDELINES.md` (tokens in `brand/tokens.json`, kept equal to `style.css`).
 
 - **Plain JS, no build step, no framework.** Files are served as they are. `web/vendor/` (MapLibre, three.js) is
   git-ignored and vendored by the Dockerfile with checksums; never load from a CDN.
