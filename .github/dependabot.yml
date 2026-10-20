@@ -3,9 +3,19 @@ updates:
   - package-ecosystem: pip
     directory: /
     schedule: {interval: weekly}
+    ignore:
+      # mcp 2.x renamed FastMCP and changed its API; moving to it is its own change (app/mcp_server.py).
+      - dependency-name: mcp
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule: {interval: monthly}
+    groups:
+      actions: {patterns: ["*"]}
   - package-ecosystem: docker
     directory: /
     schedule: {interval: monthly}
+    ignore:
+      # A new Python minor needs its wheels (Pillow, shapely) published first; move the image by hand.
+      - dependency-name: python
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
