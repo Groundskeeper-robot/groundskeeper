@@ -8,7 +8,7 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 ## 0.16.0 — 2026-10-20
 
 ### Added
-- **Container images for every release** on GitHub's registry (`ghcr.io/jpittelkow/groundskeeper`), for amd64
+- **Container images for every release** on GitHub's registry (`ghcr.io/groundskeeper-robot/groundskeeper`), for amd64
   and arm64 (Raspberry Pi), with a ready `docker-compose.yml` and `.env.example`.
 - **Demo mode** (`DEMO=1`): a made-up robot mows a made-up yard (on a public park's lawn, with real aerial imagery
   under it) with a week of history, so the panel can be tried without a Yarbo; it never contacts a robot, the Yarbo

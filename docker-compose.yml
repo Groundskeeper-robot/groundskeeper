@@ -3,7 +3,7 @@
 # as defaults in .env next to this file (copy .env.example; chmod 600, it can hold the HA token).
 services:
   groundskeeper:
-    image: ghcr.io/jpittelkow/groundskeeper:latest
+    image: ghcr.io/groundskeeper-robot/groundskeeper:latest
     container_name: groundskeeper
     restart: unless-stopped
     # Host networking is only needed to receive a Tempest weather station's UDP broadcast (port 50222); the panel

@@ -19,7 +19,7 @@ that breaks one of its rules can't be merged, whether a person or an AI assistan
 You need Python 3.12 and Git. Node.js is optional and only used to syntax-check the front end.
 
 ```bash
-git clone https://github.com/jpittelkow/groundskeeper && cd groundskeeper
+git clone https://github.com/Groundskeeper-robot/groundskeeper && cd groundskeeper
 python -m venv .venv
 .venv/bin/pip install -r requirements.txt -r requirements-dev.txt          # Windows: .venv\Scripts\pip
 mkdir -p web/vendor
@@ -127,7 +127,7 @@ Versions follow [semver](https://semver.org). `CHANGELOG.md` follows [Keep a Cha
    git tag vX.Y.Z && git push origin vX.Y.Z
    ```
 4. The release workflow checks that the tag, `app/version.py` and the changelog agree. It then publishes
-   `ghcr.io/jpittelkow/groundskeeper:X.Y.Z`, `:X.Y` and `:latest` for amd64 and arm64, and creates a GitHub
+   `ghcr.io/groundskeeper-robot/groundskeeper:X.Y.Z`, `:X.Y` and `:latest` for amd64 and arm64, and creates a GitHub
    release whose notes are that version's changelog section.
 
 ## Security

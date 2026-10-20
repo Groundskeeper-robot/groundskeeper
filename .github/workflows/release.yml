@@ -2,9 +2,16 @@ name: Release
 
 # Push a tag vX.Y.Z (matching app/version.py and a "## X.Y.Z" section in CHANGELOG.md) to publish
 # ghcr.io/<owner>/groundskeeper:X.Y.Z, :X.Y and :latest for amd64 and arm64, and a GitHub release.
+# Run it by hand (Actions -> Release -> Run workflow) with an existing tag to publish that tag's image again, e.g.
+# after the repository moved to another owner; an existing GitHub release is left as it is.
 on:
   push:
     tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to publish again (vX.Y.Z)"
+        required: true
 
 permissions:
   contents: write
@@ -15,11 +22,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - name: Which tag
+        id: tag
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "minor=$(echo "${TAG#v}" | cut -d. -f1,2)" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Tag, app/version.py and CHANGELOG.md agree
-        run: python scripts/release_notes.py "${GITHUB_REF_NAME#v}" > release-notes.md
+        run: python scripts/release_notes.py "${{ steps.tag.outputs.version }}" > release-notes.md
       - uses: docker/setup-qemu-action@v4
       - uses: docker/setup-buildx-action@v4
       - uses: docker/login-action@v4
@@ -32,8 +49,8 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository_owner }}/groundskeeper
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=${{ steps.tag.outputs.version }}
+            type=raw,value=${{ steps.tag.outputs.minor }}
             type=raw,value=latest
           labels: |
             org.opencontainers.image.title=Groundskeeper
@@ -46,10 +63,17 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: PANEL_BUILD=${{ github.sha }}
+          build-args: PANEL_BUILD=${{ steps.tag.outputs.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create "$GITHUB_REF_NAME" --title "Groundskeeper ${GITHUB_REF_NAME#v}" --notes-file release-notes.md
+          TAG: ${{ steps.tag.outputs.tag }}
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "release $TAG already exists; left as it is"
+          else
+            gh release create "$TAG" --title "Groundskeeper $VERSION" --notes-file release-notes.md
+          fi

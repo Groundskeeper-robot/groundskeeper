@@ -41,7 +41,7 @@ park's lawn, so no real home appears. `python scripts/screenshots.py` makes them
 
 ```bash
 mkdir groundskeeper && cd groundskeeper
-curl -fsSLO https://raw.githubusercontent.com/jpittelkow/groundskeeper/main/docker-compose.yml
+curl -fsSLO https://raw.githubusercontent.com/Groundskeeper-robot/groundskeeper/main/docker-compose.yml
 docker compose up -d
 ```
 
@@ -52,7 +52,7 @@ sign-in (needed only for control), the imagery, cameras, Home Assistant and safe
 
 **Updating:** run `docker compose pull && docker compose up -d`. To stay on one release line, pin the image tag in
 `docker-compose.yml` (for example `:1.0`). Each release's changes are in the [changelog](CHANGELOG.md) and on the
-[releases page](https://github.com/jpittelkow/groundskeeper/releases).
+[releases page](https://github.com/Groundskeeper-robot/groundskeeper/releases).
 
 **Other options** are in [`.env.example`](.env.example). The panel runs as `PUID:PGID` (1000:1000 by default), so
 set those to your own user if you want to edit `./data` by hand. An Unraid example is in

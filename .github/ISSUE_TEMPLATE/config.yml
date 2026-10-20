@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Security problem
-    url: https://github.com/jpittelkow/groundskeeper/security/advisories/new
+    url: https://github.com/Groundskeeper-robot/groundskeeper/security/advisories/new
     about: Report it privately, please.
   - name: Question or idea
-    url: https://github.com/jpittelkow/groundskeeper/discussions
+    url: https://github.com/Groundskeeper-robot/groundskeeper/discussions
     about: Ask in Discussions.
