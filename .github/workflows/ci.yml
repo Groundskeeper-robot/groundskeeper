@@ -42,10 +42,9 @@ jobs:
           python-version: "3.12"
       - name: No private addresses, personal emails or real robot data
         run: python scripts/check_public.py
-      - name: No secrets (gitleaks)
-        uses: gitleaks/gitleaks-action@v3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # The gitleaks CLI (MIT) rather than gitleaks-action, which needs a paid licence key for organisation repos.
+      - name: No secrets (gitleaks, whole history)
+        run: docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/repo" zricethezav/gitleaks:v8.28.0 git /repo --redact --no-banner -v
 
   docker:
     runs-on: ubuntu-latest
