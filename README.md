@@ -27,6 +27,74 @@ pauses or docks it only when every safety check passes.
 The screenshots come from the built-in demo (`DEMO=1`): a made-up robot mowing a made-up yard laid out on a public
 park's lawn, so no real home appears. `python scripts/screenshots.py` makes them again.
 
+## Highlights
+
+### The sharpest free aerial map of your yard
+
+Most map apps stop at 30–60 cm per pixel. County and state GIS services often fly at **7–15 cm**, sharp enough to
+see pavers and sprinkler heads, but they are hard to find. Groundskeeper ships a catalog of **131 imagery
+sources** in 18 countries, with state, county and city services for **every US state and DC**, and picks the
+sharpest free one that covers your yard.
+
+- One card per source that covers your yard, each with its own sample of your yard, its resolution, licence and
+  season. Leave it on Automatic or pick one.
+- Add any map service by pasting its address; the panel works out what kind it is and lets you try it at your yard.
+- Line the photo up with the robot's map by clicking matching points.
+- **Private by design:** the panel only contacts sources whose coverage contains your yard, so your location is
+  never sent to the rest.
+- The catalog is plain JSON, one file per source. Found a sharper service for your county?
+  [Add it](catalog/README.md) and everyone there gets it.
+
+More: [Map imagery](docs/user/imagery.md), [the catalog](catalog/SOURCES.md).
+
+### Local first, cloud when you want control
+
+Groundskeeper talks to the robot two ways, and you choose how far to go.
+
+- **Local:** it listens to the robot's own MQTT broker on your network: position about once a second while it
+  mows, battery, RTK, the map, plans and every reply. Recording, maps, coverage and alerts work with no Yarbo account and no
+  internet. It only ever reads there.
+- **Cloud:** sign in to your Yarbo account in Settings, the same route the official app uses, and the panel can
+  start, pause, resume, stop and dock the robot, and write map changes, each behind its checks.
+- **Works alongside the Yarbo app:** a mow started from the phone is recorded like any other, and the panel notes
+  the commands other clients send.
+- Control stays off until you switch it on, so you can run local-only for as long as you like.
+
+### Home Assistant and your weather station
+
+- **Tempest weather station:** read straight from the hub's local broadcast, no account or cloud. Rain, temperature
+  and humidity decide whether the lawn is Dry, Damp or Wet, and rain starting during a mow can send the robot
+  home (with control on; otherwise it notifies you).
+- **Weather from Home Assistant** instead of a Tempest, or as a backup: rain, temperature and humidity sensors,
+  picked from a list of your entities. **Soil moisture** sensors (Zigbee ones work) keep the lawn "wet" until the
+  ground has dried, however long ago it rained.
+- **Presence:** an alarm panel, `zone.home`, people or trackers decide whether someone is home before a start.
+- **Notifications** to your phone through the companion app: errors, stuck, maintenance due, and before a
+  scheduled start, a "ready to mow" note with a camera snapshot for you to confirm.
+- **Sensors back into Home Assistant:** state, battery, RTK, whether it is mowing, the local link, lawn conditions
+  and the last run, for your own dashboards and automations.
+
+More: [Integrations](docs/user/integrations.md).
+
+### Set it up by asking an AI assistant (MCP)
+
+Connect Claude, or any assistant that speaks MCP, with one command and a token from Settings. Then ask it:
+
+> *Find the most detailed aerial map of my yard: check every source that covers it, look at the samples, and if a
+> county or state service would be sharper, find it for me.*
+
+> *Walk me through setting up cameras, run rules, lawn conditions, the schedule and alerts.*
+
+> *What's the robot doing, and would it start right now?*
+
+- It reads everything you can see and helps with setup, saying what it will change and waiting for your yes.
+- It can only make safety settings **stricter**, never looser, and it can't switch control or map writing on.
+- Coordinates, the robot's serial and your Yarbo account are removed from what it reads, so it can search for
+  imagery by region without ever learning your address.
+- Commands to the robot are off unless you switch on **Assistant commands**, and even then every check applies.
+
+More: [AI assistants (MCP)](docs/user/mcp.md).
+
 ## What it does
 
 - **Live:** the robot on aerial imagery with its track coloured by RTK quality, the plan's progress, the battery,
