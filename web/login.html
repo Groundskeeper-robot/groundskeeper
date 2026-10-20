@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>try { const t = localStorage.getItem("theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) { /* no storage */ }</script>
+<title>Sign in · Groundskeeper</title>
+<link rel="icon" href="/brand/favicon.svg?v=2" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico?v=2" sizes="16x16 32x32 48x48">
+<link rel="manifest" href="/manifest.json">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body class="loginpage">
+<main class="login card">
+  <div class="brand">
+    <img class="brandmark" src="/brand/groundskeeper-mark.svg" width="28" height="28" alt="">
+    <span class="brandname">Groundskeeper<small class="brandsub">for Yarbo</small></span>
+  </div>
+  <form id="login" hidden>
+    <label class="flabel" for="pw">Password</label>
+    <input class="field" id="pw" type="password" autocomplete="current-password" required autofocus>
+    <button class="btn pri wide" type="submit">Sign in</button>
+    <p class="shelp">Forgot it? Run <code>python -m app.auth reset</code> in the container and restart it.</p>
+  </form>
+  <form id="setup" hidden>
+    <p class="shelp">Set the admin password. The setup code is in the panel's log, for example
+      <code>docker logs groundskeeper</code>.</p>
+    <label class="flabel" for="code">Setup code</label>
+    <input class="field" id="code" autocomplete="one-time-code" placeholder="XXXX-XXXX-XXXX" required>
+    <label class="flabel" for="npw">New password</label>
+    <input class="field" id="npw" type="password" autocomplete="new-password" required>
+    <label class="flabel" for="npw2">Again</label>
+    <input class="field" id="npw2" type="password" autocomplete="new-password" required>
+    <button class="btn pri wide" type="submit">Set password</button>
+  </form>
+  <p class="loginerr" id="err" role="alert"></p>
+</main>
+<script src="/login.js"></script>
+</body>
+</html>

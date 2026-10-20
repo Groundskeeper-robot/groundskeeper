@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ms_maris_local_hr",
+  "name": "MARIS local high-resolution imagery (15 cm)",
+  "provider": "MARIS and MDEQ (Mississippi Digital Earth Model)",
+  "country": "US",
+  "region": "Mississippi",
+  "homepage": "https://maris.mississippi.edu/HTML/DATA/data_Aerial/LocalHighRes/LocalHighRes.html",
+  "kind": "arcgis_map",
+  "url": "https://gis.mississippi.edu/server/rest/services/Raster/Local_High_Res_2025/MapServer",
+  "max_px": 4096,
+  "native_m": 0.1524,
+  "vintage": "Leaf-off county flights: North 2024 and Central 2023 at 6 inch; South 2016 to 2022 at 6 and 12 inch",
+  "attribution": "Imagery: MARIS, MDEQ",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_ms"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Mississippi State Capitol, Jackson",
+    "landmark": [-90.1822, 32.3039]
+  }
+}

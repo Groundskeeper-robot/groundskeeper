@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "au_nsw_imagery",
+  "name": "Spatial Services imagery",
+  "provider": "NSW Spatial Services",
+  "country": "AU",
+  "region": "New South Wales",
+  "homepage": "https://portal.spatial.nsw.gov.au/",
+  "kind": "tiles",
+  "url": "https://maps.six.nsw.gov.au/arcgis/rest/services/public/NSW_Imagery/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 21,
+  "native_m": 0.1,
+  "attribution": "Imagery: © Spatial Services NSW",
+  "license": {
+    "id": "CC-BY-4.0",
+    "name": "Open data (CC BY 4.0); credit required",
+    "url": "https://creativecommons.org/licenses/by/4.0/",
+    "commercial": true,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "au_nsw"
+  },
+  "verified": {
+    "date": "2026-10-03",
+    "place": "Sydney Opera House",
+    "landmark": [151.2153, -33.8568]
+  }
+}

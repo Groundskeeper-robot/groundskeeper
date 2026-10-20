@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schema.json",
+  "id": "tn_nashville_ortho2026",
+  "name": "Metro Nashville 2026 orthoimagery (15 cm)",
+  "provider": "Metropolitan Government of Nashville and Davidson County (Metro GIS)",
+  "country": "US",
+  "region": "Davidson County (Nashville), Tennessee",
+  "homepage": "https://www.nashville.gov/departments/planning/mapping-and-gis",
+  "kind": "tiles",
+  "url": "https://maps.nashville.gov/arcgis/rest/services/Imagery/2026Imagery_WGS84/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 20,
+  "native_m": 0.1524,
+  "vintage": "Countywide 6-inch flight, 2026 (Metro publishes one service per year)",
+  "attribution": "Imagery: Metro Nashville GIS",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public Metro Government service, provided as is; credit required",
+    "url": "https://www.nashville.gov/departments/planning/mapping-and-gis/property-mapping",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_tn_davidson"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Tennessee State Capitol, Nashville",
+    "landmark": [-86.78417, 36.16583]
+  }
+}

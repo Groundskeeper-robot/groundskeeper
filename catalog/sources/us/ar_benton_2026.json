@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ar_benton_2026",
+  "name": "Benton County imagery 2026 (15 cm)",
+  "provider": "Benton County AR, published by NWARPC",
+  "country": "US",
+  "region": "Benton County, Arkansas",
+  "homepage": "https://www.arcgis.com/home/item.html?id=c91c9e49b5c94a0aaf32c3f8a4f6e9fb",
+  "kind": "tiles",
+  "url": "https://tiles.arcgis.com/tiles/G4bYaaas92zuKaUR/arcgis/rest/services/Benton_County_Imagery/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 20,
+  "native_m": 0.1524,
+  "vintage": "Leaf-off winter flight 2025-2026 (6 inch)",
+  "attribution": "Imagery: Benton County AR, via NWARPC",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public county service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_ar_benton"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Crystal Bridges Museum of American Art, Bentonville",
+    "landmark": [-94.2038, 36.3822]
+  }
+}

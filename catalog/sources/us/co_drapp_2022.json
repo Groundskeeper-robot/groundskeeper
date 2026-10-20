@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schema.json",
+  "id": "co_drapp_2022",
+  "name": "DRCOG DRAPP 2022 orthoimagery (7.5 cm)",
+  "provider": "Denver Regional Council of Governments (DRAPP), hosted by Sanborn",
+  "country": "US",
+  "region": "Denver metro, Colorado",
+  "homepage": "https://data.drcog.org/about",
+  "kind": "arcgis_image",
+  "url": "https://drcog-data.sanborn.com/arcgis/rest/services/DRCOG_2022/Mosaics_2022/ImageServer?bandIds=0,1,2",
+  "max_px": 4096,
+  "native_m": 0.0762,
+  "vintage": "Leaf-off spring flights, 2022: 7.5 cm over the metro core, 15 cm at its edges, 30 cm in the foothills and eastern plains",
+  "attribution": "Imagery: DRCOG Regional Data Catalog (DRAPP 2022), CC BY 3.0",
+  "license": {
+    "id": "CC-BY-3.0",
+    "name": "Past DRAPP imagery is open data from the DRCOG Regional Data Catalog (CC BY 3.0); credit required",
+    "url": "https://creativecommons.org/licenses/by/3.0/",
+    "commercial": true,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_co_denver_metro"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Colorado State Capitol, Denver",
+    "landmark": [-104.9848, 39.7393]
+  }
+}

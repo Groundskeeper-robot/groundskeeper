@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "nd_gishub_2018_30cm",
+  "name": "North Dakota 2018 statewide imagery (30 cm)",
+  "provider": "ND State Water Commission, served by the ND GIS Hub",
+  "country": "US",
+  "region": "North Dakota",
+  "homepage": "https://www.gis.nd.gov/",
+  "kind": "arcgis_image",
+  "url": "https://ndgishub.nd.gov/arcgis/rest/services/Imagery/AerialImage_ND_2018_30cm/ImageServer?bandIds=0,1,2",
+  "max_px": 4096,
+  "native_m": 0.3,
+  "vintage": "Leaf-on summer flights, July to October 2018 (the 30 cm source of NAIP 2018)",
+  "attribution": "Imagery: ND State Water Commission, via the ND GIS Hub",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_nd"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "North Dakota State Capitol, Bismarck",
+    "landmark": [-100.7824, 46.8208]
+  }
+}

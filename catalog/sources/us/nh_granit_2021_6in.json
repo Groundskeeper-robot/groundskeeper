@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "nh_granit_2021_6in",
+  "name": "NH GRANIT 2021-2022 orthoimagery (15 cm)",
+  "provider": "NH GRANIT (UNH Earth Systems Research Center), State of New Hampshire",
+  "country": "US",
+  "region": "New Hampshire",
+  "homepage": "https://granit.unh.edu/pages/imagery",
+  "kind": "tiles",
+  "url": "https://nhgeodata.unh.edu/image/rest/services/ImageServices/NH_2021_2022_6in_tiled/ImageServer/tile/{z}/{y}/{x}",
+  "max_zoom": 20,
+  "native_m": 0.1524,
+  "vintage": "Leaf-off spring and fall flights, 2021 and 2022",
+  "attribution": "Imagery: NH GRANIT, State of New Hampshire",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state data; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_nh"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "New Hampshire State House, Concord",
+    "landmark": [-71.5379, 43.2069]
+  }
+}

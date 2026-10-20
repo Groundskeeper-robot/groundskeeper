@@ -1,0 +1,38 @@
+# Example Compose Manager stack for an Unraid host (for other hosts see docker-compose.yml at the repo root).
+# Paste it into a new Compose Manager stack, or let scripts/deploy.sh copy it to GK_COMPOSE_DIR (it replaces the
+# example data path below with GK_DATA_DIR). Change /mnt/user/appdata/yarbo-panel to your appdata share if needed.
+# Nothing site-specific lives in this file. The robot's address, Frigate, Home Assistant and the rest are set in
+# the panel (Settings) or, as defaults, in the env file below.
+services:
+  yarbo-panel:
+    image: yarbo-panel:latest
+    container_name: yarbo-panel
+    restart: unless-stopped
+    # Host networking so the container receives the Tempest hub's UDP broadcast (port 50222).
+    # The panel listens on 8425 directly on the host.
+    network_mode: host
+    environment:
+      DATA_DIR: /data
+      PORT: "8425"
+      # Unraid's usual owner for appdata (nobody:users). The panel runs as this user, not root; the first start
+      # hands an existing (root-owned) data folder to it.
+      PUID: "99"
+      PGID: "100"
+    # Optional defaults, every one settable in the panel instead (Settings → Robot, Cameras, Home Assistant,
+    # Lawn conditions, Notifications, This panel): YARBO_HOST, YARBO_PORT, YARBO_SN, FRIGATE_URL, HA_URL, HA_TOKEN,
+    # TEMPEST_PORT, PANEL_URL, POLL_IDLE_S, POLL_ACTIVE_S, MAP_REFRESH_S, RAW_EVERY_S, RAW_KEEP_DAYS, RUN_IDLE_END_S,
+    # and TZ for the scheduler's clock. They go in the env file (chmod 600), never here.
+    env_file:
+      - path: /mnt/user/appdata/yarbo-panel/.env
+        required: false
+    volumes:
+      - /mnt/user/appdata/yarbo-panel:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8425/health', timeout=5).status == 200 else 1)"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      net.unraid.docker.webui: "http://[IP]:[PORT:8425]/"
+      net.unraid.docker.managed: "composeman"

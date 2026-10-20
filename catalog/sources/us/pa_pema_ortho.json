@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "pa_pema_ortho",
+  "name": "PEMA orthoimagery 2021-2023",
+  "provider": "Pennsylvania Emergency Management Agency, served by PASDA",
+  "country": "US",
+  "region": "Pennsylvania",
+  "homepage": "https://www.pasda.psu.edu/",
+  "kind": "arcgis_map",
+  "url": "https://imagery.pasda.psu.edu/arcgis/rest/services/pasda/PEMAImagery2021_2023/MapServer?layers=show:3",
+  "max_px": 4096,
+  "native_m": 0.1524,
+  "vintage": "Leaf-off spring flights, 2021 to 2023",
+  "attribution": "Imagery: PEMA, via PASDA",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_pa"
+  },
+  "verified": {
+    "date": "2026-10-09",
+    "place": "Pennsylvania State Capitol, Harrisburg",
+    "landmark": [-76.8836, 40.2644]
+  }
+}

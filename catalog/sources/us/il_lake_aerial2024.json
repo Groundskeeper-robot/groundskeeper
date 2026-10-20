@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "il_lake_aerial2024",
+  "name": "Lake County aerial photography 2024 (7.6 cm)",
+  "provider": "Lake County (Illinois) GIS Division",
+  "country": "US",
+  "region": "Lake County, Illinois",
+  "homepage": "https://data-lakecountyil.opendata.arcgis.com/",
+  "kind": "tiles",
+  "url": "https://tiles.arcgis.com/tiles/HESxeTbDliKKvec2/arcgis/rest/services/aerial2024/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 21,
+  "native_m": 0.0762,
+  "vintage": "Leaf-off spring flight, March 16 to April 13, 2024 (3 in); a 2025 flight is download-only so far",
+  "attribution": "Imagery: Lake County, Illinois",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public county open data; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_il_lake"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Lake County Courthouse, Waukegan",
+    "landmark": [-87.8331, 42.3604]
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schema.json",
+  "id": "nm_abq_aerials2024",
+  "name": "City of Albuquerque 2024 aerials (15 cm)",
+  "provider": "City of Albuquerque Planning Department, AGIS",
+  "country": "US",
+  "region": "Bernalillo County, New Mexico",
+  "homepage": "https://www.cabq.gov/gis/advanced-map-viewer",
+  "kind": "arcgis_image",
+  "url": "https://abqgis01.cabq.gov/arcgis/rest/services/WebImagery/Aerials2024_Web/ImageServer?bandIds=0,1,2",
+  "max_px": 4096,
+  "native_m": 0.1524,
+  "vintage": "Leaf-off early spring flight, 2024 (15 cm, Albuquerque and Bernalillo County)",
+  "attribution": "Imagery: City of Albuquerque (www.cabq.gov)",
+  "license": {
+    "id": "provider-terms",
+    "name": "City data reuse with the City's attribution disclaimer; the City may revoke use",
+    "url": "https://www.cabq.gov/abq-data/abq-data-disclaimer-1",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_nm_bernalillo"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "University Stadium (UNM), Albuquerque",
+    "landmark": [-106.6282, 35.0669]
+  }
+}

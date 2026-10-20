@@ -1,0 +1,32 @@
+{
+  "$schema": "../../schema.json",
+  "id": "de_by_dop40",
+  "name": "DOP40 (40 cm)",
+  "provider": "Bayerische Vermessungsverwaltung",
+  "country": "DE",
+  "region": "Bavaria",
+  "homepage": "https://geodaten.bayern.de/opengeodata/",
+  "kind": "wms",
+  "url": "https://geoservices.bayern.de/od/wms/dop/v1/dop40",
+  "layers": "by_dop40c",
+  "version": "1.3.0",
+  "crs": "EPSG:4326",
+  "native_m": 0.4,
+  "attribution": "Imagery: © Bayerische Vermessungsverwaltung",
+  "license": {
+    "id": "CC-BY-4.0",
+    "name": "Open data (CC BY 4.0); credit required",
+    "url": "https://creativecommons.org/licenses/by/4.0/",
+    "commercial": true,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "de_by"
+  },
+  "verified": {
+    "date": "2026-10-03",
+    "place": "Marienplatz, Munich",
+    "landmark": [11.5755, 48.1374]
+  }
+}

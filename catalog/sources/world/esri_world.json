@@ -1,0 +1,36 @@
+{
+  "$schema": "../../schema.json",
+  "id": "esri_world",
+  "name": "Esri World Imagery",
+  "provider": "Esri",
+  "country": "XX",
+  "region": "Worldwide",
+  "homepage": "https://location.arcgis.com/",
+  "kind": "tiles",
+  "url": "https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?token={key}",
+  "max_zoom": 19,
+  "native_m": 0.3,
+  "vintage": "Varies by place",
+  "attribution": "Imagery: Esri, Maxar, Earthstar Geographics",
+  "license": {
+    "id": "provider-terms",
+    "name": "Your ArcGIS key's terms apply",
+    "url": "https://www.esri.com/en-us/legal/terms/full-master-agreement",
+    "commercial": null,
+    "credit": true
+  },
+  "auth": {
+    "label": "an ArcGIS Location Platform API key",
+    "signup": "https://location.arcgis.com/"
+  },
+  "cache_days": 1,
+  "coverage": {
+    "type": "World"
+  },
+  "verified": {
+    "date": "2026-10-03",
+    "place": "Royal Observatory, Greenwich",
+    "landmark": [-0.0015, 51.4778],
+    "note": "Address format confirmed by the service's key error; renders only with a key."
+  }
+}

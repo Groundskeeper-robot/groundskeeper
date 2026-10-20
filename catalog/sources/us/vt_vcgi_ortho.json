@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "vt_vcgi_ortho",
+  "name": "VCGI best-of colour orthoimagery (15 cm)",
+  "provider": "Vermont Center for Geographic Information (VCGI)",
+  "country": "US",
+  "region": "Vermont",
+  "homepage": "https://vcgi.vermont.gov/data-and-programs/imagery-program",
+  "kind": "arcgis_image",
+  "url": "https://maps.vcgi.vermont.gov/arcgis/rest/services/EGC_services/IMG_VCGI_CLR_WM_CACHE/ImageServer?bandIds=0,1,2",
+  "max_px": 4096,
+  "native_m": 0.15,
+  "vintage": "Leaf-off spring flights: 2023 at 15 cm over towns and main road corridors, the rest of the state 2024 at 30 cm",
+  "attribution": "Imagery: VCGI, State of Vermont",
+  "license": {
+    "id": "provider-terms",
+    "name": "Freely available state imagery; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_vt"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Vermont State House, Montpelier",
+    "landmark": [-72.5803, 44.2625]
+  }
+}

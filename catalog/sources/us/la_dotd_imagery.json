@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "la_dotd_imagery",
+  "name": "LA DOTD aerial imagery, newest per area",
+  "provider": "Louisiana DOTD",
+  "country": "US",
+  "region": "Louisiana",
+  "homepage": "https://data-ladotd.opendata.arcgis.com/",
+  "kind": "arcgis_map",
+  "url": "https://maps.dotd.la.gov/imagery/rest/services/Imagery/Louisiana_Remote_Sensing_Map/MapServer?layers=show:187,183,175,173,172,177,162,144,1,141,135,167,3,2,4,5,6,9,10,11,12,13,14,15,16",
+  "max_px": 4096,
+  "native_m": 0.1524,
+  "vintage": "Newest per area: 3 inch metro and 6 inch parish flights 2013 to 2026 (mixed seasons) where DOTD has them, else the statewide 6 inch flight of 2010 (listed at 15 cm, what most of it serves: the 3 inch metro flights are their own entry, la_dotd_metros_2023)",
+  "attribution": "Imagery: Louisiana DOTD",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_la"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Louisiana State Capitol, Baton Rouge",
+    "landmark": [-91.1874, 30.457]
+  }
+}

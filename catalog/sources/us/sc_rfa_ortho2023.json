@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schema.json",
+  "id": "sc_rfa_ortho2023",
+  "name": "South Carolina 2023 statewide imagery (15 cm)",
+  "provider": "SC Revenue and Fiscal Affairs Office (RFA), hosted by Esri",
+  "country": "US",
+  "region": "South Carolina",
+  "homepage": "https://rfa.sc.gov/resources/mapping/statewide-aerial-imagery",
+  "kind": "tiles",
+  "url": "https://tiles.arcgis.com/tiles/RvqSyw3diI7dTKo5/arcgis/rest/services/SC_2023_RGB/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 20,
+  "native_m": 0.1524,
+  "vintage": "Leaf-off winter flights, 2023 (statewide 6-inch; refreshed every three years, a 2026 flight is under way)",
+  "attribution": "Imagery: SC Revenue and Fiscal Affairs Office",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state imagery, provided as is; credit required",
+    "url": "https://www.arcgis.com/home/item.html?id=0e20987129244d35b367102190fd8f86",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_sc"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "South Carolina State House, Columbia",
+    "landmark": [-81.03305, 34.00034]
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ca_lariac7_2023",
+  "name": "LARIAC7 countywide orthoimagery 2023 (10 cm)",
+  "provider": "Los Angeles Region Imagery Acquisition Consortium (LA County), hosted by EagleView",
+  "country": "US",
+  "region": "Los Angeles County, California",
+  "homepage": "https://lariac-lacounty.hub.arcgis.com/",
+  "kind": "tiles",
+  "url": "https://svc.pictometry.com/Image/BCC27E3E-766E-CE0B-7D11-AA4760AC43ED/wmts/PICT-LARIAC7--KCrSFBeqgG/default/GoogleMapsCompatible/{z}/{x}/{y}.png",
+  "max_zoom": 21,
+  "native_m": 0.1016,
+  "vintage": "Winter countywide flight (EagleView AccuPlus), January to October 2023",
+  "attribution": "Imagery: LARIAC, County of Los Angeles, EagleView",
+  "license": {
+    "id": "provider-terms",
+    "name": "LA County public web service under its GIS terms of use; EagleView-licensed imagery, view only",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_ca_los_angeles"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Los Angeles City Hall",
+    "landmark": [-118.2429, 34.0537]
+  }
+}

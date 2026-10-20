@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "or_portland_2025",
+  "name": "PortlandMaps summer 2025 aerial photos (15 cm)",
+  "provider": "City of Portland (PortlandMaps), Metro regional aerial photo consortium",
+  "country": "US",
+  "region": "Portland metro, Oregon",
+  "homepage": "https://www.portlandmaps.com/",
+  "kind": "tiles",
+  "url": "https://www.portlandmaps.com/arcgis/rest/services/Public/Aerial_Photos_Summer_2025/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 21,
+  "native_m": 0.1524,
+  "vintage": "Leaf-on summer flight, 2025; urban Multnomah, Washington and Clackamas counties (the rural south and east of Clackamas County is not flown)",
+  "attribution": "Imagery: City of Portland, Metro",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public city service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_or_portland"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Providence Park, Portland",
+    "landmark": [-122.6917, 45.5214]
+  }
+}

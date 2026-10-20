@@ -1,0 +1,34 @@
+{
+  "type": "Feature",
+  "properties": {
+    "name": "Cobb County, Georgia",
+    "source": "US Census Bureau county boundaries (public domain), via plotly/datasets geojson-counties-fips",
+    "note": "Buffered 3 km and simplified to 18 points; generous on purpose.",
+    "command": "county_outline.py --fips 13067 --buffer-km 3 --name us_ga_cobb"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [-84.7569, 33.8812],
+        [-84.7703, 34.0779],
+        [-84.7611, 34.0983],
+        [-84.7369, 34.1065],
+        [-84.4181, 34.1004],
+        [-84.3939, 34.0906],
+        [-84.3517, 33.971],
+        [-84.3512, 33.9583],
+        [-84.4141, 33.888],
+        [-84.4584, 33.7972],
+        [-84.5564, 33.7234],
+        [-84.5775, 33.7164],
+        [-84.599, 33.7227],
+        [-84.639, 33.7781],
+        [-84.7246, 33.779],
+        [-84.7474, 33.7873],
+        [-84.7566, 33.8066],
+        [-84.7569, 33.8812]
+      ]
+    ]
+  }
+}

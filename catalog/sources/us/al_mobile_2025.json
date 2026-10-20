@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "al_mobile_2025",
+  "name": "Mobile County 2025 imagery (7.6 cm)",
+  "provider": "Mobile County Department of Revenue, served by the Alabama Office of GIS",
+  "country": "US",
+  "region": "Mobile County, Alabama",
+  "homepage": "https://map.ogb.state.al.us/arcgis/rest/services/CAGDV/CoastalImagery/MapServer",
+  "kind": "arcgis_map",
+  "url": "https://map.ogb.state.al.us/arcgis/rest/services/CAGDV/CoastalImagery/MapServer?layers=show:100",
+  "max_px": 4096,
+  "native_m": 0.0762,
+  "vintage": "2025 county flight",
+  "attribution": "Imagery: Mobile County Department of Revenue, via the Alabama Office of GIS",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_al_mobile"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Hancock Whitney Stadium, University of South Alabama, Mobile",
+    "landmark": [-88.192, 30.6969]
+  }
+}

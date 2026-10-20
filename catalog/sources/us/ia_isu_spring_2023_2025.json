@@ -1,0 +1,33 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ia_isu_spring_2023_2025",
+  "name": "Iowa county spring orthophotos 2023-2025 (2.5-7.6 cm)",
+  "provider": "Iowa State University GIS Support and Research Facility, with Iowa counties",
+  "country": "US",
+  "region": "Des Moines metro and nine other counties, Iowa",
+  "homepage": "https://ortho.gis.iastate.edu/",
+  "kind": "arcgis_image",
+  "url": "https://ortho.gis.iastate.edu/arcgis/rest/services/ortho/ortho_2023_2025_nc/ImageServer",
+  "max_px": 4096,
+  "native_m": 0.0254,
+  "vintage": "Leaf-off spring county flights, 2023 to 2025: Dallas County at 1 in (2.5 cm); Polk, Warren, Woodbury, Cerro Gordo, Muscatine, Cherokee, Clay, Franklin, Hamilton, Mills and Poweshiek at 3 in (7.6 cm); other counties are blank",
+  "attribution": "Imagery: Iowa State University GIS Facility, Iowa counties",
+  "license": {
+    "id": "provider-terms",
+    "name": "Free public service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_ia_spring_2023_2025"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Iowa State Capitol, Des Moines",
+    "landmark": [
+      -93.6037,
+      41.5911
+    ]
+  }
+}

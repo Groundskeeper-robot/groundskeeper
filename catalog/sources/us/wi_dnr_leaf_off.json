@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "wi_dnr_leaf_off",
+  "name": "Wisconsin DNR leaf-off (county surveys)",
+  "provider": "Wisconsin DNR",
+  "country": "US",
+  "region": "Wisconsin",
+  "homepage": "https://dnrmaps.wi.gov/",
+  "kind": "arcgis_image",
+  "url": "https://dnrmaps.wi.gov/arcgis_image/rest/services/DW_Imagery/EN_Image_Basemap_Latest_Leaf_Off/ImageServer",
+  "max_px": 4096,
+  "native_m": 0.0762,
+  "vintage": "Leaf-off (spring) county flights, compiled by region",
+  "attribution": "Imagery: Wisconsin DNR, county orthoimagery",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_wi"
+  },
+  "verified": {
+    "date": "2026-10-03",
+    "place": "Wisconsin State Capitol, Madison",
+    "landmark": [-89.3842, 43.0747]
+  }
+}

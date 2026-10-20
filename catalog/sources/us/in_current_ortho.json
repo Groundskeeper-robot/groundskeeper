@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schema.json",
+  "id": "in_current_ortho",
+  "name": "Indiana current orthoimagery (15 cm)",
+  "provider": "Indiana Geographic Information Office",
+  "country": "US",
+  "region": "Indiana",
+  "homepage": "https://www.indianamap.org/datasets/INMap::indiana-current-imagery/about",
+  "kind": "arcgis_image",
+  "url": "https://di-ingov.img.arcgis.com/arcgis/rest/services/DynamicWebMercator/Indiana_Current_Imagery/ImageServer?bandIds=0,1,2",
+  "max_px": 4096,
+  "native_m": 0.1524,
+  "vintage": "Leaf-off spring flights, 2022 to 2025 (a third of the state each year)",
+  "attribution": "Imagery: Indiana Geographic Information Office",
+  "license": {
+    "id": "CC0-1.0",
+    "name": "CC0 1.0 (public domain dedication)",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "commercial": true,
+    "credit": false
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_in"
+  },
+  "verified": {
+    "date": "2026-10-09",
+    "place": "Indiana Statehouse, Indianapolis",
+    "landmark": [-86.1625, 39.7686]
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "es_pnoa",
+  "name": "IGN PNOA (25 cm)",
+  "provider": "Instituto Geográfico Nacional",
+  "country": "ES",
+  "region": "Spain",
+  "homepage": "https://pnoa.ign.es/",
+  "kind": "tiles",
+  "url": "https://www.ign.es/wmts/pnoa-ma?request=GetTile&service=WMTS&VERSION=1.0.0&Layer=OI.OrthoimageCoverage&Style=default&Format=image/jpeg&TileMatrixSet=GoogleMapsCompatible&TileMatrix={z}&TileRow={y}&TileCol={x}",
+  "max_zoom": 20,
+  "native_m": 0.25,
+  "attribution": "Imagery: PNOA © Instituto Geográfico Nacional de España",
+  "license": {
+    "id": "CC-BY-4.0",
+    "name": "Open data (CC BY 4.0); credit required",
+    "url": "https://creativecommons.org/licenses/by/4.0/",
+    "commercial": true,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "es"
+  },
+  "verified": {
+    "date": "2026-10-03",
+    "place": "Buen Retiro Park, Madrid",
+    "landmark": [-3.6883, 40.4153]
+  }
+}

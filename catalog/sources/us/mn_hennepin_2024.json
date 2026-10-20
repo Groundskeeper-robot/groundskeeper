@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "mn_hennepin_2024",
+  "name": "Hennepin County aerial imagery 2024 (15 cm)",
+  "provider": "Hennepin County GIS",
+  "country": "US",
+  "region": "Hennepin County, Minnesota",
+  "homepage": "https://gis.hennepin.us/OpenData/imagery/",
+  "kind": "arcgis_map",
+  "url": "https://gis.hennepin.us/arcgis/rest/services/Imagery/UTM_Aerial_2024/MapServer",
+  "max_px": 4096,
+  "native_m": 0.1524,
+  "vintage": "Leaf-off spring 2024 (6 in, flown by Nearmap); the county adds a UTM_Aerial_<year> service each year (2026 is listed but not yet served reliably)",
+  "attribution": "Imagery: Hennepin County",
+  "license": {
+    "id": "provider-terms",
+    "name": "Free public county data, provided as is; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_mn_hennepin"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Minneapolis City Hall",
+    "landmark": [-93.2651, 44.9773]
+  }
+}

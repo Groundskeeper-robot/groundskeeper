@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "mn_dakota_2026",
+  "name": "Dakota County leaf-off aerial photography 2026 (15 cm)",
+  "provider": "Dakota County GIS",
+  "country": "US",
+  "region": "Dakota County, Minnesota",
+  "homepage": "https://dakotacountymn.gov/residents/home-property/gis-data",
+  "kind": "arcgis_image",
+  "url": "https://gisimg.co.dakota.mn.us/arcgis/rest/services/AerialPhotography/2026AirPhotoLeafOff6Inch_Spring/ImageServer",
+  "max_px": 4096,
+  "native_m": 0.1524,
+  "vintage": "Leaf-off spring 2026 (6 in, flown by Nearmap); the county adds spring and fall services each year",
+  "attribution": "Imagery: Dakota County, Nearmap",
+  "license": {
+    "id": "provider-terms",
+    "name": "Free and open county GIS data, provided as is; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_mn_dakota"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Dakota County Government Center, Hastings",
+    "landmark": [-92.8862, 44.7409]
+  }
+}

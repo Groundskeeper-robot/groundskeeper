@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "wy_casper_2020",
+  "name": "Casper MPO 2020 imagery (22 cm)",
+  "provider": "Natrona Regional Geospatial Cooperative, City of Casper",
+  "country": "US",
+  "region": "Casper, Wyoming",
+  "homepage": "https://www.casperwy.gov/",
+  "kind": "tiles",
+  "url": "https://tiles.arcgis.com/tiles/sF6mYFdZFl3Y1kjj/arcgis/rest/services/Raster_Mosaic_Casper_MPO/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 19,
+  "native_m": 0.22,
+  "vintage": "2020 flight (Fugro) at 7.6 cm, but the tile cache stops at zoom 19 (about 22 cm); the Casper MPO area only",
+  "attribution": "Imagery: Natrona Regional Geospatial Cooperative, Casper MPO (Fugro)",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public city service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_wy_natrona"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Natrona County Courthouse, Casper",
+    "landmark": [-106.3256, 42.8515]
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ks_joco_ortho2024",
+  "name": "Johnson County AIMS 2024 orthophotography (7.6 cm)",
+  "provider": "Johnson County, Kansas AIMS",
+  "country": "US",
+  "region": "Johnson County, Kansas",
+  "homepage": "https://aims.jocogov.org/",
+  "kind": "arcgis_map",
+  "url": "https://maps.jocogov.org/ArcGIS/rest/services/Imagery_Other/MapServer?layers=show:2",
+  "max_px": 4096,
+  "native_m": 0.0762,
+  "vintage": "Leaf-off flight, February 2024 (0.25 ft). Newer AIMS flights (2025, 2026) are behind a subscription token; this public service keeps one layer per year",
+  "attribution": "Imagery: Johnson County, Kansas AIMS",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public county service; AIMS terms forbid selling, giving or reproducing the data",
+    "url": "https://aims.jocogov.org/OtherResources/Terms.aspx",
+    "commercial": false,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_ks_johnson"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Johnson County Courthouse, Olathe",
+    "landmark": [-94.8201, 38.8841]
+  }
+}

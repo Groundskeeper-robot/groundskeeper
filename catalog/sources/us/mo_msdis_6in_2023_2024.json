@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "mo_msdis_6in_2023_2024",
+  "name": "Missouri 6-inch statewide imagery 2023-2024 (15 cm)",
+  "provider": "Missouri 911 Service Board, MDC, DNR and MGISAC; served by MSDIS (University of Missouri)",
+  "country": "US",
+  "region": "Missouri",
+  "homepage": "https://msdis.missouri.edu/",
+  "kind": "arcgis_image",
+  "url": "https://stateimagery.msdis.missouri.edu/arcgis/rest/services/Missouri_6inch_Statewide_2023_2024_Dynamic/ImageServer?bandIds=0,1,2",
+  "max_px": 4096,
+  "native_m": 0.15,
+  "vintage": "Leaf-off statewide flights (Sanborn): northern half spring 2023, southern half spring 2024",
+  "attribution": "Imagery: State of Missouri, via MSDIS",
+  "license": {
+    "id": "provider-terms",
+    "name": "Free public state imagery, no published licence; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_mo"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Missouri State Capitol, Jefferson City",
+    "landmark": [-92.1728, 38.5792]
+  }
+}

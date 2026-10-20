@@ -1,0 +1,45 @@
+name: Bug report
+description: Something in the panel is wrong or broken
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. **Before you paste logs or screenshots, remove anything that locates your yard:**
+        coordinates, the robot's serial, your addresses and map screenshots of a real yard. Security problems
+        go to the private report in SECURITY.md, not here.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. Open Map Studio\n2. ..."
+  - type: input
+    id: version
+    attributes:
+      label: Panel version
+      description: Settings → This panel, or the foot of the nav
+      placeholder: "1.0.0 · a1b2c3d"
+    validations:
+      required: true
+  - type: input
+    id: robot
+    attributes:
+      label: Robot, head and firmware
+      placeholder: "Yarbo Core, mower head, firmware 3.x"
+  - type: dropdown
+    id: install
+    attributes:
+      label: How it runs
+      options: [Docker Compose, Unraid, Other Docker, From source]
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: "`docker logs groundskeeper`, trimmed to the relevant part, with locations removed"
+      render: text

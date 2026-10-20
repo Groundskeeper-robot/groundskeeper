@@ -1,0 +1,34 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ok_aerial2025",
+  "name": "Oklahoma Aerial 2025, eastern counties (15 cm)",
+  "provider": "Oklahoma Office of Geographic Information (OKMaps)",
+  "country": "US",
+  "region": "Eastern 54 counties, Oklahoma",
+  "homepage": "https://okmaps.org/OGI/",
+  "kind": "wms",
+  "url": "https://okmaps.org/geoserver/ows",
+  "layers": "ogi:Aerial2025_Composite",
+  "version": "1.3.0",
+  "crs": "EPSG:3857",
+  "max_px": 2048,
+  "native_m": 0.1524,
+  "vintage": "Leaf-off flight, February to mid-March 2025; covers the eastern ~60% of the state (54 counties incl. Oklahoma City and Tulsa), none of the west or the panhandle",
+  "attribution": "Imagery: State of Oklahoma, OKMaps",
+  "license": {
+    "id": "provider-terms",
+    "name": "Open, free to download and use (paid for by the Oklahoma Legislature)",
+    "url": "https://okmaps.org/ogi/RestDataAccessItem.aspx?UUID=59387755-7252-42c5-964a-659cda946349",
+    "commercial": true,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_ok_aerial2025"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Oklahoma State Capitol, Oklahoma City",
+    "landmark": [-97.5034, 35.4922]
+  }
+}

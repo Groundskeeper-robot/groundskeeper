@@ -1,0 +1,23 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-10-01T02:55:00Z"},
+  "title": "Yarbo Super-User Panel",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 1440, "h": 1120, "title": "Live", "expand": "fill", "is_interactive": true},
+    "Runs.dc.html": {"x": 1520, "y": 0, "w": 1440, "h": 1200, "title": "Runs", "expand": "fill", "is_interactive": true},
+    "MapStudio.dc.html": {"x": 3040, "y": 0, "w": 1440, "h": 1520, "title": "Map Studio", "expand": "fill", "is_interactive": true},
+    "Schedule.dc.html": {"x": 0, "y": 1640, "w": 1440, "h": 1260, "title": "Schedule", "expand": "fill", "is_interactive": true},
+    "Insights.dc.html": {"x": 1520, "y": 1640, "w": 1440, "h": 1000, "title": "Insights", "expand": "fill", "is_interactive": true},
+    "Maintenance.dc.html": {"x": 3040, "y": 1640, "w": 1440, "h": 920, "title": "Maintenance", "expand": "fill", "is_interactive": true},
+    "Health.dc.html": {"x": 0, "y": 3020, "w": 1440, "h": 1000, "title": "Health", "expand": "fill", "is_interactive": true},
+    "Lab.dc.html": {"x": 1520, "y": 3020, "w": 1440, "h": 960, "title": "Protocol Lab", "expand": "fill", "is_interactive": true},
+    "Settings.dc.html": {"x": 3040, "y": 3020, "w": 1440, "h": 1100, "title": "Settings", "expand": "fill", "is_interactive": true}
+  },
+  "order": ["Main.dc.html", "Runs.dc.html", "MapStudio.dc.html", "Schedule.dc.html", "Insights.dc.html", "Maintenance.dc.html", "Health.dc.html", "Lab.dc.html", "Settings.dc.html"],
+  "notes": {
+    "title": {"x": 0, "y": -300, "text": "Yarbo super-user app: v0.3, nine screens", "kind": "title1", "maxW": 4480}
+  },
+  "designSystems": []
+}

@@ -1,0 +1,27 @@
+name: Protocol capture
+description: A command recorded from the official Yarbo app, so the panel can learn it
+labels: [capture needed]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Recorded with Map Studio → More → **Record an app edit** (see CONTRIBUTING.md).
+        **Remove coordinates, point lists and your robot's serial before you paste.** Masked values are fine.
+  - type: textarea
+    id: action
+    attributes:
+      label: What you did in the app
+      description: Exactly one change, e.g. "Front lawn → Mowing height 3.0 in → 3.5 in"
+    validations:
+      required: true
+  - type: textarea
+    id: capture
+    attributes:
+      label: The captured command(s)
+      render: json
+    validations:
+      required: true
+  - type: input
+    id: robot
+    attributes:
+      label: Robot, head, firmware and app version

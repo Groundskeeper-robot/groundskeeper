@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "la_dotd_metros_2023",
+  "name": "LA DOTD 2023 metro imagery (7.6 cm)",
+  "provider": "Louisiana DOTD",
+  "country": "US",
+  "region": "Baton Rouge, Shreveport, Monroe, Alexandria, Northshore and Ruston areas, Louisiana",
+  "homepage": "https://data-ladotd.opendata.arcgis.com/",
+  "kind": "arcgis_image",
+  "url": "https://maps.dotd.la.gov/imagery/rest/services/Imagery/2023_Metros_3IN_RGBI/ImageServer?bandIds=0,1,2",
+  "max_px": 4096,
+  "native_m": 0.0762,
+  "vintage": "2023 metro flights (3 inch), urban cores of the listed metros",
+  "attribution": "Imagery: Louisiana DOTD",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state service, provided as is; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_la_dotd_metros"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Louisiana State Capitol, Baton Rouge",
+    "landmark": [-91.1874, 30.457]
+  }
+}

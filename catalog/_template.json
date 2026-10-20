@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schema.json",
+  "id": "cc_provider_layer",
+  "name": "The source's own name (10 cm)",
+  "provider": "Who publishes it",
+  "country": "CC",
+  "region": "What a user reads: a country, state or county",
+  "homepage": "https://example.org/",
+  "kind": "tiles",
+  "url": "https://example.org/tiles/{z}/{x}/{y}.jpg",
+  "max_zoom": 20,
+  "native_m": 0.1,
+  "vintage": "Leaf-off spring flights, 2025",
+  "attribution": "Imagery: © Provider",
+  "license": {
+    "id": "CC-BY-4.0",
+    "name": "Open data (CC BY 4.0); credit required",
+    "url": "https://creativecommons.org/licenses/by/4.0/",
+    "commercial": true,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "cc"
+  },
+  "verified": {
+    "date": "YYYY-MM-DD",
+    "place": "A public landmark, City",
+    "landmark": [0.0, 0.0]
+  }
+}

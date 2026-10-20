@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "de_firstmap_ortho2024",
+  "name": "Delaware 2024 orthoimagery (15 cm)",
+  "provider": "State of Delaware, FirstMap (Delaware Geospatial Data Exchange)",
+  "country": "US",
+  "region": "Delaware",
+  "homepage": "https://firstmap.delaware.gov/",
+  "kind": "tiles",
+  "url": "https://imagery.firstmap.delaware.gov/imagery/rest/services/DE_Imagery/DE_Imagery_2024/ImageServer/tile/{z}/{y}/{x}",
+  "max_zoom": 20,
+  "native_m": 0.15,
+  "vintage": "Leaf-off statewide flight, 2024; a new layer (DE_Imagery_YYYY) follows each statewide flight",
+  "attribution": "Imagery: State of Delaware FirstMap, Sanborn Map Company",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_de"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Legislative Hall (Delaware State Capitol), Dover",
+    "landmark": [-75.5197, 39.1573]
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ak_matsu_2024",
+  "name": "Mat-Su Borough 2024 aerial mosaic (15 cm)",
+  "provider": "Matanuska-Susitna Borough GIS",
+  "country": "US",
+  "region": "Matanuska-Susitna Borough, Alaska",
+  "homepage": "https://matsu.gov/",
+  "kind": "arcgis_image",
+  "url": "https://maps.matsugov.us/imagery/rest/services/Imagery/AerialMosaic_2024_SP_Dyn/ImageServer?bandIds=0,1,2",
+  "max_px": 4096,
+  "native_m": 0.1524,
+  "vintage": "Leaf-off spring 2024; 15 cm (0.5 ft) over the core area (Palmer, Wasilla), 30 cm (1 ft) in the outer borough",
+  "attribution": "Imagery: Matanuska-Susitna Borough",
+  "license": {
+    "id": "provider-terms",
+    "name": "Copyrighted borough data; personal or internal use, no redistribution of the data",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_ak_matsu"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Matanuska-Susitna Borough Building, Palmer",
+    "landmark": [-149.1086, 61.5995]
+  }
+}

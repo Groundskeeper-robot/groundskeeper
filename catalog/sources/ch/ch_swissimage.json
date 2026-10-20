@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ch_swissimage",
+  "name": "swisstopo SWISSIMAGE (10 cm)",
+  "provider": "swisstopo",
+  "country": "CH",
+  "region": "Switzerland",
+  "homepage": "https://www.swisstopo.admin.ch/",
+  "kind": "tiles",
+  "url": "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg",
+  "max_zoom": 20,
+  "native_m": 0.1,
+  "attribution": "Imagery: © swisstopo",
+  "license": {
+    "id": "provider-terms",
+    "name": "Free use with credit (swisstopo open government data)",
+    "url": "https://www.geo.admin.ch/en/general-terms-of-use-fsdi",
+    "commercial": true,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "ch"
+  },
+  "verified": {
+    "date": "2026-10-03",
+    "place": "Federal Palace, Bern",
+    "landmark": [7.4441, 46.9466]
+  }
+}

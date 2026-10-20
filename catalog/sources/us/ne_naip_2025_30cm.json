@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ne_naip_2025_30cm",
+  "name": "Nebraska NAIP 2025 (30 cm)",
+  "provider": "USDA NAIP, served by the Nebraska OCIO (NebraskaMAP)",
+  "country": "US",
+  "region": "Nebraska",
+  "homepage": "https://www.nebraskamap.gov/",
+  "kind": "arcgis_image",
+  "url": "https://gis.ne.gov/image/rest/services/NAIP2025WM/ImageServer?bandIds=0,1,2",
+  "max_px": 4096,
+  "native_m": 0.3,
+  "vintage": "Leaf-on summer flights, 2025 (NAIP flown at 30 cm statewide)",
+  "attribution": "Imagery: USDA NAIP 2025, via NebraskaMAP",
+  "license": {
+    "id": "public-domain",
+    "name": "Public domain (US government work)",
+    "url": "https://naip-usdaonline.hub.arcgis.com/",
+    "commercial": true,
+    "credit": false
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_ne"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Nebraska State Capitol, Lincoln",
+    "landmark": [-96.6997, 40.808]
+  }
+}

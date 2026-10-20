@@ -1,0 +1,38 @@
+{
+  "type": "Feature",
+  "properties": {
+    "name": "Cass County, North Dakota",
+    "source": "US Census Bureau county boundaries (public domain), via plotly/datasets geojson-counties-fips",
+    "note": "Buffered 3 km and simplified to 22 points; generous on purpose.",
+    "command": "county_outline.py --fips 38017 --buffer-km 3 --name us_nd_cass"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [-97.721, 46.9535],
+        [-97.734, 46.9594],
+        [-97.7455, 46.9786],
+        [-97.7455, 47.24],
+        [-97.7425, 47.2504],
+        [-97.721, 47.2651],
+        [-96.8188, 47.2634],
+        [-96.7978, 47.2503],
+        [-96.7937, 47.2403],
+        [-96.7853, 47.1252],
+        [-96.7842, 46.9788],
+        [-96.7434, 46.9379],
+        [-96.7281, 46.9067],
+        [-96.7621, 46.8103],
+        [-96.7449, 46.6894],
+        [-96.7464, 46.6206],
+        [-96.7549, 46.6116],
+        [-96.7829, 46.6035],
+        [-97.6972, 46.6049],
+        [-97.71, 46.6108],
+        [-97.7215, 46.63],
+        [-97.721, 46.9535]
+      ]
+    ]
+  }
+}

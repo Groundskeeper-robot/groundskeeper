@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "sd_rapid_city_2023",
+  "name": "Rapid City area 2023 orthoimagery (10 cm)",
+  "provider": "City of Rapid City / Pennington County GIS",
+  "country": "US",
+  "region": "Rapid City, South Dakota",
+  "homepage": "https://www.pennco.org/",
+  "kind": "arcgis_image",
+  "url": "https://gis.rcgov.org/server/rest/services/PublicSites/Ortho2023/ImageServer?bandIds=0,1,2",
+  "max_px": 4096,
+  "native_m": 0.1015,
+  "vintage": "Leaf-off flight, 2023; the Rapid City area (about 43.93 to 44.30 N), not all of Pennington County",
+  "attribution": "Imagery: City of Rapid City / Pennington County GIS",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public city/county service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_sd_pennington"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Pennington County Courthouse, Rapid City",
+    "landmark": [-103.2225, 44.0789]
+  }
+}

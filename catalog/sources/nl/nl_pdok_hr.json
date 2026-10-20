@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "nl_pdok_hr",
+  "name": "PDOK aerial photo (8 cm)",
+  "provider": "Beeldmateriaal Nederland / PDOK",
+  "country": "NL",
+  "region": "Netherlands",
+  "homepage": "https://www.pdok.nl/",
+  "kind": "tiles",
+  "url": "https://service.pdok.nl/hwh/luchtfotorgb/wmts/v1_0/Actueel_orthoHR/EPSG:3857/{z}/{x}/{y}.jpeg",
+  "max_zoom": 21,
+  "native_m": 0.08,
+  "attribution": "Imagery: Beeldmateriaal Nederland / PDOK",
+  "license": {
+    "id": "CC-BY-4.0",
+    "name": "Open data (CC BY 4.0); credit required",
+    "url": "https://creativecommons.org/licenses/by/4.0/",
+    "commercial": true,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "nl"
+  },
+  "verified": {
+    "date": "2026-10-03",
+    "place": "Royal Palace, Dam Square, Amsterdam",
+    "landmark": [4.8913, 52.3731]
+  }
+}

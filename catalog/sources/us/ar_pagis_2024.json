@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ar_pagis_2024",
+  "name": "PAgis 2024 aerial photography (7.6 cm)",
+  "provider": "Pulaski Area Geographic Information System (PAgis)",
+  "country": "US",
+  "region": "Pulaski County, Arkansas",
+  "homepage": "https://www.pagis.org/index.php/online-mapping/",
+  "kind": "arcgis_map",
+  "url": "https://www.pagis.org/arcgis/rest/services/MAPS/AerialPhotos2024/MapServer",
+  "max_px": 4096,
+  "native_m": 0.0762,
+  "vintage": "Leaf-off winter flight, 2024",
+  "attribution": "Imagery: PAgis (Pulaski Area GIS)",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public county service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_ar_pulaski"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Arkansas State Capitol, Little Rock",
+    "landmark": [-92.2891, 34.7465]
+  }
+}

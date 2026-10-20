@@ -1,0 +1,33 @@
+{
+  "$schema": "../../schema.json",
+  "id": "be_vl_ortho",
+  "name": "Digitaal Vlaanderen orthophoto mosaic 2025",
+  "provider": "Digitaal Vlaanderen",
+  "country": "BE",
+  "region": "Flanders and Brussels",
+  "homepage": "https://www.vlaanderen.be/digitaal-vlaanderen",
+  "kind": "wms",
+  "url": "https://geo.api.vlaanderen.be/omw/wms",
+  "layers": "omwrgb25vl",
+  "version": "1.3.0",
+  "crs": "EPSG:4326",
+  "max_px": 2048,
+  "native_m": 0.25,
+  "vintage": "2025 summer mosaic; a new layer (omwrgbNNvl) is published each year",
+  "attribution": "Imagery: © Digitaal Vlaanderen",
+  "license": {
+    "id": "provider-terms",
+    "name": "Free reuse with credit (Modellicentie Gratis Hergebruik)",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "be_vlg"
+  },
+  "verified": {
+    "date": "2026-10-03",
+    "place": "Belfry of Ghent",
+    "landmark": [3.725, 51.0536]
+  }
+}

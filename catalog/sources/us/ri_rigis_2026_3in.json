@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ri_rigis_2026_3in",
+  "name": "RIGIS spring 2026 aerial photographs (7.6 cm)",
+  "provider": "RIDOT and EagleView, served by RIGIS (URI Environmental Data Center)",
+  "country": "US",
+  "region": "Rhode Island",
+  "homepage": "https://www.rigis.org/datasets/62afcbf0ddd04ed6b0707fdeac58184b",
+  "kind": "arcgis_image",
+  "url": "https://maps.edc.uri.edu/rigis/rest/services/IMG/RI_202603_RGB_3in_web/ImageServer",
+  "max_px": 4096,
+  "native_m": 0.0762,
+  "vintage": "Leaf-off spring flights, 2026; not traditionally orthorectified (the provider warns positional accuracy varies). RIGIS adds a new service each season (RI_YYYYMM_RGB_3in_web)",
+  "attribution": "Imagery: RIDOT and EagleView, via RIGIS",
+  "license": {
+    "id": "CC-BY-4.0",
+    "name": "Creative Commons Attribution 4.0 (URI Environmental Data Center)",
+    "url": "https://creativecommons.org/licenses/by/4.0/",
+    "commercial": true,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_ri"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Rhode Island State House, Providence",
+    "landmark": [-71.415, 41.831]
+  }
+}

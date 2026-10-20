@@ -1,0 +1,324 @@
+# Changelog
+
+What changed in each version of the panel, newest first. The version is in Settings → This panel and under the
+robot card. Before 0.9.0 the panel had no version numbers; those changes are listed by date.
+
+## Unreleased
+
+## 0.16.0 — 2026-10-20
+
+### Added
+- **Container images for every release** on GitHub's registry (`ghcr.io/jpittelkow/groundskeeper`), for amd64
+  and arm64 (Raspberry Pi), with a ready `docker-compose.yml` and `.env.example`.
+- **Demo mode** (`DEMO=1`): a made-up robot mows a made-up yard (on a public park's lawn, with real aerial imagery
+  under it) with a week of history, so the panel can be tried without a Yarbo; it never contacts a robot, the Yarbo
+  cloud or any integration. `DEMO_SEED=1` now means the same. `scripts/screenshots.py` makes the README screenshots
+  from it.
+- **Sign-in.** The panel now asks for a password before it shows anything; only `/health` and the sign-in page are
+  open. On the first visit you set the password with a one-time setup code from the panel's log
+  (`docker logs ...`), so nobody else on the network can claim it first. Settings → **Access** changes the
+  password, signs out this or every browser, and makes named **API tokens** for programs (`Authorization: Bearer`).
+  Forgot it: `python -m app.auth reset` in the container. `PANEL_AUTH=off` turns sign-in off for a panel behind a
+  reverse proxy that signs people in itself. AI assistants keep their own token. **Upgrading:** after this update
+  the panel asks for the setup code from its log once.
+- `/health` says whether the robot is mid-run (`busy`), so the deploy script's "not while mowing" check works
+  without signing in.
+- **Dead ends in Map Studio:** draw one (+ Dead end, starting inside an area), reshape, rename or delete it and send
+  it to the robot like a pathway; select one for its settings (speed, blades, trimmer), read back and checked. A
+  replaced dead end keeps its settings. From the app's own commands, recorded 2026-10-11.
+
+### Changed
+- **The container no longer runs as root.** It runs as `PUID:PGID` (1000:1000 by default; the Unraid example uses
+  99:100) and hands an existing data folder to that user on its first start. The libraries it downloads at build
+  time are checked against their hashes, and the image has its own health check.
+- A pathway's transit offset range goes to ±39.4 in (1.0 m), the Yarbo app's own limit (it was held at 27.6 in
+  until the limit was known).
+
+### Removed
+- **The Terrain map tool.** The 3D map shows the ground instead, with the robot's own heights (the flat height and
+  slope image no longer lined up with the photo).
+
+### Fixed
+- **Planned vs driven compares the whole plan.** The robot reports each area's plan as separate passes (the edge
+  around the outline and the fill stripes), and the panel kept only the first of them, so a run could be compared
+  with a fifth of its plan and look mostly off plan. Every pass is kept now, each from where the run took it up
+  (a resumed plan leaves out what the robot had already driven, and passes it lists as finished), and the passes kept
+  with earlier runs of the same plan fill in what a run is missing. Runs recorded before this are worked out from the robot's whole plan report kept with them.
+- **A plan resumed after a long pause stays one run.** A run paused for more than 3 hours closes, and its resume
+  was only joined back within 3 hours of the run's last movement, which such a run can never meet, so a plan
+  paused in the evening and resumed the next morning became two runs. A resume of the same plan session now joins
+  up to 36 hours later (never on a report that the plan is done: a new run's first report can be the last plan's). Runs split before this stay apart; Join with previous joins them.
+- **Coverage of a resumed run counts the earlier runs of its plan.** What they mowed is neither a gap nor part of
+  this run's share (it used to show as gaps "next to RTK loss"); the run page says how much
+  that was.
+- **No stuck alert while the robot waits for an RTK fix.** Standing still on a float fix with the blades stopped
+  is the robot waiting for its fix: the alert now says "Yarbo is waiting for an RTK fix" (and Live shows it), and the
+  stuck alert comes only if it still does not move 3 minutes after the fix is back.
+- **One odd firmware reading is not a firmware change.** A new version counts once the robot has reported it for a
+  minute; a chassis version that flickered for a few seconds was logged as two firmware changes.
+- **Planned vs driven uses the robot's own plan** when it was kept during the run: the robot reports each area's
+  path once it starts the area, and the panel now keeps it (only the run's first report was kept before, which has
+  no path yet). Runs without it are compared with a fresh preview, as before, and the result says which.
+- **A Wi-Fi survey cut short by a restart** that never rejoined its run still gets its report in Events.
+- **Run distances are right, and survive panel restarts.** A run's distance, points, RTK share and battery are now
+  worked out from its stored track when it ends, is joined or is closed after a restart. Before, the running totals
+  started again at every restart, and they counted positions that arrived out of place after a weak-signal gap as
+  driving. Every stored run is worked out again on upgrade; on a test mow the result came within about 4 % of the
+  wheel odometers.
+- **Positions in the robot's own order.** The panel now stores the robot's own time for each position. Distance and
+  coverage use that order, a position that is out of place and back is not counted as driving, and "hard going"
+  times wheel travel by it, so a burst of messages after a weak-signal gap no longer looks like jumps.
+- **Wi-Fi survey across restarts:** its counters are kept with the run, so the verdict covers the whole mow.
+- **The dock is no longer a weak-positioning spot** in Problem areas (time on the charger is left out).
+- **A plan is not marked finished too early** when the robot briefly lists an area as done while still mowing it.
+- **Leaving a charging break no longer ends the run** for the few seconds the robot shows no plan.
+- **Late confirmations:** a command marked unconfirmed is still watched for 3 minutes; if the robot carries it out
+  late, the log says "confirmed late". Nothing is sent again.
+- **Guard notices are not repeated after a restart** for the same detection (the protective pause is unchanged).
+- **Changes to run rules and guards are logged** in Events (old → new, and whether the panel or an assistant).
+- **Home Assistant:** a value that is not known yet is sent as "unknown", and one refused sensor no longer stops the
+  others from updating.
+- **Secrets in the robot's replies** are masked when kept, and stored copies are masked when the panel starts.
+- **Claude Desktop setup fixed.** Settings → AI assistant (and the setup guide) now give a Claude Desktop entry that
+  runs the `mcp-remote` bridge on your computer (needs Node.js). The old entry put an http server straight into
+  Claude Desktop's config, which only starts local programs. The page also says not to use Add custom connector: it
+  needs https and connects from Anthropic's cloud, which cannot reach a home network.
+- **Secrets from other apps' commands are no longer kept.** The panel logs and captures commands other clients send
+  the robot (to learn their formats); the Yarbo app's "join this Wi-Fi" command carried the Wi-Fi password, which ended
+  up in Events and Captured writes. Passwords, tokens and email addresses are now masked before anything is stored,
+  and copies already stored are masked when the panel starts.
+
+### Added
+- **Follow the robot in 3D.** With the 3D map on, Follow flies the camera behind the robot and 45° to one side and
+  keeps it there, turning with the robot (at most 40° a second, so the turn at the end of a stripe is a swing, not
+  a spin). Right-drag (two fingers on a phone) moves the camera round the robot and it keeps that angle; zoom and
+  tilt stay as you set them; a drag or Fit yard lets go. Works on Live and in a run's replay.
+- **The robot in 3D.** With the 3D map on, the robot is a small 3D model that faces its heading, leans with its own
+  pitch and roll, and glides between the panel's updates (it keeps going at its speed for a moment, then catches
+  up) instead of jumping. In Runs it drives the replay. The status now carries the robot's compass heading.
+- **Replay draws the track as it goes.** Press Play and the run's track grows behind the replay point (the slider
+  shows it up to where you drag); before Play the whole run shows. Play is now a green button with a play icon.
+- **`GET /api/runs/{id}/plan-feedback`:** the robot's plan reply kept for a run, by shape (or `?raw=true`), for
+  comparing a run with the robot's own plan.
+- **3D map.** The new 3D button among the map tools tilts the map and raises the ground under it: the robot's
+  own RTK heights over the lawns, the 2015 lidar around them, eased together so there is no step where they meet.
+  The photo, zones, track, run replay and the robot all lie on it, on Live and in Runs. The menu next to it (1× to 3×)
+  draws the ground taller; right-drag (two fingers on a phone) turns and tilts. Map Studio and the camera
+  layout's small map stay flat.
+- **Notifications: pick the Home Assistant notify service from a list** of the ones your Home Assistant has, the
+  companion app's phones first, instead of typing its name. "Type a name…" is still there for anything missing.
+- **Map Studio: move a group of corners in small steps.** Shift-drag a box over a selected shape's corners (or
+  Shift-click them), then move them north, south, east or west with the arrows or the arrow keys by a step you set
+  (0.5 to 100 cm). A burst of moves is one draft edit, so one Undo takes it back.
+- **Wi-Fi survey** (Settings → Robot: Off / Next run only / Every run). While a run is driving, the panel asks the
+  robot every 30 s which Wi-Fi networks it hears and stores each one's signal where the robot was. Each ask is a ~4 s
+  scan on the robot, so **Next run only** surveys one run (at least 10 minutes of driving), reports in Events
+  (answers, reply time, pauses in the robot's messages during a scan and otherwise) and switches itself off.
+- **Signal → Wi-Fi (survey):** one network's signal across the yard in 4 m cells, with a list of the networks heard
+  (a saved one first, else the one heard best).
+- **Imagery for every US state and DC:** 91 new free sources, statewide where a state publishes one (18 states and
+  DC now have it at 15 cm or sharper) and the largest counties and cities elsewhere (2.5–15 cm). Alaska and Hawaii get imagery for
+  the first time (30 cm statewide). Browse the catalog lists each country's sources under a heading per state,
+  statewide first; searching a state by name or code (Texas, TX) shows everything that serves it, national and
+  worldwide sources included. On a phone the list is tall enough to read.
+- **No-vision zones can be sent to the robot** from Map Studio: switched on or off, reshaped and renamed, in place
+  (same id), read back and undone on a mismatch. Switching one on, growing it or moving it (more ground where the
+  robot ignores its cameras) asks for an extra OK. A zone's obstacle bypass is shown with the area's obstacle
+  avoidance labels (Moderate bypass). Adding or deleting one still happens in the app.
+- **Pathway mow settings: Blades on and the transit path offset** (on/off, range and step, in inches like an area's)
+  can be changed. Any offset change is checked as a whole: the range must stay within 27.6 in each side (the widest
+  the app has been seen to send) and the step within 3.9-19.7 in, until the app's own limits are known.
+
+### Changed
+- **The panel is now Groundskeeper**, with the new logo: a GK monogram over a strip of lawn, the robot as a dot
+  in the grass. It shows in the nav, browser tabs, the favicon and a home-screen icon (added to a phone's home
+  screen it opens as Groundskeeper). Home Assistant entity ids (`sensor.yarbo_panel_*`) and the install stay as
+  they were; only the link sensor's display name changes. New MCP snippets name the server `groundskeeper`;
+  existing assistant configs keep working.
+- **Live follow-cam is live video:** Frigate's live stream at 5 frames a second, under a second behind, instead of
+  a still every 3 seconds; in the Camera layout and the Follow-cam card. It stops while the tab is hidden or you are
+  on another page, and falls back to stills if the stream fails.
+- **Problem areas:** a weak-positioning spot names a weak HaLow link (−77 dBm or lower) or late corrections when
+  there was one, so a link problem can be told from a poor sky view. The spot's details show its HaLow average.
+- **Top bar:** the battery sits at the far right with an icon that fills with the charge, red when low through amber
+  to green when full; it stays in view on a phone. The local broker chip sits beside the cloud chip.
+- **Map imagery:** Browse the catalog and Fetch again are green buttons, easier to spot.
+- **Live → Camera layout:** the small map sits right under the emergency buttons, above the robot's state and
+  Control, instead of at the end of the panel.
+- **Top bar, regrouped:** problems first, tinted in their colour; the switches (Control, Map writing) as one pill;
+  the lawn; then at the right the connections as one pill (Cloud, Broker, RTK, shortened to the word and its dot on
+  narrower screens) and the robot's state with its battery at the far right, which keeps its row. On a phone the bar
+  is two rows: the title, layout switch and theme on top, then the scrolling chips with the state and battery always
+  in view at the end.
+- **The name reads "Groundskeeper for Yarbo"** in the nav.
+- **Live → Camera layout: the small map always shows the whole yard.** It refits when its card changes size (before,
+  it could open zoomed in, or stay wherever it had been left) and cannot be panned or zoomed; Map layout gives the
+  full map.
+- **Live → Camera layout follows the robot:** when no camera's coverage holds it, the big slot shows the map again,
+  and the camera comes back when the robot drives into view (each change waits 10 s). A pinned camera stays up.
+
+## 0.15.1 — 2026-10-10
+
+### Fixed
+- The Home Assistant entity lists (presence, and the Lawn-conditions inputs) fill in as soon as Home Assistant is
+  connected: saving the connection reads them again, and a failed read retries every 15 s while the page is open.
+  Before, a failed read stuck for a minute and the page needed a reload. Its error is in words, like the Test
+  button's.
+
+## 0.15.0 — 2026-10-10
+
+### Added
+- **Light / dark switch** in the top-right corner of every page. A click picks light or dark for this browser
+  and stops following the device; Settings → This panel → Theme → System follows the device again.
+- **Settings → Set up**, a guide through the first run: robot, Yarbo cloud, AI assistant, imagery, cameras, Home
+  Assistant, weather, safety and notifications, in order. Each step uses the same controls as its own section and is
+  ticked when the panel already has what it needs. It opens by itself on a fresh install (no robot address or no
+  map yet). The Safety step has "Use the recommended": control off, yard must be clear on, no resume after a guard
+  pause. Help → Setting up lists the same steps. MCP has a matching `setup_status` tool.
+- **Live → Camera layout** (Map / Camera beside the title; each browser remembers its choice): the follow-cam takes
+  the map's place, the map becomes a small card, and the panel starts with a big red **Pause** (**Resume** while
+  paused) plus Stop and Return to dock. Each needs a second tap within 4 seconds. Same checks as the Control card.
+  On a phone: the picture, the robot's state, then the red button.
+- **Lawn conditions: Home Assistant sensors from a list.** Each input lists the HA entities that fit it, matched by
+  device class with what each reads now, likely ones first; "Show all sensors" and "Type an id…" cover the rest.
+  New kinds can be read: rain in mm/d, in/d or cm, a weather entity (its temperature and humidity, and rainy or
+  not), and an on/off moisture sensor for rain or soil.
+- **Presence from a list** (Settings → Home Assistant): alarm panels, `zone.home` (people in it), groups of people,
+  people and trackers. Persons, trackers, groups and `zone.home` now work as presence, not only alarm panels.
+
+### Changed
+- The Home Assistant address starts filled in with HA's usual `http://homeassistant.local:8123`.
+- **Test** and the HA status line say what went wrong in words: a name the server cannot find (in Docker, `.local`
+  names often do not resolve: use the IP address), no answer in time, or a refused connection. Before, a timeout
+  showed nothing at all.
+
+### Fixed
+- An on/off rain sensor (or a soil sensor) that had not changed for 15 minutes was read as "no update from the
+  sensor"; HA's `last_reported` is used now, and on/off sensors hold their state.
+
+## 0.14.0 — 2026-10-10
+
+### Changed
+- **Phones:** the nav is a bar at the foot of the screen (six icons with their names, always in reach), and the
+  title bar stays at the top while you scroll. A new page opens at its top. Settings shows every section at once and
+  puts each control under its name (two rows used to run off the screen). The runs table fits without scrolling
+  sideways. "Show" on a problem spot, gap or off-plan stretch brings the map back into view. Switches in the bar
+  show on/off by the toggle alone. Bigger checkboxes.
+- **Map imagery:** the catalog is its own section ("The whole catalog": how many sources and countries, how many are
+  free at 15 cm or sharper) with a Browse button, and a "Browse the catalog" button at the top of the page.
+- Camera coverage on the map is a thin white dotted outline, no longer the same blue dashes as no-vision zones.
+
+## 0.13.0 — 2026-10-10
+
+### Added
+- **Settings → AI assistant**, its own section right after Robot and flagged as the optional, recommended next
+  step: create a token, copy a ready-made snippet for Claude Code or Claude Desktop (or the address and header for
+  any MCP client), and three questions to try first. The token and snippets used to sit under This panel.
+- **How sharp is sharp?** in Settings → Map imagery and the help: the cm-per-pixel number on every imagery card
+  now carries a verdict (very sharp, sharp, good, coarse) and a scale of what each step shows (7–10 cm: pavers and
+  sprinkler heads; 30 cm: soft edges; 60 cm: a blur), with where sharper imagery is usually found.
+- **MCP:** the server instructions and the imagery tools now spell out how to find the most detailed map of the
+  yard (compare native_m in cm, look at samples, search the region for a county or state service, hand the address
+  back), so an assistant does it the same way every time.
+
+## 0.12.0 — 2026-10-10
+
+### Changed
+- **Navigation:** six items. Health, Maintenance and Events are tabs under **Robot**; Help is the **?** by each title
+  and a link at the foot of the nav. Old addresses still work.
+- **Top bar:** Control is a switch (and Map writing, in Map Studio): off in one click, on after typing ENABLE. The
+  status chips open where you can act on them.
+- **One palette:** Live and Map Studio now draw shapes in the same colours, and a shape never shares a colour with a
+  measurement: mowing areas white, no-go zones red hatched, no-vision zones blue dashed, the fence yellow; the
+  single-point track is red-orange (weak positioning, not an error); gaps and off-plan stretches pink. Neutral data
+  (satellites, voltages, temperatures) is no longer drawn in good/bad colours.
+- **Charts:** a value scale with gridlines and a hover or touch readout; the latest value in each chart's header.
+- A run that ended back on the dock without the plan's progress being read is shown as information, not a warning.
+
+### Added
+- **Light theme**, following the device or Settings → This panel → Theme.
+
+## 0.11.0 — 2026-10-09
+
+### Added
+- **Why can't it run?** Whenever the robot cannot start or carry on, the panel says why and what fixes it, in the
+  same words on Live, Schedule, a run's page and in notifications: each failed start check, no plans on the robot,
+  the wrong head, a skipped schedule window (now also a notification), the robot pausing itself (bumper, e-stop,
+  rain, fault: an alert once per pause), and a run that ended before its plan finished.
+- **Maintenance starts at Yarbo's advice:** blades every 3 months, tracks greased every two weeks (new item),
+  battery reviewed at 500 cycles, a season check at each head change; each item links Yarbo's own page. Intervals
+  you set yourself are kept.
+- **Weather from Home Assistant:** rain, temperature and humidity sensors in HA can stand in for the Tempest or
+  back it up, chosen per input. **Soil moisture** sensors are a fifth lawn rule (Damp / Wet above levels you set).
+- **Tempest station pick** when the hub hears more than one, **units** (mm · °C or in · °F) for Live and the rules,
+  and the last 24 hours of temperature, dew point, rain and soil moisture under Settings → Lawn conditions.
+
+## 0.10.0 — 2026-10-09
+
+### Added
+- **AI assistants (MCP):** connect Claude or another MCP client to the panel (Settings → This panel → AI
+  assistants). It can read everything, help set the panel up (it asks before each change; nothing that loosens
+  safety is offered), and send commands only
+  when you switch on **Assistant commands** in Settings → Safety. It never sees coordinates. Help → AI assistants.
+- **18 more imagery sources:** eight US states (NY, PA, OH, IN, NC, VA, CT, MA), six German states, Portugal,
+  Ontario, Estonia and Emilia-Romagna. Tiles labelled as generic binary (MassGIS) are recognised as images.
+- **Finding imagery for a new place:** a guide in Help, and `python -m app.imagery covers LAT LON` to see which
+  sources claim a place.
+
+## 0.9.0 — 2026-10-09
+
+### Added
+- **Version numbers.** The panel says which version and build it is (Settings → This panel, under the robot card,
+  `/api/about`, `/health`).
+- **Help** in the panel: a page per view, How do I…, Safety, Integrations, and this changelog. The **?** next to
+  each page's title opens its help.
+- **Not capable of yet:** what the panel cannot do today, and what would unlock each item.
+
+## 2026-10-09
+- **Planned vs driven** on a run's page: the robot's own route preview against the track. Off-plan stretches are
+  pink and listed as across the stripes or away from the plan.
+- Robot-measured terrain is cut to the mowing areas.
+- Tempest: a repeated rain-start broadcast counts as one rain start.
+
+## 2026-10-08
+- **Terrain:** USGS lidar height and slope with contours, and a surface measured from the robot's own RTK heights
+  (recorded from this day on).
+- **Area mow settings** laid out like the Yarbo app, with the app's names; matched settings are editable, each save
+  read back. Route preview on the map.
+- Pathways drawn as roads you can tell apart. Open pages reload themselves after an update.
+- **UI once-over:** Runs takes in Insights; one track colour control and one legend; one full-width Events log
+  (with the control log); raw data moved to Settings; Live is "now"; phone header and nav.
+
+## 2026-10-07
+- **Robot backups:** save on request, delete, restore (Map Studio → History). Area writes keep local copies.
+- Map Studio: reshape and rename an area in place; **Record an app edit** to learn commands the panel has not seen.
+
+## 2026-10-06
+- **Problem areas:** where the robot really has trouble (stuck, errors, steep ground, weak positioning, hard
+  going), on the map and per run.
+- **Insights:** how the mowing goes over time (now the Runs overview).
+- Every robot state code is read; alerts on the robot's own stuck flag and errors.
+- Signal heatmap, edge-pass track colouring, partial map writes.
+- **Pathway mow settings** editor in Map Studio.
+
+## 2026-10-05
+- **Plan-aware runs:** one run per plan session, with a real paused state; join a run with the previous one.
+- Guard resume (opt-in), Ignore on every guard, "Yard must be clear", commands confirmed by the robot's state.
+- A live track that keeps up, a robot you can spot, and a stuck alert that does not rely on the robot's own flag.
+
+## 2026-10-04
+- **Settings redesign:** one section at a time; integrations set in the panel and applied live.
+- **Map Studio:** tidy tools and drawing aids; side panel tabs; rename every shape in one list.
+- **Map imagery:** add a source (discover, try at the yard, save, export for sharing).
+
+## 2026-10-03
+- **Map imagery:** a catalog of national and regional aerial sources with coverage outlines, a picker with yard
+  samples and automatic mode, align by points, and a worldwide layer when zoomed out.
+- Map history: a map put back as it was becomes current again.
+
+## 2026-10-01
+- **Map writes** for no-go zones and pathways, from the captured app protocol.
+- **Map Studio:** inspect, measure, history with the robot's backups, diffs, drafts, editing on the map.
+- **Phase 2:** guarded control, scheduler, Frigate follow-cam, alerts, maintenance.
+- **Phase 1b:** run analytics, gap detection, lawn conditions, Health, imagery alignment.
+- **First version:** a read-only recorder and map for a Yarbo robot.

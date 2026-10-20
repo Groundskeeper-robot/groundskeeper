@@ -1,0 +1,37 @@
+{
+  "$schema": "../../schema.json",
+  "id": "mapbox_satellite",
+  "name": "Mapbox Satellite",
+  "provider": "Mapbox",
+  "country": "XX",
+  "region": "Worldwide",
+  "homepage": "https://www.mapbox.com/",
+  "kind": "tiles",
+  "url": "https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}@2x.jpg90?access_token={key}",
+  "tile_size": 512,
+  "max_zoom": 22,
+  "native_m": 0.3,
+  "vintage": "Varies by place",
+  "attribution": "Imagery: © Mapbox, © Maxar",
+  "license": {
+    "id": "provider-terms",
+    "name": "Your token's terms apply",
+    "url": "https://www.mapbox.com/legal/tos",
+    "commercial": null,
+    "credit": true
+  },
+  "auth": {
+    "label": "a Mapbox access token",
+    "signup": "https://account.mapbox.com/"
+  },
+  "cache_days": 1,
+  "coverage": {
+    "type": "World"
+  },
+  "verified": {
+    "date": "2026-10-03",
+    "place": "Royal Observatory, Greenwich",
+    "landmark": [-0.0015, 51.4778],
+    "note": "Address format confirmed by the service's key error; renders only with a key."
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "me_bangor_2024",
+  "name": "City of Bangor orthophotos 2024 (7.6 cm)",
+  "provider": "City of Bangor, Maine",
+  "country": "US",
+  "region": "City of Bangor, Maine",
+  "homepage": "https://www.bangormaine.gov/gis",
+  "kind": "arcgis_image",
+  "url": "https://mapping.bangormaine.gov/server/rest/services/Orthophotos/Orthophotos_2024/ImageServer?bandIds=0,1,2",
+  "max_px": 4096,
+  "native_m": 0.0762,
+  "vintage": "Leaf-off spring flight, April to May 2024; covers the city of Bangor only",
+  "attribution": "Imagery: City of Bangor, Maine",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public city service; terms not stated, credit the city",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_me_penobscot"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Bangor City Hall, Bangor",
+    "landmark": [-68.7703, 44.8036]
+  }
+}

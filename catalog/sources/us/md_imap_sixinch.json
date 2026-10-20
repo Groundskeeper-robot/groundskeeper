@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "md_imap_sixinch",
+  "name": "MD iMAP six-inch imagery, latest (15 cm)",
+  "provider": "Maryland Department of Information Technology, MD iMAP",
+  "country": "US",
+  "region": "Maryland",
+  "homepage": "https://imap.maryland.gov/",
+  "kind": "arcgis_image",
+  "url": "https://mdgeodata.md.gov/imagery/rest/services/SixInch/SixInchImagery/ImageServer?bandIds=0,1,2",
+  "max_px": 4096,
+  "native_m": 0.1524,
+  "vintage": "Leaf-off spring flights: 2023 southern Western Shore, 2024 Eastern Shore, 2025 northern Western Shore",
+  "attribution": "Imagery: MD iMAP, Maryland DoIT",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_md"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Maryland State House, Annapolis",
+    "landmark": [-76.4911, 38.9789]
+  }
+}

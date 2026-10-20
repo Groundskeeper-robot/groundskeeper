@@ -1,0 +1,38 @@
+{
+  "type": "Feature",
+  "properties": {
+    "name": "Hamilton County (Chattanooga), Tennessee",
+    "source": "US Census Bureau county boundaries (public domain), via plotly/datasets geojson-counties-fips",
+    "note": "Buffered 3 km and simplified to 22 points; generous on purpose.",
+    "command": "county_outline.py --fips 47065 --buffer-km 3 --name us_tn_hamilton"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [-85.162, 35.4744],
+        [-85.1431, 35.485],
+        [-85.1203, 35.4829],
+        [-84.9927, 35.4282],
+        [-84.9166, 35.2994],
+        [-84.9164, 35.2764],
+        [-84.9893, 35.146],
+        [-84.9449, 34.994],
+        [-84.9478, 34.9751],
+        [-84.9651, 34.9624],
+        [-84.9767, 34.9605],
+        [-85.3641, 34.9562],
+        [-85.487, 34.9589],
+        [-85.5046, 34.973],
+        [-85.5055, 34.9932],
+        [-85.3995, 35.0939],
+        [-85.4182, 35.1382],
+        [-85.4198, 35.1507],
+        [-85.4144, 35.1624],
+        [-85.2748, 35.3325],
+        [-85.2527, 35.3701],
+        [-85.162, 35.4744]
+      ]
+    ]
+  }
+}

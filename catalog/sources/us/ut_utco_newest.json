@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ut_utco_newest",
+  "name": "Utah County newest imagery (5 cm)",
+  "provider": "Utah County Information Systems, GIS",
+  "country": "US",
+  "region": "Utah County, Utah",
+  "homepage": "https://is.utahcounty.gov/",
+  "kind": "arcgis_image",
+  "url": "https://gisaerials.utahcounty.gov/arcgis/rest/services/NewestImagery/NewestImagery_WGS84/ImageServer",
+  "max_px": 4096,
+  "native_m": 0.0508,
+  "vintage": "Leaf-off spring flight, 2026 (Pictometry, 5 cm, countywide); NAIP 2021 beyond the county",
+  "attribution": "Imagery: Utah County GIS (Pictometry)",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public county service; terms do not cover imagery reuse; credit required",
+    "url": "https://www.utahcounty.gov/disclaimer.html",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_ut_utah_county"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "LaVell Edwards Stadium (BYU), Provo",
+    "landmark": [-111.6546, 40.2573]
+  }
+}

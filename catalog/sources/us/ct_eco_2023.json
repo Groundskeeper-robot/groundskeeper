@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ct_eco_2023",
+  "name": "CT ECO 2023 orthoimagery (7.5 cm)",
+  "provider": "CT ECO (UConn CLEAR and CT DEEP)",
+  "country": "US",
+  "region": "Connecticut",
+  "homepage": "https://cteco.uconn.edu/",
+  "kind": "arcgis_image",
+  "url": "https://cteco.uconn.edu/ctraster/rest/services/images/Ortho_2023_tiled/ImageServer?bandIds=0,1,2",
+  "max_px": 4096,
+  "native_m": 0.0762,
+  "vintage": "Leaf-off spring flights, March to April 2023",
+  "attribution": "Imagery: CT ECO, State of Connecticut",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_ct"
+  },
+  "verified": {
+    "date": "2026-10-09",
+    "place": "Connecticut State Capitol, Hartford",
+    "landmark": [-72.6823, 41.764]
+  }
+}

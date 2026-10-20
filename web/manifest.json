@@ -1,0 +1,26 @@
+{
+  "name": "Groundskeeper",
+  "short_name": "Groundskeeper",
+  "description": "A self-hosted recorder, map and guarded control panel for Yarbo.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0E1311",
+  "theme_color": "#0E1311",
+  "icons": [
+    {
+      "src": "/brand/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/brand/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/brand/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

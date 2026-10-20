@@ -1,0 +1,3 @@
+pytest
+jsonschema>=4.18
+shapely>=2

@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "nd_fargo_2024",
+  "name": "City of Fargo 2024 aerial (7.6 cm)",
+  "provider": "City of Fargo GIS",
+  "country": "US",
+  "region": "Fargo, North Dakota",
+  "homepage": "https://www.fargond.gov/",
+  "kind": "arcgis_map",
+  "url": "https://gis.cityoffargo.com/arcgis/rest/services/Aerials/FargoImageryService2024/MapServer",
+  "max_px": 4096,
+  "native_m": 0.0762,
+  "vintage": "Leaf-off spring flight (EagleView), 2024; covers Fargo and West Fargo, not rural Cass County",
+  "attribution": "Imagery: City of Fargo (EagleView)",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public city service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_nd_cass"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Cass County Courthouse, Fargo",
+    "landmark": [-96.7934, 46.8721]
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ga_dekalb_ortho2026",
+  "name": "DeKalb County 2026 imagery (7.5 cm)",
+  "provider": "DeKalb County, Georgia GIS (EagleView/Pictometry flight)",
+  "country": "US",
+  "region": "DeKalb County, Georgia",
+  "homepage": "https://dcgis-dekalbgis.hub.arcgis.com/",
+  "kind": "arcgis_image",
+  "url": "https://dcgis.dekalbcountyga.gov/geoanalytics/rest/services/Imagery/Imagery2026/ImageServer",
+  "max_px": 4096,
+  "native_m": 0.0762,
+  "vintage": "Countywide winter flight, January 2026 (the county publishes one service per year, 2017 onwards)",
+  "attribution": "Imagery: DeKalb County, Georgia",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public county image service; terms not stated; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_ga_dekalb"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "DeKalb County Courthouse, Decatur",
+    "landmark": [-84.29766, 33.77406]
+  }
+}

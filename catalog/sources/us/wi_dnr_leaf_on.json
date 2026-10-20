@@ -1,0 +1,29 @@
+{
+  "$schema": "../../schema.json",
+  "id": "wi_dnr_leaf_on",
+  "name": "Wisconsin DNR leaf-on (NAIP)",
+  "provider": "Wisconsin DNR",
+  "country": "US",
+  "region": "Wisconsin",
+  "homepage": "https://dnrmaps.wi.gov/",
+  "kind": "arcgis_image",
+  "url": "https://dnrmaps.wi.gov/arcgis_image/rest/services/DW_Imagery/EN_Image_Basemap_Latest_Leaf_On/ImageServer",
+  "native_m": 0.6,
+  "vintage": "Leaf-on (summer), NAIP",
+  "attribution": "Imagery: Wisconsin DNR, NAIP",
+  "license": {
+    "id": "provider-terms",
+    "name": "NAIP imagery served by the Wisconsin DNR; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_wi"
+  },
+  "verified": {
+    "date": "2026-10-03",
+    "place": "Wisconsin State Capitol, Madison",
+    "landmark": [-89.3842, 43.0747]
+  }
+}

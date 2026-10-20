@@ -1,0 +1,37 @@
+{
+  "type": "Feature",
+  "properties": {
+    "name": "Wyoming",
+    "source": "Natural Earth 1:10m states and provinces (public domain)",
+    "note": "Buffered 10 km and simplified to 21 points; generous on purpose.",
+    "command": "python -m app.imagery coverage --country US --state \"Wyoming\" --buffer-km 10 --name us_wy"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [-111.169, 40.979],
+        [-111.174, 45.0],
+        [-111.164, 45.035],
+        [-111.138, 45.064],
+        [-111.098, 45.084],
+        [-111.051, 45.09],
+        [-104.057, 45.091],
+        [-104.01, 45.084],
+        [-103.97, 45.064],
+        [-103.943, 45.035],
+        [-103.934, 45.0],
+        [-103.93, 42.625],
+        [-103.931, 40.999],
+        [-103.94, 40.965],
+        [-103.967, 40.936],
+        [-104.007, 40.916],
+        [-104.054, 40.909],
+        [-111.05, 40.909],
+        [-111.103, 40.918],
+        [-111.145, 40.943],
+        [-111.169, 40.979]
+      ]
+    ]
+  }
+}

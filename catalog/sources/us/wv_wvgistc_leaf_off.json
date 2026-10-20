@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "wv_wvgistc_leaf_off",
+  "name": "WV best leaf-off imagery mosaic (county flights)",
+  "provider": "West Virginia GIS Technical Center (WVU), county imagery",
+  "country": "US",
+  "region": "West Virginia",
+  "homepage": "https://wvgis.wvu.edu/",
+  "kind": "arcgis_map",
+  "url": "https://services.wvgis.wvu.edu/arcgis/rest/services/Imagery_BaseMaps_EarthCover/wv_imagery_WVGISTC_leaf_off_mosaic/MapServer",
+  "max_px": 4096,
+  "native_m": 0.0762,
+  "vintage": "Leaf-off county flights, 2018 to 2026 (most recent per county), 7.5 to 15 cm; 2010-12 one-foot statewide imagery fills any gaps",
+  "attribution": "Imagery: WV GIS Technical Center, WV county imagery",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state service for viewing only; county imagery not redistributed",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_wv"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "West Virginia State Capitol, Charleston",
+    "landmark": [-81.6123, 38.3363]
+  }
+}

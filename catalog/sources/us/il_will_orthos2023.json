@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "il_will_orthos2023",
+  "name": "Will County orthoimagery 2023 (15 cm)",
+  "provider": "Will County GIS Division (EagleView imagery)",
+  "country": "US",
+  "region": "Will County, Illinois",
+  "homepage": "https://willcounty.gov/County-Offices/Administration/GIS-Division/Data/Aerial-Imagery",
+  "kind": "arcgis_image",
+  "url": "https://gis.willcountyillinois.com/image/rest/services/Orthoimagery/Orthos_2023_6IN/ImageServer",
+  "max_px": 4096,
+  "native_m": 0.1524,
+  "vintage": "Leaf-off spring flight, April 6 to 21, 2023 (6 in); the county's 2024 3 in service needs a login",
+  "attribution": "Imagery: Will County, EagleView",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public county service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_il_will"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Will County Courthouse, Joliet",
+    "landmark": [-88.0837, 41.5245]
+  }
+}

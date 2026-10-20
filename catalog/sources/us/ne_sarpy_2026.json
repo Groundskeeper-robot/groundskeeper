@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ne_sarpy_2026",
+  "name": "Sarpy County 2026 aerials (7.6 cm)",
+  "provider": "Sarpy County GIS",
+  "country": "US",
+  "region": "Sarpy County, Nebraska",
+  "homepage": "https://gis.sarpy.gov/",
+  "kind": "tiles",
+  "url": "https://tiles.arcgis.com/tiles/OiG7dbwhQEWoy77N/arcgis/rest/services/Aerials2026/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 21,
+  "native_m": 0.0762,
+  "vintage": "Leaf-off spring flight, 2026",
+  "attribution": "Imagery: Sarpy County GIS",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public county service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_ne_sarpy"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Sarpy County Courthouse, Papillion",
+    "landmark": [-96.0402, 41.141]
+  }
+}

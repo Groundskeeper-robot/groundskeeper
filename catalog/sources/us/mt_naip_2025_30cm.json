@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schema.json",
+  "id": "mt_naip_2025_30cm",
+  "name": "Montana NAIP 2025 provisional (30 cm)",
+  "provider": "USDA NAIP, served by the Montana State Library (MSDI)",
+  "country": "US",
+  "region": "Montana",
+  "homepage": "https://msl.mt.gov/geoinfo/data/web_services",
+  "kind": "arcgis_image",
+  "url": "https://gisservice.mt.gov/arcgis/rest/services/MSDI_Framework/msdi_naip2025_provisional_image_v1/ImageServer?bandIds=0,1,2",
+  "max_px": 4096,
+  "native_m": 0.3,
+  "vintage": "Leaf-on summer flights, 2025 (provisional NAIP, flown at 30 cm statewide)",
+  "attribution": "Imagery: USDA NAIP 2025, via the Montana State Library",
+  "license": {
+    "id": "public-domain",
+    "name": "Public domain (US government work)",
+    "url": "https://naip-usdaonline.hub.arcgis.com/",
+    "commercial": true,
+    "credit": false
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_mt"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Montana State Capitol, Helena",
+    "landmark": [-112.0184, 46.5857]
+  }
+}

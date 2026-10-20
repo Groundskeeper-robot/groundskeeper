@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "mt_bozeman_2026",
+  "name": "City of Bozeman 2026 aerial (7.6 cm)",
+  "provider": "City of Bozeman GIS",
+  "country": "US",
+  "region": "Bozeman, Montana",
+  "homepage": "https://data-bozeman.opendata.arcgis.com/",
+  "kind": "arcgis_image",
+  "url": "https://gisweb.bozeman.net/image/rest/services/COB_20260408_WGS84_WebMercator/ImageServer",
+  "max_px": 4096,
+  "native_m": 0.0762,
+  "vintage": "Leaf-off spring flight, April 8, 2026; the Bozeman city area only, not all of Gallatin County",
+  "attribution": "Imagery: City of Bozeman",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public city service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_mt_gallatin"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Gallatin County Courthouse, Bozeman",
+    "landmark": [-111.0418, 45.6796]
+  }
+}

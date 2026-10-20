@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "oh_osip_ortho",
+  "name": "OSIP most current imagery",
+  "provider": "Ohio DAS OIT, OGRIP (Ohio Statewide Imagery Program)",
+  "country": "US",
+  "region": "Ohio",
+  "homepage": "https://osip-geohio.hub.arcgis.com/",
+  "kind": "tiles",
+  "url": "https://maps.ohio.gov/image/rest/services/osip_most_current_cache/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 20,
+  "native_m": 0.1524,
+  "vintage": "Leaf-off spring flights, 2018 to 2025 (most recent per county)",
+  "attribution": "Imagery: State of Ohio, OGRIP OSIP",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state imagery, provided as is; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_oh"
+  },
+  "verified": {
+    "date": "2026-10-09",
+    "place": "Ohio Statehouse, Columbus",
+    "landmark": [-82.9988, 39.9612]
+  }
+}

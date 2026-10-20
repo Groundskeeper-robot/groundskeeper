@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schema.json",
+  "id": "nv_washoe_ortho",
+  "name": "Washoe County orthophotos (7.5 cm)",
+  "provider": "Washoe County Technology Services, GIS",
+  "country": "US",
+  "region": "Washoe County, Nevada",
+  "homepage": "https://www.washoecounty.gov/gis/",
+  "kind": "tiles",
+  "url": "https://wcgisweb.washoecounty.us/arcgis/rest/services/Basemaps/Orthophotos/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 21,
+  "native_m": 0.0762,
+  "vintage": "2025 EagleView flight, 7.5 cm, over Reno, Sparks and the south of the county (not the far north)",
+  "attribution": "Imagery: Washoe County GIS (EagleView)",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public county map service; the orthophoto files are sold under a data licence; credit required",
+    "url": "https://www.washoecounty.gov/gis/data_warehouse.php",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_nv_washoe"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Historic Washoe County Courthouse, Reno",
+    "landmark": [-119.8124, 39.5239]
+  }
+}

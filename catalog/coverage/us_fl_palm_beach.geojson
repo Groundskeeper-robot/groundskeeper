@@ -1,0 +1,40 @@
+{
+  "type": "Feature",
+  "properties": {
+    "name": "Palm Beach County, Florida",
+    "source": "US Census Bureau county boundaries (public domain), via plotly/datasets geojson-counties-fips",
+    "note": "Buffered 3 km and simplified to 24 points; generous on purpose.",
+    "command": "county_outline.py --fips 12099 --buffer-km 3 --name us_fl_palm_beach"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [-80.2977, 26.3072],
+        [-80.8812, 26.3067],
+        [-80.9024, 26.3145],
+        [-80.9114, 26.3335],
+        [-80.9162, 26.7252],
+        [-80.9158, 26.959],
+        [-80.9069, 26.9781],
+        [-80.8856, 26.9861],
+        [-80.2479, 26.9843],
+        [-80.0822, 26.9975],
+        [-80.0718, 26.9967],
+        [-80.0548, 26.9861],
+        [-80.0171, 26.8663],
+        [-80.0012, 26.7956],
+        [-80.0065, 26.7581],
+        [-80.0027, 26.7008],
+        [-80.0088, 26.5674],
+        [-80.0306, 26.4416],
+        [-80.0451, 26.3167],
+        [-80.055, 26.3006],
+        [-80.0741, 26.2939],
+        [-80.1036, 26.2959],
+        [-80.1156, 26.3007],
+        [-80.2977, 26.3072]
+      ]
+    ]
+  }
+}

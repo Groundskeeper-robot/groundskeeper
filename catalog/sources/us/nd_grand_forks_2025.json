@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "nd_grand_forks_2025",
+  "name": "Grand Forks 2025 orthoimagery (7.6 cm)",
+  "provider": "Grand Forks - East Grand Forks MPO, served by the ND GIS Hub",
+  "country": "US",
+  "region": "Grand Forks, North Dakota",
+  "homepage": "https://www.gis.nd.gov/",
+  "kind": "arcgis_image",
+  "url": "https://ndgishub.nd.gov/arcgis/rest/services/Imagery/AerialImage_GrandForks_2025/ImageServer?bandIds=0,1,2",
+  "max_px": 4096,
+  "native_m": 0.0762,
+  "vintage": "Leaf-off spring flights, April 20 and May 3, 2025; the Grand Forks - East Grand Forks MPO area only",
+  "attribution": "Imagery: Grand Forks - East Grand Forks MPO, via the ND GIS Hub",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_nd_grand_forks"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Grand Forks County Courthouse, Grand Forks",
+    "landmark": [-97.0297, 47.9227]
+  }
+}

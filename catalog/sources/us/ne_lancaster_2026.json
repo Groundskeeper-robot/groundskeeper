@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ne_lancaster_2026",
+  "name": "Lincoln/Lancaster County 2026 orthoimagery (7.6 cm)",
+  "provider": "City of Lincoln / Lancaster County GIS",
+  "country": "US",
+  "region": "Lancaster County, Nebraska",
+  "homepage": "https://gis.lincoln.ne.gov/apps/gisviewer/",
+  "kind": "tiles",
+  "url": "https://gis.lincoln.ne.gov/image/rest/services/Aerials/Aerial2026/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 21,
+  "native_m": 0.0762,
+  "vintage": "Spring flight (EagleView/Pictometry), 2026",
+  "attribution": "Imagery: City of Lincoln / Lancaster County",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public city/county service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_ne_lancaster"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Nebraska State Capitol, Lincoln",
+    "landmark": [-96.6997, 40.808]
+  }
+}

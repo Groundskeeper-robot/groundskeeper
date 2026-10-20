@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schema.json",
+  "id": "usgs_naip",
+  "name": "USGS NAIP",
+  "provider": "USDA Farm Production and Conservation, served by USGS",
+  "country": "US",
+  "region": "United States (lower 48)",
+  "homepage": "https://www.usgs.gov/centers/eros/science/usgs-eros-archive-aerial-photography-national-agriculture-imagery-program-naip",
+  "kind": "arcgis_image",
+  "url": "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer",
+  "max_px": 4000,
+  "native_m": 0.6,
+  "vintage": "Leaf-on (summer); each state is flown every 2 to 3 years",
+  "attribution": "Imagery: USGS NAIP",
+  "license": {
+    "id": "public-domain",
+    "name": "Public domain (US government work)",
+    "url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+    "commercial": true,
+    "credit": false
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_lower48"
+  },
+  "verified": {
+    "date": "2026-10-03",
+    "place": "The Pentagon, Arlington",
+    "landmark": [-77.056, 38.8709]
+  }
+}

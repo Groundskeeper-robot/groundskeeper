@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ga_cobb_ortho",
+  "name": "Cobb County current orthophotos (7.5 cm)",
+  "provider": "Cobb County, Georgia GIS",
+  "country": "US",
+  "region": "Cobb County, Georgia",
+  "homepage": "https://www.cobbcounty.gov/information-services/gis",
+  "kind": "arcgis_map",
+  "url": "https://gis.cobbcounty.gov/gisserver/rest/services/cobbpublic/cobborthomapwm/MapServer",
+  "max_px": 4096,
+  "native_m": 0.0762,
+  "vintage": "Countywide 3-inch flight, renewed every year; this is the county's current alias (newer than its 2025 layer when checked, so 2026)",
+  "attribution": "Imagery: Cobb County, Georgia",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public county map service; terms not stated; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_ga_cobb"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Truist Park, Cobb County",
+    "landmark": [-84.46762, 33.89074]
+  }
+}

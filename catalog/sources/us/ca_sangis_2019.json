@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ca_sangis_2019",
+  "name": "SanGIS 2019 imagery (23 cm)",
+  "provider": "SanGIS (San Diego Geographic Information Source)",
+  "country": "US",
+  "region": "San Diego County, California",
+  "homepage": "https://www.sangis.org/",
+  "kind": "arcgis_image",
+  "url": "https://gis.sangis.org/maps/rest/services/Public/Imagery_2019/ImageServer",
+  "max_px": 4096,
+  "native_m": 0.2286,
+  "vintage": "Countywide flight, 2019 (9 in)",
+  "attribution": "Imagery: SanGIS",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public regional service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_ca_san_diego"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Petco Park, San Diego",
+    "landmark": [-117.1566, 32.7073]
+  }
+}

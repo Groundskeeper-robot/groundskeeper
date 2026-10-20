@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ca_oc_2022_3in",
+  "name": "Orange County 2022 orthoimagery (7.5 cm)",
+  "provider": "OC Public Works, OC Survey GIS",
+  "country": "US",
+  "region": "Orange County, California",
+  "homepage": "https://www.ocgis.com/",
+  "kind": "arcgis_image",
+  "url": "https://www.ocgis.com/arcpub/rest/services/Aerial_Imagery_Countywide/22_OC_3IN_SP6/ImageServer",
+  "max_px": 4096,
+  "native_m": 0.0762,
+  "vintage": "Countywide flight, 2022",
+  "attribution": "Imagery: County of Orange, OC Public Works",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public county service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_ca_orange"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Angel Stadium, Anaheim",
+    "landmark": [-117.8828, 33.8]
+  }
+}

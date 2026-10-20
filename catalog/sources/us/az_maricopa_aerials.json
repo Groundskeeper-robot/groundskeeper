@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schema.json",
+  "id": "az_maricopa_aerials",
+  "name": "Maricopa County Assessor aerials 2026 (7.5 cm)",
+  "provider": "Maricopa County Assessor's Office",
+  "country": "US",
+  "region": "Maricopa County, Arizona",
+  "homepage": "https://maricopacountyassessor.org/maps/",
+  "kind": "tiles",
+  "url": "https://gis.mcassessor.maricopa.gov/arcgis/rest/services/Imagery/Aerials2026/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 21,
+  "native_m": 0.0762,
+  "vintage": "Flown October to December 2025; the Assessor publishes a new AerialsYYYY service each year",
+  "attribution": "Imagery: Maricopa County Assessor's Office",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public county service; download for commercial use or resale prohibited without a sublicence (A.R.S. 39-121.03)",
+    "url": "https://www.maricopa.gov/3942/GIS-Mapping-Applications",
+    "commercial": false,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_az_maricopa"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Arizona State Capitol, Phoenix",
+    "landmark": [-112.097, 33.4481]
+  }
+}

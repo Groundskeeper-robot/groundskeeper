@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ar_adop_2023",
+  "name": "ADOP 2023 statewide orthoimagery (23 cm)",
+  "provider": "Arkansas GIS Office (Arkansas Digital Ortho Program)",
+  "country": "US",
+  "region": "Arkansas",
+  "homepage": "https://geodata.gis.arkansas.gov/",
+  "kind": "arcgis_image",
+  "url": "https://gis.arkansas.gov/arcgis/rest/services/ImageServices/IMAGERY_9IN_2023/ImageServer",
+  "max_px": 4096,
+  "native_m": 0.2286,
+  "vintage": "Leaf-off winter flights, January to March 2023 (9 inch)",
+  "attribution": "Imagery: Arkansas GIS Office, ADOP",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_ar"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Arkansas State Capitol, Little Rock",
+    "landmark": [-92.2891, 34.7465]
+  }
+}

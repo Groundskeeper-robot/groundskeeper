@@ -1,0 +1,34 @@
+{
+  "$schema": "../../schema.json",
+  "id": "pt_dgt_ortosat2023",
+  "name": "OrtoSat2023 (30 cm)",
+  "provider": "Direção-Geral do Território (DGT)",
+  "country": "PT",
+  "region": "Mainland Portugal",
+  "homepage": "https://www.dgterritorio.gov.pt/dados-abertos",
+  "kind": "wms",
+  "url": "https://ortos.dgterritorio.gov.pt/wms/ortosat2023",
+  "layers": "ortoSat2023-CorVerdadeira",
+  "version": "1.3.0",
+  "crs": "EPSG:3857",
+  "max_px": 4096,
+  "native_m": 0.3,
+  "vintage": "Pléiades Neo satellite mosaic, 2023",
+  "attribution": "Imagery: © Direção-Geral do Território, OrtoSat2023",
+  "license": {
+    "id": "CC-BY-4.0",
+    "name": "Open data (CC BY 4.0); credit required",
+    "url": "https://creativecommons.org/licenses/by/4.0/",
+    "commercial": true,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "pt_mainland"
+  },
+  "verified": {
+    "date": "2026-10-09",
+    "place": "Praça do Comércio, Lisbon",
+    "landmark": [-9.1366, 38.7076]
+  }
+}

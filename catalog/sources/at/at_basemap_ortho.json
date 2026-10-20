@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "at_basemap_ortho",
+  "name": "basemap.at orthophoto (about 30 cm)",
+  "provider": "basemap.at (the Austrian states)",
+  "country": "AT",
+  "region": "Austria",
+  "homepage": "https://basemap.at/",
+  "kind": "tiles",
+  "url": "https://maps.wien.gv.at/basemap/bmaporthofoto30cm/normal/google3857/{z}/{y}/{x}.jpeg",
+  "max_zoom": 20,
+  "native_m": 0.3,
+  "attribution": "Imagery: basemap.at",
+  "license": {
+    "id": "CC-BY-4.0",
+    "name": "Open data (CC BY 4.0); credit required",
+    "url": "https://creativecommons.org/licenses/by/4.0/",
+    "commercial": true,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "at"
+  },
+  "verified": {
+    "date": "2026-10-03",
+    "place": "St. Stephen's Cathedral, Vienna",
+    "landmark": [16.3725, 48.2085]
+  }
+}

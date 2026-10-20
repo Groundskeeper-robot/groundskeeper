@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ca_on_oiwms",
+  "name": "Ontario Imagery Web Map Service",
+  "provider": "Geospatial Ontario (Ministry of Natural Resources)",
+  "country": "CA",
+  "region": "Ontario",
+  "homepage": "https://geohub.lio.gov.on.ca/maps/101295c5d3424045917bdd476f322c02",
+  "kind": "arcgis_map",
+  "url": "https://ws.lioservices.lrc.gov.on.ca/arcgis1071a/rest/services/LIO_Imagery/Ontario_Imagery_Web_Map_Service/MapServer",
+  "max_px": 4096,
+  "native_m": 0.16,
+  "vintage": "A mosaic of provincial acquisitions, 16 to 50 cm",
+  "attribution": "Imagery: © King's Printer for Ontario",
+  "license": {
+    "id": "provider-terms",
+    "name": "Open Government Licence – Ontario where Ontario owns the imagery; credit required",
+    "url": "https://www.ontario.ca/page/open-government-licence-ontario",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "ca_on"
+  },
+  "verified": {
+    "date": "2026-10-09",
+    "place": "Ontario Legislative Building, Queen's Park, Toronto",
+    "landmark": [-79.3917, 43.6623]
+  }
+}

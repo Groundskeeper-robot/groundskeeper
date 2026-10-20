@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schema.json",
+  "id": "dc_octo_aerial",
+  "name": "DC GIS aerial photo, latest (8 cm)",
+  "provider": "DC Office of the Chief Technology Officer (OCTO), DC GIS",
+  "country": "US",
+  "region": "District of Columbia",
+  "homepage": "https://opendata.dc.gov/",
+  "kind": "tiles",
+  "url": "https://maps2.dcgis.dc.gov/dcgis/rest/services/DCGIS_DATA/DC_Aerial_Photo_WebMercator/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 21,
+  "native_m": 0.08,
+  "vintage": "Leaf-off spring flight, 27 March 2025 (the service follows the latest biennial flight)",
+  "attribution": "Imagery: DC OCTO, DC GIS",
+  "license": {
+    "id": "CC-BY-4.0",
+    "name": "Creative Commons Attribution 4.0 International",
+    "url": "https://creativecommons.org/licenses/by/4.0/",
+    "commercial": true,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_dc"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "John A. Wilson Building (DC City Hall), Washington",
+    "landmark": [-77.0314, 38.895]
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "$schema": "../../schema.json",
+  "id": "nz_linz_aerial",
+  "name": "LINZ Basemaps aerial",
+  "provider": "Toitū Te Whenua LINZ",
+  "country": "NZ",
+  "region": "New Zealand",
+  "homepage": "https://basemaps.linz.govt.nz/",
+  "kind": "tiles",
+  "url": "https://basemaps.linz.govt.nz/v1/tiles/aerial/WebMercatorQuad/{z}/{x}/{y}.jpeg?api={key}",
+  "max_zoom": 21,
+  "native_m": 0.1,
+  "attribution": "Imagery: © Toitū Te Whenua LINZ",
+  "license": {
+    "id": "CC-BY-4.0",
+    "name": "Open data (CC BY 4.0); credit required",
+    "url": "https://creativecommons.org/licenses/by/4.0/",
+    "commercial": true,
+    "credit": true
+  },
+  "auth": {
+    "label": "a free LINZ Basemaps API key",
+    "signup": "https://basemaps.linz.govt.nz/"
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "nz"
+  },
+  "verified": {
+    "date": "2026-10-03",
+    "place": "Wellington city centre",
+    "landmark": [174.7762, -41.2865],
+    "note": "Address format confirmed by the service's key error; renders only with a key."
+  }
+}

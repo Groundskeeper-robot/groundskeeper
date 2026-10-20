@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "tn_hamilton_ortho2024",
+  "name": "Hamilton County 2024 aerial imagery (7.5 cm)",
+  "provider": "Hamilton County, Tennessee GIS",
+  "country": "US",
+  "region": "Hamilton County (Chattanooga), Tennessee",
+  "homepage": "https://gis.hamiltontn.gov/",
+  "kind": "arcgis_map",
+  "url": "https://mapsdev.hamiltontn.gov/hcwa/rest/services/Base_Imagery_2024/MapServer?layers=show:2",
+  "max_px": 4096,
+  "native_m": 0.0762,
+  "vintage": "Countywide spring flight, 2024 (some trees in early leaf); the county publishes a new service every two years",
+  "attribution": "Imagery: Hamilton County, Tennessee",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public county service; terms not stated; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_tn_hamilton"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Hamilton County Courthouse, Chattanooga",
+    "landmark": [-85.30691, 35.04921]
+  }
+}

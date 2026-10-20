@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "tx_austin_ortho",
+  "name": "City of Austin aerial imagery (15 cm)",
+  "provider": "City of Austin",
+  "country": "US",
+  "region": "Travis County, Texas",
+  "homepage": "https://data.austintexas.gov/",
+  "kind": "tiles",
+  "url": "https://maps.austintexas.gov/image/rest/services/MapTiled/AerialImagery_WebMercator/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 20,
+  "native_m": 0.1524,
+  "vintage": "Leaf-off 6-inch flight, January 2025 (the city replaces this cache with each new flight)",
+  "attribution": "Imagery: City of Austin",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public city service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_tx_travis"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Texas State Capitol, Austin",
+    "landmark": [-97.7404, 30.2747]
+  }
+}

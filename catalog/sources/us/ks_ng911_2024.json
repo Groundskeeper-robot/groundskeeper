@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ks_ng911_2024",
+  "name": "Kansas NG911 statewide imagery 2024 (30 cm)",
+  "provider": "Kansas Data Access and Support Center (DASC), Kansas 911 Coordinating Council",
+  "country": "US",
+  "region": "Kansas",
+  "homepage": "https://www.kansasgis.org/",
+  "kind": "arcgis_image",
+  "url": "https://services.kansasgis.org/arcgis7/rest/services/IMAGERY_STATEWIDE/NG911_Imagery_2024/ImageServer?bandIds=0,1,2",
+  "max_px": 4096,
+  "native_m": 0.3048,
+  "vintage": "Leaf-off statewide flight (Surdex), March to April 2024; 1-ft pixels everywhere; reflown about every 3 years (2015, 2018, 2021, 2024)",
+  "attribution": "Imagery: Kansas DASC, Kansas 911 Coordinating Council",
+  "license": {
+    "id": "provider-terms",
+    "name": "Publicly available state service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_ks"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Kansas State Capitol, Topeka",
+    "landmark": [-95.6781, 39.0483]
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ak_anchorage_2024",
+  "name": "Anchorage 2024 aerial imagery (7.5 cm)",
+  "provider": "Municipality of Anchorage GIS (flown by EagleView)",
+  "country": "US",
+  "region": "Municipality of Anchorage, Alaska",
+  "homepage": "https://www.ancgis.com/",
+  "kind": "tiles",
+  "url": "https://www.ancgis.com/arcgis/rest/services/imagery_public/Photo_2024/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 21,
+  "native_m": 0.0762,
+  "vintage": "Late spring flight, May 20 to June 15, 2024; 7.5 cm (3 in) in town, 15 cm (6 in) elsewhere; Anchorage bowl, Eagle River and Chugiak",
+  "attribution": "Imagery: Municipality of Anchorage, EagleView",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public municipal service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_ak_anchorage"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Alaska Center for the Performing Arts, Anchorage",
+    "landmark": [-149.8944, 61.2171]
+  }
+}

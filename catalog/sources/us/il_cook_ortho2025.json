@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "il_cook_ortho2025",
+  "name": "Cook County orthoimagery 2025 (15 cm)",
+  "provider": "Cook County GIS",
+  "country": "US",
+  "region": "Cook County, Illinois",
+  "homepage": "https://hub-cookcountyil.opendata.arcgis.com/pages/imagery",
+  "kind": "arcgis_image",
+  "url": "https://gis.cookcountyil.gov/imagery/rest/services/CookOrtho2025/ImageServer?bandIds=0,1,2",
+  "max_px": 4096,
+  "native_m": 0.1524,
+  "vintage": "2025 flight, 6 in, 4-band (trees in leaf at the landmark); the county publishes a CookOrthoYYYY service every year",
+  "attribution": "Imagery: Cook County GIS",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public county open data; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_il_cook"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Chicago City Hall",
+    "landmark": [-87.632, 41.8838]
+  }
+}

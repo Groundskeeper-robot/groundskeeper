@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schema.json",
+  "id": "az_pima_latest",
+  "name": "Pima County latest imagery basemap (8 cm)",
+  "provider": "Pima County Information Technology, GIS",
+  "country": "US",
+  "region": "Pima County, Arizona",
+  "homepage": "https://gisopendata.pima.gov/datasets/basemap-latest-imagery",
+  "kind": "arcgis_map",
+  "url": "https://gisdata.pima.gov/arcgis2/rest/services/BaseMaps_OrthobaseHybridNoAnno_SP/MapServer",
+  "max_px": 4096,
+  "native_m": 0.0794,
+  "vintage": "Pictometry 2024 (8 cm, Tucson to Ajo), filled with PAG 2023 and NAIP 2023 elsewhere",
+  "attribution": "Imagery: Pima County GIS (Pictometry, PAG)",
+  "license": {
+    "id": "provider-terms",
+    "name": "Pima County open data: for use in a map or private application, not as a service in another public-facing app",
+    "url": "https://gisopendata.pima.gov/datasets/basemap-latest-imagery",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_az_pima"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Arizona Stadium (University of Arizona), Tucson",
+    "landmark": [-110.9488, 32.2288]
+  }
+}

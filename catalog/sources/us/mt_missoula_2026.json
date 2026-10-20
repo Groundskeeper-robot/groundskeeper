@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "mt_missoula_2026",
+  "name": "City of Missoula 2026 aerial (7.6 cm)",
+  "provider": "City of Missoula GIS",
+  "country": "US",
+  "region": "Missoula, Montana",
+  "homepage": "https://www.ci.missoula.mt.us/",
+  "kind": "tiles",
+  "url": "https://tiles.arcgis.com/tiles/HfwHS0BxZBQ1E5DY/arcgis/rest/services/CityOfMissoulaAerial2026/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 21,
+  "native_m": 0.0762,
+  "vintage": "Leaf-off spring flight, 2026; the greater Missoula valley, not all of Missoula County",
+  "attribution": "Imagery: City of Missoula",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public city service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_mt_missoula"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Missoula County Courthouse, Missoula",
+    "landmark": [-113.9959, 46.8733]
+  }
+}

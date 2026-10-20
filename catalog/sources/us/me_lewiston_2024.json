@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "me_lewiston_2024",
+  "name": "City of Lewiston EagleView 2024 (7.6 cm)",
+  "provider": "City of Lewiston, Maine (EagleView imagery)",
+  "country": "US",
+  "region": "City of Lewiston, Maine",
+  "homepage": "https://www.arcgis.com/home/item.html?id=18f7afd3c38443a2b239355c55985da9",
+  "kind": "tiles",
+  "url": "https://tiles.arcgis.com/tiles/IrCJY9hdZl1ZRiUu/arcgis/rest/services/Orhtopho2024EagleView/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 21,
+  "native_m": 0.0762,
+  "vintage": "Leaf-off flight, April 2024 (EagleView); covers the city of Lewiston only",
+  "attribution": "Imagery: City of Lewiston, Maine; EagleView",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public city service; terms not stated, credit the city",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_me_androscoggin"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Lewiston City Hall, Lewiston",
+    "landmark": [-70.2156, 44.0951]
+  }
+}

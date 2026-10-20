@@ -1,0 +1,39 @@
+{
+  "type": "Feature",
+  "properties": {
+    "name": "Davidson County (Nashville), Tennessee",
+    "source": "US Census Bureau county boundaries (public domain), via plotly/datasets geojson-counties-fips",
+    "note": "Buffered 3 km and simplified to 23 points; generous on purpose.",
+    "command": "county_outline.py --fips 47037 --buffer-km 3 --name us_tn_davidson"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [-86.7977, 36.0098],
+        [-86.9199, 36.0241],
+        [-87.007, 35.9681],
+        [-87.0304, 35.9624],
+        [-87.0524, 35.9711],
+        [-87.0589, 35.9797],
+        [-87.0874, 36.0474],
+        [-87.0289, 36.1388],
+        [-86.9388, 36.4],
+        [-86.9134, 36.4098],
+        [-86.8318, 36.3823],
+        [-86.7781, 36.4249],
+        [-86.7674, 36.4306],
+        [-86.7423, 36.4307],
+        [-86.7242, 36.4164],
+        [-86.6955, 36.3634],
+        [-86.5638, 36.2561],
+        [-86.4851, 36.1116],
+        [-86.4831, 36.0942],
+        [-86.5907, 35.9537],
+        [-86.6138, 35.9414],
+        [-86.6626, 35.9519],
+        [-86.7977, 36.0098]
+      ]
+    ]
+  }
+}

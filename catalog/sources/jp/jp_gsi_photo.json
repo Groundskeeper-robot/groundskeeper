@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "jp_gsi_photo",
+  "name": "GSI seamless aerial photo",
+  "provider": "Geospatial Information Authority of Japan (GSI)",
+  "country": "JP",
+  "region": "Japan",
+  "homepage": "https://maps.gsi.go.jp/development/ichiran.html",
+  "kind": "tiles",
+  "url": "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg",
+  "max_zoom": 18,
+  "native_m": 0.5,
+  "attribution": "Imagery: 地理院タイル (GSI Japan)",
+  "license": {
+    "id": "provider-terms",
+    "name": "GSI content terms (CC BY 4.0 compatible); credit required",
+    "url": "https://www.gsi.go.jp/kikakuchousei/kikakuchousei40182.html",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "jp"
+  },
+  "verified": {
+    "date": "2026-10-03",
+    "place": "Imperial Palace, Tokyo",
+    "landmark": [139.7528, 35.6852]
+  }
+}

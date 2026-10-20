@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "mi_imagery_2024",
+  "name": "Michigan MiSAIL imagery 2024 (41 counties)",
+  "provider": "State of Michigan DTMB (MiSAIL program)",
+  "country": "US",
+  "region": "Detroit metro, the Thumb, northern Lower and eastern Upper Peninsula (41 counties), Michigan",
+  "homepage": "https://www.michigan.gov/dtmb/services/maps/misail",
+  "kind": "arcgis_image",
+  "url": "https://imagery.michigan.gov/server/rest/services/Michigan_imagery_2024/ImageServer?bandIds=0,1,2",
+  "max_px": 4096,
+  "native_m": 0.1524,
+  "vintage": "2024 county flights: 6 in in Wayne, Macomb, Washtenaw, Branch, Hillsdale and the northern Lower / eastern Upper Peninsula counties; 1 ft in Oakland, Genesee, the Thumb and south-central counties; small 3-4 in areas (Gratiot, Delta, Ionia, Isabella, Hillsdale) (listed at 15 cm, what most of it serves, so the 7.6 cm Oakland County source ranks above it)",
+  "attribution": "Imagery: State of Michigan (MiSAIL)",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_mi_misail_2024"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Michigan Stadium, Ann Arbor",
+    "landmark": [-83.7478, 42.2658]
+  }
+}

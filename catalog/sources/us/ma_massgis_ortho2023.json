@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ma_massgis_ortho2023",
+  "name": "MassGIS 2023 orthoimagery (15 cm)",
+  "provider": "MassGIS",
+  "country": "US",
+  "region": "Massachusetts",
+  "homepage": "https://www.mass.gov/info-details/massgis-data-2023-aerial-imagery",
+  "kind": "tiles",
+  "url": "https://tiles.arcgis.com/tiles/hGdibHYSPO59RG1h/arcgis/rest/services/orthos2023/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 20,
+  "native_m": 0.15,
+  "vintage": "Leaf-off spring flights, February to April 2023",
+  "attribution": "Imagery: MassGIS",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state data; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_ma"
+  },
+  "verified": {
+    "date": "2026-10-09",
+    "place": "Massachusetts State House, Boston",
+    "landmark": [-71.0638, 42.3588]
+  }
+}

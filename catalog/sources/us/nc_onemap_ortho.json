@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "nc_onemap_ortho",
+  "name": "NC OneMap latest orthoimagery (15 cm)",
+  "provider": "NC Center for Geographic Information and Analysis",
+  "country": "US",
+  "region": "North Carolina",
+  "homepage": "https://www.nconemap.gov/",
+  "kind": "arcgis_image",
+  "url": "https://services.nconemap.gov/secure/rest/services/Imagery/Orthoimagery_Latest/ImageServer",
+  "max_px": 4096,
+  "native_m": 0.1524,
+  "vintage": "Leaf-off winter flights, most recent per area (four-year cycle)",
+  "attribution": "Imagery: NC CGIA, NC 911 Board",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_nc"
+  },
+  "verified": {
+    "date": "2026-10-09",
+    "place": "North Carolina State Capitol, Raleigh",
+    "landmark": [-78.6391, 35.7804]
+  }
+}

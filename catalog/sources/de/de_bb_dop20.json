@@ -1,0 +1,33 @@
+{
+  "$schema": "../../schema.json",
+  "id": "de_bb_dop20",
+  "name": "DOP20 (20 cm)",
+  "provider": "Landesvermessung und Geobasisinformation Brandenburg (LGB)",
+  "country": "DE",
+  "region": "Brandenburg and Berlin",
+  "homepage": "https://geobasis-bb.de/",
+  "kind": "wms",
+  "url": "https://isk.geobasis-bb.de/mapproxy/dop20c/service/wms",
+  "layers": "bebb_dop20c",
+  "version": "1.3.0",
+  "crs": "EPSG:3857",
+  "max_px": 4096,
+  "native_m": 0.2,
+  "attribution": "Imagery: © GeoBasis-DE/LGB, dl-de/by-2-0",
+  "license": {
+    "id": "DL-DE-BY-2.0",
+    "name": "Datenlizenz Deutschland Namensnennung 2.0; credit required",
+    "url": "https://www.govdata.de/dl-de/by-2-0",
+    "commercial": true,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "de_bb_be"
+  },
+  "verified": {
+    "date": "2026-10-09",
+    "place": "Brandenburg Gate, Berlin",
+    "landmark": [13.3777, 52.5163]
+  }
+}

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>try { const t = localStorage.getItem("theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) { /* no storage */ }</script>
+<title>Groundskeeper</title>
+<link rel="icon" href="/brand/favicon.svg?v=2" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico?v=2" sizes="16x16 32x32 48x48">
+<link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0E1311" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F6F8F7" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="/vendor/maplibre-gl.css">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="shell">
+  <nav class="side" aria-label="Sections">
+    <div class="brand">
+      <img class="brandmark" src="/brand/groundskeeper-mark.svg" width="28" height="28" alt="">
+      <span class="brandname">Groundskeeper<small class="brandsub">for Yarbo</small></span>
+    </div>
+    <a class="nav" href="#live" data-view="live"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><circle cx="12" cy="12" r="8"></circle><path d="M12 1v3M12 20v3M1 12h3M20 12h3"></path></svg>Live</a>
+    <a class="nav" href="#runs" data-view="runs"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v5h5"></path><path d="M12 7v5l3 2"></path></svg>Runs</a>
+    <a class="nav" href="#studio" data-view="studio"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"></path><path d="M9 4v14M15 6v14"></path></svg>Map Studio</a>
+    <a class="nav" href="#schedule" data-view="schedule"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>Schedule</a>
+    <a class="nav" href="#robot" data-view="robot"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="10" rx="3"></rect><circle cx="7" cy="18" r="2"></circle><circle cx="17" cy="18" r="2"></circle><path d="M8 7V5h8v2"></path></svg>Robot</a>
+    <a class="nav" href="#settings" data-view="settings"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"></path></svg>Settings</a>
+
+    <div class="robotcard" aria-label="Robot">
+      <p class="label">Robot</p>
+      <div class="mono small" id="rc-sn">—</div>
+      <div class="muted small" id="rc-head">—</div>
+    </div>
+    <div class="navfoot"><a href="#help">Help</a><a class="navver mono tiny" id="navver" href="#help/changelog" title="What changed"></a></div>
+  </nav>
+
+  <div class="mainarea">
+    <header class="top">
+      <h1 class="h1"><span id="viewtitle">Live</span><a id="helplink" class="helplink" href="#help" title="Help for this page" aria-label="Help for this page">?</a></h1>
+      <nav id="subtabs" class="subtabs" aria-label="Robot" hidden></nav>
+      <div id="liveview" class="subtabs liveview" role="group" aria-label="Live layout" hidden><button type="button" class="subtab" data-mode="map">Map</button><button type="button" class="subtab" data-mode="camera">Camera</button></div>
+      <div id="chips" class="chips" aria-live="polite"></div>
+      <div id="battery" class="battslot"></div>
+      <button type="button" id="themebtn" class="themebtn" aria-label="Switch between light and dark"></button>
+    </header>
+
+    <main class="layout">
+      <section class="mapwrap" aria-label="Yard map">
+        <div id="map"></div>
+        <div id="camstage" class="camstage" aria-label="Follow-cam" hidden></div>
+        <div class="maptools" role="group" aria-label="Map layers">
+          <button type="button" class="tool on" data-layer="imagery" aria-pressed="true">Imagery</button>
+          <button type="button" class="tool on" data-layer="zones" aria-pressed="true">Zones</button>
+          <button type="button" class="tool on" data-layer="labels" aria-pressed="true">Labels</button>
+          <button type="button" class="tool on" data-layer="track" aria-pressed="true" data-studio-hide>Track</button>
+          <button type="button" class="tool on" data-layer="cameras" aria-pressed="true">Cameras</button>
+          <button type="button" class="tool" data-layer="trouble" aria-pressed="false" data-studio-hide title="Where the robot gets stuck, errors, steep ground and weak positioning, from recorded runs">Problem areas</button>
+          <button type="button" class="tool" data-layer="signal" aria-pressed="false" data-studio-hide title="Signal across the yard, from every recorded run">Signal</button>
+          <button type="button" class="tool" id="ground3d" aria-pressed="false" data-studio-hide title="Tilt the map and raise the ground: the robot's own heights over the lawns, public lidar (USGS 3DEP) around them. Right-drag (two fingers on a phone) turns and tilts.">3D</button>
+          <label class="tool toolsel" id="ground3dx" data-studio-hide hidden title="How much taller the ground is drawn than it is"><select id="ground3dsel" aria-label="Draw the ground this much taller"><option value="1">1×</option><option value="1.5">1.5×</option><option value="2">2×</option><option value="3">3×</option></select></label>
+          <button type="button" class="tool" id="follow3d" aria-pressed="false" data-studio-hide hidden title="Follow the robot from behind and to one side. Right-drag (two fingers on a phone) moves the camera round it; a drag or Fit yard lets go.">Follow</button>
+          <label class="tool toolsel" data-studio-hide title="What the track's colour shows">Colour <select id="trackmetric" aria-label="Colour the track by"></select></label>
+          <button type="button" class="tool" id="recenter">Fit yard</button>
+        </div>
+        <div class="legend" aria-label="Legend">
+          <div class="signalbox" id="problembox" hidden><span class="muted">Problems</span><span id="problemscale" class="signalscale"></span></div>
+          <div class="signalbox" id="signalbox" hidden>
+          <label for="signalmetric" class="muted">Signal</label>
+          <select id="signalmetric" class="field slim">
+            <option value="halow">HaLow strength</option>
+            <option value="rtk">RTK fixed share</option>
+            <option value="sats">Satellites</option>
+            <option value="wifi">Wi-Fi (survey)</option>
+          </select>
+          <select id="signalnet" class="field slim" aria-label="Wi-Fi network" title="The network to show; % is its average where heard" hidden></select>
+          <span id="signalscale" class="signalscale"></span>
+        </div>
+          <span><i class="sw area"></i>Mowing area</span>
+          <span><i class="sw nogo"></i>No-go</span>
+          <span><i class="sw novis"></i>No-vision</span>
+          <span><i class="sw path"></i>Pathway</span>
+          <span id="legend-track" class="legendgroup"><span><i class="sw fixed"></i>RTK fixed</span>
+          <span><i class="sw float"></i>Float</span>
+          <span><i class="sw single"></i>Single</span></span>
+          <span class="lg-gap"><i class="sw gap"></i>Gap</span>
+        </div>
+      </section>
+
+      <aside class="panel" aria-labelledby="viewtitle">
+        <div class="view" id="p-live"><p class="muted pad">Connecting…</p></div>
+        <div class="view" id="p-runs" hidden></div>
+        <div class="view" id="p-health" hidden></div>
+        <div class="view" id="p-studio" hidden></div>
+        <div class="view" id="p-schedule" hidden></div>
+        <div class="view" id="p-maintenance" hidden></div>
+        <div class="view" id="p-settings" hidden></div>
+        <div class="view" id="p-events" hidden></div>
+        <div class="view" id="p-help" hidden></div>
+      </aside>
+    </main>
+    <div id="toast" class="toast" role="status" hidden></div>
+
+  </div>
+</div>
+
+<script src="/vendor/maplibre-gl.js"></script>
+<script src="/app.js"></script>
+<script src="/robot3d.js"></script>
+<script src="/ops.js"></script>
+<script src="/imagery.js"></script>
+<script src="/settings.js"></script>
+<script src="/studio.js"></script>
+<script src="/help.js"></script>
+</body>
+</html>

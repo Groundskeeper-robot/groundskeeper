@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ky_kyfromabove_phase3",
+  "name": "KyFromAbove Phase 3 orthoimagery (7.5 cm)",
+  "provider": "Kentucky Division of Geographic Information (KyFromAbove)",
+  "country": "US",
+  "region": "Kentucky",
+  "homepage": "https://kyfromabove.ky.gov/",
+  "kind": "arcgis_image",
+  "url": "https://kyraster.ky.gov/arcgis/rest/services/ImageServices/Ky_KYAPED_Phase3_3IN_WGS84WM/ImageServer?bandIds=0,1,2",
+  "max_px": 4096,
+  "native_m": 0.0762,
+  "vintage": "Leaf-off spring flights, 2022 to 2024 (statewide 3-inch Phase 3)",
+  "attribution": "Imagery: KyFromAbove, Kentucky Division of Geographic Information",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state open data (KyFromAbove), provided as is; credit required",
+    "url": "https://kygeonet.ky.gov/#info",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_ky"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Kentucky State Capitol, Frankfort",
+    "landmark": [-84.8753, 38.1867]
+  }
+}

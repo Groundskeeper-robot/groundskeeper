@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "or_lane_airphotos",
+  "name": "Lane County current air photos (7.5 cm)",
+  "provider": "Lane Council of Governments (RLID), City of Eugene",
+  "country": "US",
+  "region": "Lane County, Oregon",
+  "homepage": "https://www.rlid.org/",
+  "kind": "arcgis_map",
+  "url": "https://gateway.maps.rlid.org/maps1/rest/services/Regional/Airphotos/MapServer",
+  "max_px": 4096,
+  "native_m": 0.0762,
+  "vintage": "Leaf-off winter 2025: 7.5 cm (3 in) in Eugene, Springfield and Cottage Grove, 23 cm (9 in) in other towns and the McKenzie corridor; NAIP 60 cm elsewhere",
+  "attribution": "Imagery: Lane Council of Governments, City of Eugene, Pictometry",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public regional service, provided as is; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_or_lane"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Autzen Stadium, Eugene",
+    "landmark": [-123.0685, 44.0583]
+  }
+}

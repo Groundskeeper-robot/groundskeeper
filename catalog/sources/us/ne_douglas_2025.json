@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ne_douglas_2025",
+  "name": "Douglas County 2025 orthoimagery (2.5 cm)",
+  "provider": "Douglas County / City of Omaha GIS (DOGIS)",
+  "country": "US",
+  "region": "Douglas County, Nebraska",
+  "homepage": "https://data.dogis.org/pages/imagery",
+  "kind": "tiles",
+  "url": "https://dcgis.org/server/rest/services/2025_Douglas_County_NE_Imagery/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 22,
+  "native_m": 0.0254,
+  "vintage": "Leaf-off spring flight (EagleView), March 2025",
+  "attribution": "Imagery: Douglas County / City of Omaha GIS (EagleView)",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public county service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_ne_douglas"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Douglas County Courthouse, Omaha",
+    "landmark": [-95.9392, 41.2568]
+  }
+}

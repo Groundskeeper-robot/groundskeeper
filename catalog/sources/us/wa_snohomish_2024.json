@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "wa_snohomish_2024",
+  "name": "Snohomish County 2024 aerial imagery (7.5 cm)",
+  "provider": "Snohomish County Assessor GIS",
+  "country": "US",
+  "region": "Snohomish County, Washington",
+  "homepage": "https://snohomishcountywa.gov/2069/Aerial-Photos",
+  "kind": "arcgis_map",
+  "url": "https://gis.snoco.org/sas/rest/services/SAS_Services/SAS_Imagery_2024/MapServer",
+  "max_px": 4096,
+  "native_m": 0.0762,
+  "vintage": "Leaf-off spring 2024 (March to June); 7.5 cm (3 in) in urban areas, 23 cm (9 in) in rural areas",
+  "attribution": "Imagery: Snohomish County",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public county service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_wa_snohomish"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Snohomish County Courthouse, Everett",
+    "landmark": [-122.2062, 47.9771]
+  }
+}

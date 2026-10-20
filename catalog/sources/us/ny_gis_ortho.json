@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ny_gis_ortho",
+  "name": "NYS latest orthoimagery (30 cm)",
+  "provider": "NYS ITS Geospatial Services",
+  "country": "US",
+  "region": "New York",
+  "homepage": "https://gis.ny.gov/orthoimagery",
+  "kind": "arcgis_map",
+  "url": "https://orthos.its.ny.gov/arcgis/rest/services/wms/Latest/MapServer",
+  "max_px": 4096,
+  "native_m": 0.3048,
+  "vintage": "Leaf-off spring flights, 2022 to 2025 (most recent per area)",
+  "attribution": "Imagery: NYS ITS Geospatial Services",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_ny"
+  },
+  "verified": {
+    "date": "2026-10-09",
+    "place": "New York State Capitol, Albany",
+    "landmark": [-73.7572, 42.6526]
+  }
+}

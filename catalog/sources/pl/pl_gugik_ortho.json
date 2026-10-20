@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schema.json",
+  "id": "pl_gugik_ortho",
+  "name": "GUGiK orthophoto (high resolution)",
+  "provider": "GUGiK",
+  "country": "PL",
+  "region": "Poland",
+  "homepage": "https://www.geoportal.gov.pl/",
+  "kind": "wms",
+  "url": "https://mapy.geoportal.gov.pl/wss/service/PZGIK/ORTO/WMS/HighResolution",
+  "layers": "Raster",
+  "version": "1.3.0",
+  "crs": "EPSG:4326",
+  "native_m": 0.25,
+  "attribution": "Imagery: © GUGiK (geoportal.gov.pl)",
+  "license": {
+    "id": "provider-terms",
+    "name": "Free use with credit; see the GUGiK terms",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "pl"
+  },
+  "verified": {
+    "date": "2026-10-03",
+    "place": "Warsaw city centre",
+    "landmark": [21.0122, 52.2319]
+  }
+}

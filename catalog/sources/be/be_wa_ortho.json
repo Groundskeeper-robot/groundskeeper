@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schema.json",
+  "id": "be_wa_ortho",
+  "name": "SPW latest orthophoto",
+  "provider": "Service public de Wallonie (SPW)",
+  "country": "BE",
+  "region": "Wallonia",
+  "homepage": "https://geoportail.wallonie.be/",
+  "kind": "wms",
+  "url": "https://geoservices.wallonie.be/arcgis/services/IMAGERIE/ORTHO_LAST/MapServer/WMSServer",
+  "layers": "0",
+  "version": "1.3.0",
+  "crs": "EPSG:4326",
+  "native_m": 0.25,
+  "attribution": "Imagery: © SPW (Service public de Wallonie)",
+  "license": {
+    "id": "provider-terms",
+    "name": "Free reuse with credit; see the SPW terms",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "be_wal"
+  },
+  "verified": {
+    "date": "2026-10-03",
+    "place": "Namur city centre",
+    "landmark": [4.867, 50.4651]
+  }
+}

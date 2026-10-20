@@ -1,0 +1,36 @@
+{
+  "type": "Feature",
+  "properties": {
+    "name": "Washington County, Arkansas",
+    "source": "US Census Bureau county boundaries (public domain), via plotly/datasets geojson-counties-fips",
+    "note": "Buffered 3 km and simplified to 20 points; generous on purpose.",
+    "command": "county_outline.py --fips 05143 --buffer-km 3 --name us_ar_washington"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [-94.526, 35.7557],
+        [-94.5851, 36.0983],
+        [-94.5771, 36.1202],
+        [-94.5515, 36.1294],
+        [-94.4133, 36.1269],
+        [-94.3644, 36.2249],
+        [-94.3456, 36.24],
+        [-93.9798, 36.2312],
+        [-93.889, 36.2622],
+        [-93.8656, 36.2553],
+        [-93.8579, 36.247],
+        [-93.8561, 36.2268],
+        [-93.9111, 36.0863],
+        [-93.9296, 35.7597],
+        [-93.939, 35.7421],
+        [-93.9487, 35.7364],
+        [-94.1258, 35.7233],
+        [-94.5054, 35.734],
+        [-94.5153, 35.7391],
+        [-94.526, 35.7557]
+      ]
+    ]
+  }
+}

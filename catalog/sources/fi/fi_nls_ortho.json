@@ -1,0 +1,35 @@
+{
+  "$schema": "../../schema.json",
+  "id": "fi_nls_ortho",
+  "name": "National Land Survey orthophoto",
+  "provider": "National Land Survey of Finland",
+  "country": "FI",
+  "region": "Finland",
+  "homepage": "https://www.maanmittauslaitos.fi/en",
+  "kind": "tiles",
+  "url": "https://avoin-karttakuva.maanmittauslaitos.fi/avoin/wmts/1.0.0/ortokuva/default/WGS84_Pseudo-Mercator/{z}/{y}/{x}.jpg?api-key={key}",
+  "max_zoom": 19,
+  "native_m": 0.5,
+  "attribution": "Imagery: © National Land Survey of Finland",
+  "license": {
+    "id": "CC-BY-4.0",
+    "name": "Open data (CC BY 4.0); credit required",
+    "url": "https://creativecommons.org/licenses/by/4.0/",
+    "commercial": true,
+    "credit": true
+  },
+  "auth": {
+    "label": "a free National Land Survey of Finland API key",
+    "signup": "https://www.maanmittauslaitos.fi/en/rajapinnat/api-avaimen-ohje"
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "fi"
+  },
+  "verified": {
+    "date": "2026-10-03",
+    "place": "Helsinki city centre",
+    "landmark": [24.9384, 60.1699],
+    "note": "Address format confirmed by the service's key error; renders only with a key."
+  }
+}

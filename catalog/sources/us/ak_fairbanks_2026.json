@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ak_fairbanks_2026",
+  "name": "Fairbanks North Star Borough 2026 imagery (7.5 cm)",
+  "provider": "Fairbanks North Star Borough GIS (EagleView Pictometry)",
+  "country": "US",
+  "region": "Fairbanks North Star Borough, Alaska",
+  "homepage": "https://gisportal.fnsb.gov/",
+  "kind": "tiles",
+  "url": "https://gisportal.fnsb.gov/image/rest/services/Imagery_2026_Pictometry_Fairbanks/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 21,
+  "native_m": 0.0762,
+  "vintage": "Summer 2026 (leaf-on); 7.5 cm (3 in) in the urban area, 23 cm (9 in) elsewhere in the borough",
+  "attribution": "Imagery: Fairbanks North Star Borough, EagleView",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public borough service, provided as is; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_ak_fairbanks"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Rabinowitz Courthouse, Fairbanks",
+    "landmark": [-147.7174, 64.8447]
+  }
+}

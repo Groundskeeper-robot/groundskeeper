@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schema.json",
+  "id": "sd_sioux_falls_2025",
+  "name": "Sioux Falls 2025 imagery (15 cm)",
+  "provider": "City of Sioux Falls GIS (Nearmap imagery)",
+  "country": "US",
+  "region": "Sioux Falls, South Dakota",
+  "homepage": "https://www.arcgis.com/home/item.html?id=affc8ce87b684eb1acb7e3ce8f97d286",
+  "kind": "tiles",
+  "url": "https://tiles.arcgis.com/tiles/YpECgwASS4iMvgsA/arcgis/rest/services/NearmapPublicFacingTilePackage2025/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 20,
+  "native_m": 0.1524,
+  "vintage": "Leaf-on summer 2025 (Nearmap); the Sioux Falls city area only",
+  "attribution": "Imagery: City of Sioux Falls, Nearmap",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public-facing Nearmap imagery: view only at 15 cm or coarser, no download, latest year only",
+    "url": "https://www.arcgis.com/home/item.html?id=affc8ce87b684eb1acb7e3ce8f97d286",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_sd_sioux_falls"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Old Courthouse Museum, Sioux Falls",
+    "landmark": [-96.7287, 43.5515]
+  }
+}

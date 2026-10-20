@@ -1,0 +1,31 @@
+{
+  "$schema": "../schema.json",
+  "id": "eox_s2cloudless_2025",
+  "name": "Sentinel-2 cloudless 2025 (EOX)",
+  "provider": "EOX IT Services",
+  "country": "XX",
+  "region": "Worldwide",
+  "homepage": "https://s2maps.eu/",
+  "kind": "tiles",
+  "url": "https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2025_3857/default/g/{z}/{y}/{x}.jpg",
+  "max_zoom": 12,
+  "native_m": 10,
+  "vintage": "2025 cloudless mosaic",
+  "attribution": "EOxCloudless 2025 by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2025)",
+  "license": {
+    "id": "CC-BY-NC-SA-4.0",
+    "name": "Non-commercial use only (CC BY-NC-SA 4.0); commercial use needs an EOX licence",
+    "url": "https://cloudless.eox.at/documentation/license",
+    "commercial": false,
+    "credit": true
+  },
+  "cache_days": 365,
+  "coverage": {
+    "type": "World"
+  },
+  "verified": {
+    "date": "2026-10-03",
+    "place": "Mont-Saint-Michel",
+    "landmark": [-1.5115, 48.6361]
+  }
+}

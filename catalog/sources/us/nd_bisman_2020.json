@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "nd_bisman_2020",
+  "name": "Bismarck-Mandan 2020 orthoimagery (7.6 cm)",
+  "provider": "Bismarck-Mandan MPO, served by the ND GIS Hub",
+  "country": "US",
+  "region": "Bismarck-Mandan, North Dakota",
+  "homepage": "https://www.gis.nd.gov/",
+  "kind": "arcgis_image",
+  "url": "https://ndgishub.nd.gov/arcgis/rest/services/Imagery/AerialImage_BisMan_2020/ImageServer?bandIds=0,1,2",
+  "max_px": 4096,
+  "native_m": 0.0762,
+  "vintage": "Leaf-off spring flights, April 16 to 19, 2020; the Bismarck-Mandan MPO area (about 394 sq mi), not all of Burleigh and Morton counties",
+  "attribution": "Imagery: Bismarck-Mandan MPO, via the ND GIS Hub",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_nd_bismarck_mandan"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "North Dakota State Capitol, Bismarck",
+    "landmark": [-100.7824, 46.8208]
+  }
+}

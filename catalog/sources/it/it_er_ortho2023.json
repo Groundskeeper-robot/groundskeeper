@@ -1,0 +1,34 @@
+{
+  "$schema": "../../schema.json",
+  "id": "it_er_ortho2023",
+  "name": "Ortofoto RER 2023-24 RGB (20 cm)",
+  "provider": "Regione Emilia-Romagna",
+  "country": "IT",
+  "region": "Emilia-Romagna",
+  "homepage": "https://geoportale.regione.emilia-romagna.it/servizi/servizi-ogc/elenco-capabilities-dei-servizi-wms/cartografia-di-base/service-47",
+  "kind": "wms",
+  "url": "https://servizigis.regione.emilia-romagna.it/wms/rer2023_24_rgb",
+  "layers": "RER2023_24_RGB",
+  "version": "1.3.0",
+  "crs": "EPSG:3857",
+  "max_px": 2048,
+  "native_m": 0.2,
+  "vintage": "Regional flights, 2023–2024; parts of the region are still to be published",
+  "attribution": "Imagery: © Regione Emilia-Romagna, CC BY 4.0",
+  "license": {
+    "id": "CC-BY-4.0",
+    "name": "Open data (CC BY 4.0); credit required",
+    "url": "https://creativecommons.org/licenses/by/4.0/",
+    "commercial": true,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "it_er"
+  },
+  "verified": {
+    "date": "2026-10-09",
+    "place": "Basilica of San Vitale, Ravenna",
+    "landmark": [12.1961, 44.4205]
+  }
+}

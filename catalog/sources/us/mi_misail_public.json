@@ -1,0 +1,33 @@
+{
+  "$schema": "../../schema.json",
+  "id": "mi_misail_public",
+  "name": "Michigan best-available imagery (MiSAIL public cache)",
+  "provider": "State of Michigan DTMB, Center for Shared Solutions (MiSAIL)",
+  "country": "US",
+  "region": "Michigan",
+  "homepage": "https://www.michigan.gov/dtmb/services/maps/misail",
+  "kind": "tiles",
+  "url": "https://imagery.michigan.gov/server/rest/services/Michigan_imagery_public/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 19,
+  "native_m": 0.3,
+  "vintage": "State composite of the best available MiSAIL flights (12 in statewide base, sharper county flights), cached only to zoom 19 (about 22 cm); season varies by area",
+  "attribution": "Imagery: State of Michigan (MiSAIL)",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_mi"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Michigan State Capitol, Lansing",
+    "landmark": [
+      -84.5555,
+      42.7336
+    ]
+  }
+}

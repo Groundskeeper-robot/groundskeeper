@@ -1,0 +1,36 @@
+{
+  "$schema": "../../schema.json",
+  "id": "maptiler_satellite",
+  "name": "MapTiler Satellite",
+  "provider": "MapTiler",
+  "country": "XX",
+  "region": "Worldwide",
+  "homepage": "https://www.maptiler.com/",
+  "kind": "tiles",
+  "url": "https://api.maptiler.com/tiles/satellite-v2/{z}/{x}/{y}.jpg?key={key}",
+  "max_zoom": 20,
+  "native_m": 0.5,
+  "vintage": "Varies by place",
+  "attribution": "Imagery: © MapTiler, © Maxar",
+  "license": {
+    "id": "provider-terms",
+    "name": "Your key's terms apply",
+    "url": "https://www.maptiler.com/terms/",
+    "commercial": null,
+    "credit": true
+  },
+  "auth": {
+    "label": "a MapTiler key",
+    "signup": "https://cloud.maptiler.com/"
+  },
+  "cache_days": 1,
+  "coverage": {
+    "type": "World"
+  },
+  "verified": {
+    "date": "2026-10-03",
+    "place": "Royal Observatory, Greenwich",
+    "landmark": [-0.0015, 51.4778],
+    "note": "Address format confirmed by the service's key error; renders only with a key."
+  }
+}

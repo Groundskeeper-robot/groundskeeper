@@ -1,0 +1,9 @@
+.venv
+data
+web/vendor
+**/__pycache__
+.pytest_cache
+tests
+*.db
+.git
+.env

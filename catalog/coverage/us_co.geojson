@@ -1,0 +1,37 @@
+{
+  "type": "Feature",
+  "properties": {
+    "name": "Colorado",
+    "source": "Natural Earth 1:10m states and provinces (public domain)",
+    "note": "Buffered 10 km and simplified to 21 points; generous on purpose.",
+    "command": "python -m app.imagery coverage --country US --state \"Colorado\" --buffer-km 10 --name us_co"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [-109.162, 41.0],
+        [-109.153, 41.034],
+        [-109.128, 41.064],
+        [-109.091, 41.083],
+        [-109.046, 41.09],
+        [-102.052, 41.09],
+        [-102.008, 41.083],
+        [-101.97, 41.064],
+        [-101.945, 41.034],
+        [-101.936, 41.0],
+        [-101.924, 37.0],
+        [-101.933, 36.965],
+        [-101.958, 36.936],
+        [-101.995, 36.916],
+        [-102.04, 36.909],
+        [-109.047, 36.909],
+        [-109.091, 36.916],
+        [-109.128, 36.936],
+        [-109.153, 36.965],
+        [-109.162, 37.0],
+        [-109.162, 41.0]
+      ]
+    ]
+  }
+}

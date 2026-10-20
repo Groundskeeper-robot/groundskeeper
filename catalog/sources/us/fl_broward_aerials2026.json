@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schema.json",
+  "id": "fl_broward_aerials2026",
+  "name": "Broward County 2026 aerials (15 cm)",
+  "provider": "Broward County GIS (BCGIS), from the Broward County Property Appraiser's flight",
+  "country": "US",
+  "region": "Broward County, Florida",
+  "homepage": "https://www.arcgis.com/home/item.html?id=8da3a348bce44bf3b27df75015faff4a",
+  "kind": "tiles",
+  "url": "https://tiles.arcgis.com/tiles/JMAJrTsHNLrSsWf5/arcgis/rest/services/Aerials2026_V2/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 20,
+  "native_m": 0.1524,
+  "vintage": "January 2026 flight of the urban (eastern) county; the Everglades in the west are not covered. Broward publishes a new layer each year",
+  "attribution": "Imagery: Broward County GIS, Broward County Property Appraiser",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public county service under Broward County's terms of use; credit required",
+    "url": "https://www.broward.org/Terms",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_fl_broward"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Broward County Courthouse, Fort Lauderdale",
+    "landmark": [-80.14151, 26.11521]
+  }
+}

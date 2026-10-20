@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "wa_king_2025",
+  "name": "King County 2025 aerial imagery (10 cm)",
+  "provider": "King County GIS Center (flown by EagleView)",
+  "country": "US",
+  "region": "King County, Washington",
+  "homepage": "https://kingcounty.gov/en/dept/kcit/data-information-services/gis-center/maps-apps",
+  "kind": "tiles",
+  "url": "https://gismaps.kingcounty.gov/arcgis/rest/services/BaseMaps/KingCo_Aerial_2025/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 20,
+  "native_m": 0.1,
+  "vintage": "2025 flight; flown at 7.5 cm (3 in) over urban western King County and 15 cm (6 in) in the rural east, cached to about 10 cm; also covers southwestern Snohomish County",
+  "attribution": "Imagery: King County, EagleView",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public county service; imagery under King County's EagleView licence; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_wa_king"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Lumen Field, Seattle",
+    "landmark": [-122.3317, 47.5952]
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "nj_ogis_ortho2020",
+  "name": "NJ 2020 orthophotography (30 cm)",
+  "provider": "NJ Office of Information Technology, Office of GIS (NJOGIS)",
+  "country": "US",
+  "region": "New Jersey",
+  "homepage": "https://njgin.nj.gov/njgin/edata/imagery/",
+  "kind": "tiles",
+  "url": "https://maps.nj.gov/arcgis/rest/services/Basemap/Orthos_Natural_2020_NJ_WM/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 20,
+  "native_m": 0.3048,
+  "vintage": "Leaf-off spring flights, 2020 (the most recent statewide NJ flight)",
+  "attribution": "Imagery: NJ Office of GIS, NJOIT",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state service, provided as is; credit to NJOIT-OGIS appreciated",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_nj"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "New Jersey State House, Trenton",
+    "landmark": [-74.77, 40.2205]
+  }
+}

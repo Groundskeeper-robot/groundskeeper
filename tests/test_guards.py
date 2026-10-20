@@ -1,0 +1,170 @@
+"""Guard tests: the rules in AGENTS.md that a test can check, checked. They exist so that a contributor, human or AI,
+who has not read the rules still can't break them by accident. When one fails, read the message and the AGENTS.md
+rule it names; don't edit the test to make it pass. Changing a guard (a new open path, a new place that publishes to
+the robot) is a design decision: say so in the PR and expect a closer review.
+
+Static checks only: they read the source and the module constants, never start the app or touch a network."""
+import ast
+import re
+from pathlib import Path
+
+import pytest
+
+from app import auth, control, mapwrite, mcp_server
+from app.main import SETTINGS_DEFAULTS
+from app.transport_local import COMPUTE_ONLY, READ_ONLY_COMMANDS
+
+ROOT = Path(__file__).resolve().parent.parent
+APP = sorted((ROOT / "app").rglob("*.py"))
+WEB_JS = sorted((ROOT / "web").glob("*.js"))
+WEB_HTML = sorted((ROOT / "web").glob("*.html"))
+
+
+def rel(p: Path) -> str:
+    return p.relative_to(ROOT).as_posix()
+
+
+def read(p: Path) -> str:
+    return p.read_text(encoding="utf-8")
+
+
+def js_code(text: str) -> str:
+    """JS with // line comments and /* block */ comments blanked out (good enough for the patterns checked here)."""
+    text = re.sub(r"/\*.*?\*/", lambda m: "\n" * m.group().count("\n"), text, flags=re.S)
+    return re.sub(r"(^|[^:\"'\\])//.*", r"\1", text)
+
+
+# -- Safety ---------------------------------------------------------------------------------------------------------
+
+# The only modules that may call .publish(): the two transports, the controller (every run command, behind the
+# interlocks) and the map writer (WRITE_COMMANDS only, read back after). AGENTS.md → Rules → Safety.
+PUBLISHERS = {"app/transport_local.py", "app/cloud.py", "app/control.py", "app/mapwrite.py"}
+# Where the cloud transport's publish may be handed out: the controller, and ops wiring it into the map writer.
+CLOUD_PUBLISH_USERS = {"app/control.py", "app/ops.py"}
+
+
+def _publish_calls(p: Path) -> int:
+    tree = ast.parse(read(p))
+    return sum(isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "publish"
+               for n in ast.walk(tree))
+
+
+def test_only_known_modules_publish_to_the_robot():
+    found = {rel(p) for p in APP if _publish_calls(p)}
+    extra = found - PUBLISHERS
+    assert not extra, (f"{sorted(extra)} call .publish(). Robot commands go through app.control.Controller.send() "
+                       "(run commands) or app.mapwrite.MapWriter (map writes); reads through LocalTransport. "
+                       "See AGENTS.md → Rules → Safety.")
+
+
+def test_cloud_publish_is_only_handed_to_the_controller_and_map_writer():
+    users = {rel(p) for p in APP if re.search(r"\bcloud\.publish\b", read(p))}
+    extra = users - CLOUD_PUBLISH_USERS
+    assert not extra, f"{sorted(extra)} reach cloud.publish directly; use Controller.send() (AGENTS.md → Safety)"
+
+
+def test_manual_driving_stays_blocked():
+    assert "cmd_vel" in control.HARD_BLOCKED
+    for name, cmds in [("control.CATALOGUE", control.CATALOGUE), ("READ_ONLY_COMMANDS", READ_ONLY_COMMANDS),
+                       ("mapwrite.WRITE_COMMANDS", mapwrite.WRITE_COMMANDS)]:
+        assert "cmd_vel" not in cmds, f"cmd_vel must never be in {name}"
+
+
+def test_local_broker_requests_are_reads_or_listed_compute_only():
+    for cmd in READ_ONLY_COMMANDS:
+        assert cmd.startswith(("get_", "read_")) or cmd in COMPUTE_ONLY, (
+            f"{cmd} is not a read. The local broker is read-only; a request that only computes must be named in "
+            "COMPUTE_ONLY with a comment saying why nothing on the robot changes.")
+
+
+def test_a_new_install_has_every_switch_off():
+    for key in ("control_enabled", "map_write_enabled", "mcp_control_enabled"):
+        assert SETTINGS_DEFAULTS[key] is False, f"{key} must default to off (AGENTS.md: never loosen a default)"
+    assert control.GATE_DEFAULTS["guard_resume"] is False, "guard auto-resume spins blades; it stays opt-in"
+    assert control.GATE_DEFAULTS["yard_clear_required"] is True
+    assert control.GATE_DEFAULTS["presence_required"] is True
+
+
+def test_mcp_is_off_until_a_token_is_made():
+    class NoSettings:
+        def setting(self, key, default=None):
+            return default
+    assert mcp_server.authorised(NoSettings(), "Bearer anything") is None
+
+
+DOCS = ROOT / "docs" / "dev"
+
+
+@pytest.mark.parametrize("cmd", sorted({*READ_ONLY_COMMANDS, *control.CATALOGUE, *mapwrite.WRITE_COMMANDS}))
+def test_every_robot_command_is_documented(cmd):
+    docs = read(DOCS / "protocol.md") + read(DOCS / "map-writes.md")
+    assert re.search(rf"\b{re.escape(cmd)}\b", docs), (
+        f"{cmd} is sent to the robot but not described in docs/dev/protocol.md or docs/dev/map-writes.md. Document "
+        "its format and the capture it came from first (AGENTS.md → Safety: no command without a capture).")
+
+
+# -- Access ---------------------------------------------------------------------------------------------------------
+
+# Every path that skips sign-in. Adding one is a security decision: change this set in the same PR and say why.
+OPEN_PATHS = {"/health", "/login.html", "/login.js", "/style.css", "/favicon.ico", "/manifest.json",
+              "/api/auth/status", "/api/auth/login", "/api/auth/setup"}
+
+
+def test_open_paths_are_pinned():
+    assert auth.OPEN_PATHS == OPEN_PATHS, "the set of paths open without sign-in changed (AGENTS.md → Access)"
+    assert auth.OPEN_PREFIXES == ("/brand/",)
+    assert set(auth.LOCKED_PREFIXES) >= {"/api/", "/tiles/", "/imagery/"}
+
+
+@pytest.mark.parametrize("path", ["/api/status", "/api/runs/1/points", "/api/new-route", "/tiles/1/2/3.png",
+                                  "/imagery/yard.jpg", "/"])
+def test_data_paths_need_sign_in(path):
+    assert auth.needs_auth(path)
+
+
+# -- Front end ------------------------------------------------------------------------------------------------------
+
+def test_no_html_injection_in_the_ui():
+    bad = re.compile(r"\.(?:innerHTML|outerHTML)\s*[+]?=|insertAdjacentHTML\s*\(|document\.write\s*\(")
+    hits = [f"{rel(p)}:{n}" for p in WEB_JS for n, line in enumerate(js_code(read(p)).splitlines(), 1)
+            if bad.search(line)]
+    assert not hits, f"build DOM with h()/createElement + textContent, never HTML strings: {hits}"
+
+
+def test_nothing_loads_from_a_cdn_at_runtime():
+    cdn = re.compile(r"""(?:src|href)\s*=\s*["']https?://|import\s*\(?\s*["']https?://""")
+    hits = [rel(p) for p in [*WEB_HTML, *WEB_JS] if cdn.search(js_code(read(p)) if p.suffix == ".js" else read(p))]
+    assert not hits, f"libraries are vendored by the Dockerfile with checksums, not loaded from the web: {hits}"
+
+
+# Hard-coded colours left in the UI when this test was written. The rule is colours through the tokens in
+# web/style.css (tok(), MAP, SERIES); this only stops the number from growing. Lower a count when you remove some.
+HEX_BASELINE = {"web/app.js": 22, "web/ops.js": 1, "web/studio.js": 11, "web/index.html": 2}
+HEX = re.compile(r"#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b(?![\w-])")
+TOK_FALLBACK = re.compile(r"""tok\(\s*["']--[\w-]+["']\s*,\s*["']#[0-9a-fA-F]{3,8}["']\s*\)""")
+
+
+def _hex_count(p: Path) -> int:
+    text = js_code(read(p)) if p.suffix == ".js" else read(p)
+    return len(HEX.findall(TOK_FALLBACK.sub("", text)))
+
+
+@pytest.mark.parametrize("p", [*WEB_JS, *WEB_HTML], ids=rel)
+def test_no_new_hard_coded_colours(p):
+    n, allowed = _hex_count(p), HEX_BASELINE.get(rel(p), 0)
+    assert n <= allowed, (f"{rel(p)} has {n} hard-coded colours (allowed {allowed}). Add a token in web/style.css "
+                          "and read it with tok() (AGENTS.md → Code and UI)")
+    assert n == allowed, f"{rel(p)} is down to {n} hard-coded colours: lower HEX_BASELINE to match, so it stays down"
+
+
+# -- Docs -----------------------------------------------------------------------------------------------------------
+
+AGENT_DOCS = [ROOT / "AGENTS.md", *sorted(ROOT.glob("*/AGENTS.md"))]
+PATH_REF = re.compile(r"`((?:app|web|tests|docs|catalog|scripts|tools|brand|deploy|docker|\.github)/[\w./-]*)`")
+
+
+@pytest.mark.parametrize("doc", AGENT_DOCS, ids=rel)
+def test_paths_in_agent_docs_exist(doc):
+    missing = [m for m in PATH_REF.findall(read(doc))
+               if "*" not in m and "<" not in m and not (ROOT / m.rstrip("/")).exists()]
+    assert not missing, f"{rel(doc)} names paths that don't exist: {missing}. Fix the doc in the same PR."

@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "md_imap_threeinch",
+  "name": "MD iMAP three-inch imagery (7.6 cm)",
+  "provider": "Maryland Department of Information Technology, MD iMAP",
+  "country": "US",
+  "region": "Baltimore City; Baltimore, Anne Arundel and Cecil Counties, Maryland",
+  "homepage": "https://imap.maryland.gov/",
+  "kind": "arcgis_image",
+  "url": "https://mdgeodata.md.gov/imagery/rest/services/ThreeInch/MD_ThreeInchImagery/ImageServer?bandIds=0,1,2",
+  "max_px": 4096,
+  "native_m": 0.0762,
+  "vintage": "Leaf-off spring flights: Anne Arundel 2023, Cecil 2024, Baltimore City and County 2025; patches of other counties too",
+  "attribution": "Imagery: MD iMAP, Maryland DoIT",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_md_baltimore_region"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Maryland State House, Annapolis",
+    "landmark": [-76.4911, 38.9789]
+  }
+}

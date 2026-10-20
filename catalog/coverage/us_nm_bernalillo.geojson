@@ -1,0 +1,38 @@
+{
+  "type": "Feature",
+  "properties": {
+    "name": "Bernalillo County, New Mexico",
+    "source": "US Census Bureau county boundaries (public domain), via plotly/datasets geojson-counties-fips",
+    "note": "Buffered 3 km and simplified to 22 points; generous on purpose.",
+    "command": "county_outline.py --fips 35001 --buffer-km 3 --name us_nm_bernalillo"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [-106.443, 34.8665],
+        [-106.6708, 34.8782],
+        [-106.6949, 34.8532],
+        [-106.7207, 34.8429],
+        [-107.0375, 34.8452],
+        [-107.0554, 34.8602],
+        [-107.2267, 35.2091],
+        [-107.2265, 35.2298],
+        [-107.2193, 35.2386],
+        [-107.196, 35.2465],
+        [-106.2321, 35.2402],
+        [-106.2144, 35.2256],
+        [-106.2119, 35.2154],
+        [-106.2109, 34.9805],
+        [-106.1376, 34.9785],
+        [-106.1198, 34.964],
+        [-106.1191, 34.8599],
+        [-106.1369, 34.8451],
+        [-106.1496, 34.843],
+        [-106.411, 34.8431],
+        [-106.4343, 34.8511],
+        [-106.443, 34.8665]
+      ]
+    ]
+  }
+}

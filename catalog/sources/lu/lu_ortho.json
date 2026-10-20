@@ -1,0 +1,29 @@
+{
+  "$schema": "../../schema.json",
+  "id": "lu_ortho",
+  "name": "geoportail orthophoto",
+  "provider": "Administration du cadastre et de la topographie",
+  "country": "LU",
+  "region": "Luxembourg",
+  "homepage": "https://www.geoportail.lu/",
+  "kind": "tiles",
+  "url": "https://wmts1.geoportail.lu/opendata/wmts/ortho_latest/GLOBAL_WEBMERCATOR_4_V3/{z}/{x}/{y}.jpeg",
+  "max_zoom": 20,
+  "native_m": 0.15,
+  "attribution": "Imagery: © geoportail.lu / ACT",
+  "license": {
+    "id": "provider-terms",
+    "name": "Open data; credit required (see the geoportail.lu terms)",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "lu"
+  },
+  "verified": {
+    "date": "2026-10-03",
+    "place": "Luxembourg City centre",
+    "landmark": [6.1311, 49.6101]
+  }
+}

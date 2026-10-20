@@ -1,0 +1,32 @@
+name: Imagery source
+description: Suggest a free aerial imagery service for an area
+labels: [imagery]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        See catalog/README.md for how sources are described. You can also add one yourself: Settings → Map
+        imagery → Add a source → Export for sharing gives a ready catalog entry.
+  - type: input
+    id: area
+    attributes:
+      label: Area it covers
+      placeholder: "Example County, Maryland"
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Service address
+      description: The ArcGIS ImageServer / MapServer, WMS or tile URL. No keys or tokens.
+    validations:
+      required: true
+  - type: input
+    id: res
+    attributes:
+      label: Resolution and year, if known
+      placeholder: "15 cm, 2024 leaf-off"
+  - type: input
+    id: terms
+    attributes:
+      label: Terms of use (link)

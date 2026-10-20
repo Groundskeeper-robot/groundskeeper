@@ -1,0 +1,11 @@
+.venv/
+data/
+web/vendor/
+__pycache__/
+.pytest_cache/
+*.db
+studio_*.png
+tools/design/project/
+.claude/launch.json
+.env
+.private-denylist

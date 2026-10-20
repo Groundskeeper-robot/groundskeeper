@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schema.json",
+  "id": "tn_tdot_ortho",
+  "name": "TNMap imagery from TDOT Aerial Surveys (25-30 cm)",
+  "provider": "TDOT Aerial Surveys, served by Tennessee STS-GIS (TNMap)",
+  "country": "US",
+  "region": "Tennessee",
+  "homepage": "https://imagery.tn.gov/",
+  "kind": "tiles",
+  "url": "https://tnmap.tn.gov/arcgis/rest/services/BASEMAPS/IMAGERY_WEB_MERCATOR/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 19,
+  "native_m": 0.25,
+  "vintage": "Leaf-off flights 2016 to 2023, one TDOT region a year (6-inch since 2022, 1-foot before); cached only to zoom 19, so about 25 cm everywhere",
+  "attribution": "Imagery: TDOT Aerial Surveys, State of Tennessee",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state imagery under TDOT's disclaimer, provided as is; credit required",
+    "url": "https://tnmap.maps.arcgis.com/home/item.html?id=9ddbda7c292e4f3b906863b45ad86431",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_tn"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Tennessee State Capitol, Nashville",
+    "landmark": [-86.78417, 36.16583]
+  }
+}

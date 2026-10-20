@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "hi_usda_vivid",
+  "name": "USDA Vivid satellite mosaic (30 cm)",
+  "provider": "USDA Farm Production and Conservation (FPAC), imagery by Maxar",
+  "country": "US",
+  "region": "Hawaii",
+  "homepage": "https://www.fpacbc.usda.gov/geospatial-services/customer-services/imagery-catalogs",
+  "kind": "arcgis_image",
+  "url": "https://apps.geo.fpac.usda.gov/nrcs-imagery/rest/services/ortho_imagery/usda_oconus_prime/ImageServer",
+  "max_px": 4096,
+  "native_m": 0.3,
+  "vintage": "Satellite mosaic, mostly 2024 (Maxar Vivid); USDA's current OCONUS layer, refreshed as new imagery arrives",
+  "attribution": "Imagery: USDA FPAC, © Maxar Technologies",
+  "license": {
+    "id": "provider-terms",
+    "name": "Maxar imagery licensed to USDA, published for public viewing; non-commercial",
+    "commercial": false,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_hi"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Hawaii State Capitol, Honolulu",
+    "landmark": [-157.8573, 21.3073]
+  }
+}

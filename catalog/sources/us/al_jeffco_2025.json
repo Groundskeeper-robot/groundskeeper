@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "al_jeffco_2025",
+  "name": "Jefferson County 2025 orthophotography (7.5 cm)",
+  "provider": "Jefferson County GIS Consortium",
+  "country": "US",
+  "region": "Jefferson County, Alabama",
+  "homepage": "https://data-jeffco-al.opendata.arcgis.com/",
+  "kind": "tiles",
+  "url": "https://jccgis.jccal.org/image/rest/services/2025/DOP2025WebMercator/ImageServer/tile/{z}/{y}/{x}",
+  "max_zoom": 21,
+  "native_m": 0.075,
+  "vintage": "Leaf-off flight, February 21 to March 1, 2025",
+  "attribution": "Imagery: Jefferson County GIS Consortium",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public county service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_al_jefferson"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Vulcan statue, Vulcan Park, Birmingham",
+    "landmark": [-86.7955, 33.4917]
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "$schema": "../../schema.json",
+  "id": "cz_cuzk_ortho",
+  "name": "ČÚZK orthophoto",
+  "provider": "ČÚZK",
+  "country": "CZ",
+  "region": "Czechia",
+  "homepage": "https://geoportal.cuzk.cz/",
+  "kind": "wms",
+  "url": "https://ags.cuzk.cz/arcgis1/services/ORTOFOTO/MapServer/WMSServer",
+  "layers": "0",
+  "version": "1.3.0",
+  "crs": "EPSG:4326",
+  "native_m": 0.2,
+  "attribution": "Imagery: © ČÚZK",
+  "license": {
+    "id": "CC-BY-4.0",
+    "name": "Open data (CC BY 4.0); credit required",
+    "url": "https://creativecommons.org/licenses/by/4.0/",
+    "commercial": true,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "cz"
+  },
+  "verified": {
+    "date": "2026-10-03",
+    "place": "Old Town Square, Prague",
+    "landmark": [14.4213, 50.087]
+  }
+}

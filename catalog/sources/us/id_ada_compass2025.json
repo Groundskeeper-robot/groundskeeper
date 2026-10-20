@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schema.json",
+  "id": "id_ada_compass2025",
+  "name": "Ada County 2025 orthophotography (7.5 cm)",
+  "provider": "Ada County Highway District (ACHD), COMPASS imagery",
+  "country": "US",
+  "region": "Ada County, Idaho",
+  "homepage": "https://compassidaho.org/orthophotography/",
+  "kind": "arcgis_image",
+  "url": "https://gis.achdidaho.org/imagery/rest/services/Imagery/Ada_County_Imagery_2025/ImageServer",
+  "max_px": 4096,
+  "native_m": 0.0762,
+  "vintage": "Leaf-off spring flight, 2025 (COMPASS): 7.5 cm over the urban areas, 15 cm flights over the rural rest of the county",
+  "attribution": "Imagery: COMPASS, ACHD",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public ACHD service; the COMPASS orthophoto files are sold per section; credit required",
+    "url": "https://compassidaho.org/orthophotography/",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_id_ada"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Idaho State Capitol, Boise",
+    "landmark": [-116.1997, 43.6178]
+  }
+}

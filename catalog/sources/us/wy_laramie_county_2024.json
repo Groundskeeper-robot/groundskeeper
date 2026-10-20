@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "wy_laramie_county_2024",
+  "name": "Cheyenne/Laramie County aerial base map 2024 (7.6 cm)",
+  "provider": "Cheyenne and Laramie County GIS Cooperative (CLCGISC)",
+  "country": "US",
+  "region": "Laramie County, Wyoming",
+  "homepage": "https://maps.laramiecounty.com/",
+  "kind": "arcgis_map",
+  "url": "https://maps.laramiecounty.com/arcgis/rest/services/AerialBasemapMap/MapServer?layers=show:3",
+  "max_px": 4096,
+  "native_m": 0.0762,
+  "vintage": "2024 flight: 7.6 cm over Cheyenne and the urban area, 15 cm over the rest of the county",
+  "attribution": "Imagery: Cheyenne and Laramie County GIS Cooperative",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public county service, for display purposes only; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_wy_laramie_county"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Wyoming State Capitol, Cheyenne",
+    "landmark": [-104.8202, 41.1403]
+  }
+}

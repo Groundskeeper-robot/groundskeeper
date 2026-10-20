@@ -1,0 +1,4 @@
+# Keep LF everywhere: the deploy script runs in bash and everything ships into a Linux image.
+* text=auto eol=lf
+*.jpg binary
+*.png binary

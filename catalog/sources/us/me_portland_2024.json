@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "me_portland_2024",
+  "name": "City of Portland EagleView 2024 (7.6 cm)",
+  "provider": "City of Portland, Maine (EagleView imagery)",
+  "country": "US",
+  "region": "City of Portland, Maine",
+  "homepage": "https://portlandme.maps.arcgis.com/",
+  "kind": "arcgis_image",
+  "url": "https://gis.portlandmaine.gov/image/rest/services/Imagery/Portland_EagleView_2024/ImageServer",
+  "max_px": 4096,
+  "native_m": 0.0762,
+  "vintage": "Leaf-off 2024 flight (EagleView); covers the city of Portland and its Casco Bay islands only",
+  "attribution": "Imagery: City of Portland, Maine; EagleView",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public city service; terms not stated, credit the city",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_me_cumberland"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Portland City Hall, Portland",
+    "landmark": [-70.2573, 43.6593]
+  }
+}

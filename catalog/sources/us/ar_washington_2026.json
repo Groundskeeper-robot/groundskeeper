@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ar_washington_2026",
+  "name": "Washington County imagery 2026 (7.6 cm)",
+  "provider": "Washington County AR, published by NWARPC",
+  "country": "US",
+  "region": "Washington County, Arkansas",
+  "homepage": "https://www.arcgis.com/home/item.html?id=01ab4fa1eb3d410f8ad8359572986b49",
+  "kind": "tiles",
+  "url": "https://tiles.arcgis.com/tiles/G4bYaaas92zuKaUR/arcgis/rest/services/Washington_County_Imagery/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 21,
+  "native_m": 0.0762,
+  "vintage": "Leaf-off winter flight 2025-2026; 3 inch in urban areas, 6 inch elsewhere",
+  "attribution": "Imagery: Washington County AR, via NWARPC",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public county service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_ar_washington"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Donald W. Reynolds Razorback Stadium, Fayetteville",
+    "landmark": [-94.1789, 36.0681]
+  }
+}

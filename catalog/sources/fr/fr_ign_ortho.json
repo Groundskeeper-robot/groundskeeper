@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "fr_ign_ortho",
+  "name": "IGN BD ORTHO (20 cm)",
+  "provider": "IGN",
+  "country": "FR",
+  "region": "France (mainland and Corsica)",
+  "homepage": "https://geoservices.ign.fr/bdortho",
+  "kind": "tiles",
+  "url": "https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/jpeg",
+  "max_zoom": 19,
+  "native_m": 0.2,
+  "attribution": "Imagery: © IGN BD ORTHO",
+  "license": {
+    "id": "etalab-2.0",
+    "name": "Licence Ouverte (Etalab) 2.0; credit required",
+    "url": "https://www.etalab.gouv.fr/licence-ouverte-open-licence/",
+    "commercial": true,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "fr"
+  },
+  "verified": {
+    "date": "2026-10-03",
+    "place": "Eiffel Tower, Paris",
+    "landmark": [2.2945, 48.8584]
+  }
+}

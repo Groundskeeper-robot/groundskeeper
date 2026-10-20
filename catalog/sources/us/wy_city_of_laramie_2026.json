@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "wy_city_of_laramie_2026",
+  "name": "City of Laramie 2026 aerial (11 cm)",
+  "provider": "City of Laramie GIS",
+  "country": "US",
+  "region": "Laramie, Wyoming",
+  "homepage": "https://www.cityoflaramie.org/",
+  "kind": "tiles",
+  "url": "https://tiles.arcgis.com/tiles/nuWdH5CU0WK3IL1x/arcgis/rest/services/City_of_Laramie_2026_Aerial/MapServer/tile/{z}/{y}/{x}",
+  "max_zoom": 20,
+  "native_m": 0.11,
+  "vintage": "Leaf-off flight (GeoTerra), March 4, 2026, at 7.6 cm, cached to zoom 20 (about 11 cm); the city of Laramie only",
+  "attribution": "Imagery: City of Laramie (GeoTerra)",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public city service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_wy_albany"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Albany County Courthouse, Laramie",
+    "landmark": [-105.5903, 41.3113]
+  }
+}

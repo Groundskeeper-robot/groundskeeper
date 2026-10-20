@@ -1,0 +1,33 @@
+{
+  "$schema": "../../schema.json",
+  "id": "de_rp_dop20",
+  "name": "DOP20 (20 cm)",
+  "provider": "Landesamt für Vermessung und Geobasisinformation Rheinland-Pfalz (LVermGeo)",
+  "country": "DE",
+  "region": "Rhineland-Palatinate",
+  "homepage": "https://lvermgeo.rlp.de/",
+  "kind": "wms",
+  "url": "https://geo4.service24.rlp.de/wms/rp_dop20.fcgi",
+  "layers": "rp_dop20",
+  "version": "1.3.0",
+  "crs": "EPSG:3857",
+  "max_px": 4096,
+  "native_m": 0.2,
+  "attribution": "Imagery: © GeoBasis-DE / LVermGeoRP, dl-de/by-2-0",
+  "license": {
+    "id": "DL-DE-BY-2.0",
+    "name": "Datenlizenz Deutschland Namensnennung 2.0; credit required",
+    "url": "https://www.govdata.de/dl-de/by-2-0",
+    "commercial": true,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "de_rp"
+  },
+  "verified": {
+    "date": "2026-10-09",
+    "place": "Mainz Cathedral",
+    "landmark": [8.2741, 49.9987]
+  }
+}

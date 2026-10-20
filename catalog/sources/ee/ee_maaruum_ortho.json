@@ -1,0 +1,34 @@
+{
+  "$schema": "../../schema.json",
+  "id": "ee_maaruum_ortho",
+  "name": "Orthophoto (Ortofoto)",
+  "provider": "Maa- ja Ruumiamet (Estonian Land and Spatial Development Board)",
+  "country": "EE",
+  "region": "Estonia",
+  "homepage": "https://geoportaal.maaamet.ee/eng/spatial-data/orthophotos-p309.html",
+  "kind": "wms",
+  "url": "https://kaart.maaamet.ee/wms/alus-geo",
+  "layers": "EESTIFOTO",
+  "version": "1.1.1",
+  "crs": "EPSG:3857",
+  "max_px": 2048,
+  "native_m": 0.16,
+  "vintage": "Latest flights; 10–16 cm in towns, 20–40 cm elsewhere",
+  "attribution": "Imagery: Ortofoto © Maa- ja Ruumiamet",
+  "license": {
+    "id": "provider-terms",
+    "name": "Maa- ja Ruumiamet open data licence (like CC BY 4.0); credit required",
+    "url": "https://geoportaal.maaruum.ee/opendata-licence",
+    "commercial": true,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "ee"
+  },
+  "verified": {
+    "date": "2026-10-09",
+    "place": "Town Hall Square, Tallinn",
+    "landmark": [24.7453, 59.4372]
+  }
+}

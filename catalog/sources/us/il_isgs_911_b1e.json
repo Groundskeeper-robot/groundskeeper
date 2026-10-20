@@ -1,0 +1,34 @@
+{
+  "$schema": "../../schema.json",
+  "id": "il_isgs_911_b1e",
+  "name": "Illinois 911 orthoimagery, block 1 east (15 cm)",
+  "provider": "Illinois State Geological Survey, for the Office of the Statewide 911 Administrator",
+  "country": "US",
+  "region": "Northeast outside Chicagoland (Kankakee, DeKalb, LaSalle), Illinois",
+  "homepage": "https://clearinghouse.isgs.illinois.edu/data/imagery/illinois-911-aerial-acquisition",
+  "kind": "arcgis_image",
+  "url": "https://data.isgs.illinois.edu/arcgis/rest/services/Imagery/IL_Blk1_East_2025/ImageServer?bandIds=0,1,2",
+  "max_px": 4096,
+  "native_m": 0.1524,
+  "vintage": "Leaf-off flights, November 2022 to April 2024 (published 2025), 6 in; one of eight ISGS block services that together cover Illinois except Cook and the collar counties",
+  "attribution": "Imagery: Illinois State Geological Survey, Illinois 911",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state data; cite the Illinois State Geological Survey",
+    "url": "https://clearinghouse.isgs.illinois.edu/about/terms",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_il_911_b1e"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Kankakee County Courthouse, Kankakee",
+    "landmark": [
+      -87.8605,
+      41.1193
+    ]
+  }
+}

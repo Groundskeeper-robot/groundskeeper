@@ -1,0 +1,33 @@
+{
+  "$schema": "../../schema.json",
+  "id": "mn_twin_cities_2025",
+  "name": "Twin Cities seven-county orthoimagery 2025 (30 cm)",
+  "provider": "MnGeo (Minnesota Geospatial Information Office), Metropolitan Council",
+  "country": "US",
+  "region": "Twin Cities seven-county metro, Minnesota",
+  "homepage": "https://gis.data.mn.gov/",
+  "kind": "wms",
+  "url": "https://imageserver.gisdata.mn.gov/cgi-bin/wms",
+  "layers": "met25",
+  "version": "1.3.0",
+  "crs": "EPSG:3857",
+  "max_px": 4096,
+  "native_m": 0.3,
+  "vintage": "Leaf-off spring 2025, 1 ft (Anoka, Carver, Dakota, Hennepin, Ramsey, Scott, Washington); a new metNN layer each flight",
+  "attribution": "Imagery: MnGeo, Metropolitan Council",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_mn_twin_cities"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Minnesota State Capitol, Saint Paul",
+    "landmark": [-93.1022, 44.9552]
+  }
+}

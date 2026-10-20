@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schema.json",
+  "id": "va_vbmp_ortho",
+  "name": "VBMP most recent imagery (30 cm)",
+  "provider": "Virginia Geographic Information Network (VGIN)",
+  "country": "US",
+  "region": "Virginia",
+  "homepage": "https://vgin.vdem.virginia.gov/",
+  "kind": "arcgis_map",
+  "url": "https://vginmaps.vdem.virginia.gov/arcgis/rest/services/VBMP_Imagery/MostRecentImagery_WGS/MapServer",
+  "max_px": 4096,
+  "native_m": 0.3048,
+  "vintage": "Leaf-off spring flights, 2022 to 2025; some urban areas at 15 or 7.5 cm",
+  "attribution": "Imagery: VGIN, Virginia Base Mapping Program",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public state service; credit required",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_va"
+  },
+  "verified": {
+    "date": "2026-10-09",
+    "place": "Virginia State Capitol, Richmond",
+    "landmark": [-77.4336, 37.5387]
+  }
+}

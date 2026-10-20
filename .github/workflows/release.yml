@@ -1,0 +1,55 @@
+name: Release
+
+# Push a tag vX.Y.Z (matching app/version.py and a "## X.Y.Z" section in CHANGELOG.md) to publish
+# ghcr.io/<owner>/groundskeeper:X.Y.Z, :X.Y and :latest for amd64 and arm64, and a GitHub release.
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Tag, app/version.py and CHANGELOG.md agree
+        run: python scripts/release_notes.py "${GITHUB_REF_NAME#v}" > release-notes.md
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/groundskeeper
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+          labels: |
+            org.opencontainers.image.title=Groundskeeper
+            org.opencontainers.image.description=Self-hosted recorder, map and guarded control panel for Yarbo robots
+            org.opencontainers.image.licenses=MIT
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: PANEL_BUILD=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "$GITHUB_REF_NAME" --title "Groundskeeper ${GITHUB_REF_NAME#v}" --notes-file release-notes.md

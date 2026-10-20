@@ -1,0 +1,41 @@
+{
+  "type": "Feature",
+  "properties": {
+    "name": "District of Columbia",
+    "source": "Natural Earth 1:10m states and provinces (public domain)",
+    "note": "Buffered 10 km and simplified to 25 points; generous on purpose.",
+    "command": "python -m app.imagery coverage --country US --state \"District of Columbia\" --buffer-km 10 --name us_dc"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [-77.14, 38.824],
+        [-77.193, 38.857],
+        [-77.215, 38.883],
+        [-77.231, 38.911],
+        [-77.235, 38.942],
+        [-77.225, 38.972],
+        [-77.202, 38.997],
+        [-77.124, 39.06],
+        [-77.087, 39.079],
+        [-77.043, 39.087],
+        [-76.998, 39.08],
+        [-76.961, 39.06],
+        [-76.828, 38.957],
+        [-76.803, 38.928],
+        [-76.794, 38.893],
+        [-76.802, 38.859],
+        [-76.827, 38.829],
+        [-76.941, 38.739],
+        [-76.975, 38.721],
+        [-77.015, 38.713],
+        [-77.056, 38.716],
+        [-77.093, 38.731],
+        [-77.121, 38.755],
+        [-77.136, 38.785],
+        [-77.14, 38.824]
+      ]
+    ]
+  }
+}

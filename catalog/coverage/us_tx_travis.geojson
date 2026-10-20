@@ -1,0 +1,38 @@
+{
+  "type": "Feature",
+  "properties": {
+    "name": "Travis County, Texas",
+    "source": "US Census Bureau county boundaries (public domain), via plotly/datasets geojson-counties-fips",
+    "note": "Buffered 3 km and simplified to 22 points; generous on purpose.",
+    "command": "county_outline.py --fips 48453 --buffer-km 3 --name us_tx_travis"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [-97.6476, 30.041],
+        [-97.6975, 29.9997],
+        [-97.7201, 29.9988],
+        [-97.7302, 30.0036],
+        [-98.1999, 30.3425],
+        [-98.2037, 30.3515],
+        [-98.1999, 30.3701],
+        [-98.1565, 30.434],
+        [-98.1515, 30.496],
+        [-98.0783, 30.6354],
+        [-98.0625, 30.649],
+        [-97.9583, 30.6553],
+        [-97.9439, 30.653],
+        [-97.9323, 30.6451],
+        [-97.7654, 30.4629],
+        [-97.5756, 30.5289],
+        [-97.3463, 30.4377],
+        [-97.3399, 30.4282],
+        [-97.342, 30.4068],
+        [-97.465, 30.1974],
+        [-97.6269, 30.0491],
+        [-97.6476, 30.041]
+      ]
+    ]
+  }
+}

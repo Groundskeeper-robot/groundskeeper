@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schema.json",
+  "id": "fl_palm_beach_aerials2026",
+  "name": "Palm Beach County 2026 aerial photography (15 cm)",
+  "provider": "Palm Beach County OTI GIS",
+  "country": "US",
+  "region": "Palm Beach County, Florida",
+  "homepage": "https://www.arcgis.com/home/item.html?id=da7ddb916edd4befb3c7cf0dd4c0c4c3",
+  "kind": "arcgis_image",
+  "url": "https://gis.pbcgov.org/image/rest/services/Aerialphotgraphy_2026_WebMercator/ImageServer",
+  "max_px": 4096,
+  "native_m": 0.1524,
+  "vintage": "Countywide winter flight, 2026 (the county publishes one service per year)",
+  "attribution": "Imagery: Palm Beach County",
+  "license": {
+    "id": "provider-terms",
+    "name": "Public county service, provided as is; credit required",
+    "url": "https://www.arcgis.com/home/item.html?id=da7ddb916edd4befb3c7cf0dd4c0c4c3",
+    "commercial": null,
+    "credit": true
+  },
+  "cache_days": 90,
+  "coverage": {
+    "ref": "us_fl_palm_beach"
+  },
+  "verified": {
+    "date": "2026-10-10",
+    "place": "Palm Beach County Courthouse, West Palm Beach",
+    "landmark": [-80.05428, 26.71548]
+  }
+}
