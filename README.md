@@ -1,4 +1,10 @@
-# Groundskeeper
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="brand/logo/groundskeeper-lockup-for-yarbo-on-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="brand/logo/groundskeeper-lockup-for-yarbo-on-light.svg">
+    <img alt="Groundskeeper for Yarbo" src="brand/logo/groundskeeper-lockup-for-yarbo-on-light.svg" height="72">
+  </picture>
+</h1>
 
 **A self-hosted recorder, map and guarded control panel for Yarbo robots.** It runs in one container on your own
 network. It records every mow, shows the yard on aerial imagery, explains why the robot can't run, and starts,
