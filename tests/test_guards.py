@@ -5,6 +5,7 @@ the robot) is a design decision: say so in the PR and expect a closer review.
 
 Static checks only: they read the source and the module constants, never start the app or touch a network."""
 import ast
+import subprocess
 import re
 from pathlib import Path
 
@@ -163,8 +164,16 @@ AGENT_DOCS = [ROOT / "AGENTS.md", *sorted(ROOT.glob("*/AGENTS.md"))]
 PATH_REF = re.compile(r"`((?:app|web|tests|docs|catalog|scripts|tools|brand|deploy|docker|\.github)/[\w./-]*)`")
 
 
+def _in_repo(path: str) -> bool:
+    """Tracked in git, a folder holding tracked files, or a path the repo deliberately ignores (web/vendor/ is filled
+    in at build time). Not the local disk: a file that exists only on one machine must not pass."""
+    path = path.rstrip("/")
+    tracked = subprocess.run(["git", "ls-files", "--", path], cwd=ROOT, capture_output=True, text=True).stdout
+    ignored = subprocess.run(["git", "check-ignore", "-q", "--no-index", path + "/x"], cwd=ROOT).returncode == 0
+    return bool(tracked.strip()) or ignored
+
+
 @pytest.mark.parametrize("doc", AGENT_DOCS, ids=rel)
 def test_paths_in_agent_docs_exist(doc):
-    missing = [m for m in PATH_REF.findall(read(doc))
-               if "*" not in m and "<" not in m and not (ROOT / m.rstrip("/")).exists()]
+    missing = [m for m in PATH_REF.findall(read(doc)) if "*" not in m and "<" not in m and not _in_repo(m)]
     assert not missing, f"{rel(doc)} names paths that don't exist: {missing}. Fix the doc in the same PR."
