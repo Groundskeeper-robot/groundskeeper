@@ -40,6 +40,7 @@ GATE_DEFAULTS = {
     "guard_person": "pause",        # during a run: pause | dock | notify | ignore
     "guard_rain": "dock",
     "guard_everyone_left": "dock",
+    "guard_after_dark": "dock",     # a plan that charged mid-run and heads back out after sunset is sent home
     "guard_resume": False,          # after a guard PAUSE, resume by itself once the cause is gone (opt-in)
     "guard_resume_after_min": 5,    # ...and has stayed gone this long
 }

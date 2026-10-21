@@ -672,6 +672,8 @@ function secRules(d) {
         selCtl({ key: "guard_rain", value: g.guard_rain, options: ACTIONS, onsave: (v) => gate("guard_rain", v) })),
       srow("Everyone leaves", "The presence entity says nobody is home.",
         selCtl({ key: "guard_everyone_left", value: g.guard_everyone_left, options: ACTIONS, onsave: (v) => gate("guard_everyone_left", v) })),
+      srow("Leaves the charger after dark", "A plan that stopped to charge heads back out by itself when it is full, at any hour. After sunset at your yard, Return to dock sends it home instead: the plan ends, and the next schedule window starts it again.",
+        selCtl({ key: "guard_after_dark", value: g.guard_after_dark || "dock", options: ACTIONS.filter(([v]) => v !== "pause"), onsave: (v) => gate("guard_after_dark", v) })),
       srow("Resume after a guard pause", "Once the cause is gone. Never after a return to dock.",
         switchCtl("Resume after a guard pause", g.guard_resume, (v) => gate("guard_resume", v), "guard_resume")),
       g.guard_resume ? ssub(srow("Clear for", "Only a pause the guard sent, and only if the start checks also pass (yard clear, someone home, dry lawn).",

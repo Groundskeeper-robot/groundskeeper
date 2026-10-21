@@ -61,11 +61,26 @@ def _sun_ut_hours(day_of_year: int, lat: float, lon: float, rising: bool, zenith
     return (t_local - lng_hour) % 24
 
 
-def _sunrise_on(day_ts: float, lat: float, lon: float) -> float | None:
+def _sun_on(day_ts: float, lat: float, lon: float, rising: bool) -> float | None:
     day = time.gmtime(day_ts)
     midnight = calendar.timegm((day.tm_year, day.tm_mon, day.tm_mday, 0, 0, 0))
-    ut = _sun_ut_hours(day.tm_yday, lat, lon, rising=True)
+    ut = _sun_ut_hours(day.tm_yday, lat, lon, rising=rising)
     return None if ut is None else midnight + ut * 3600
+
+
+def _sunrise_on(day_ts: float, lat: float, lon: float) -> float | None:
+    return _sun_on(day_ts, lat, lon, True)
+
+
+def is_dark(now: float, lat: float, lon: float) -> bool | None:
+    """Between sunset and sunrise at the yard: the latest sun event before `now` is a sunset. The algorithm's events
+    for a UT date can fall on the next UT date (an evening sunset west of Greenwich), so the events of three days are
+    compared rather than one day's. None where the sun neither rose nor set in that time (polar day or night)."""
+    events = [(ts, rising) for back in (-1, 0, 1) for rising in (True, False)
+              if (ts := _sun_on(now + back * 86400, lat, lon, rising)) is not None and ts <= now]
+    if not events:
+        return None
+    return not max(events)[1]
 
 
 def sunrise_ts(now: float, lat: float, lon: float) -> float | None:

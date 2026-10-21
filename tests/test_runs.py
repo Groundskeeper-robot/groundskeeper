@@ -1,5 +1,6 @@
 """Plan-aware runs, command confirmation and the during-run guards (2026-10-05)."""
 import asyncio
+import calendar
 
 import pytest
 
@@ -923,3 +924,57 @@ def test_a_person_who_comes_back_later_in_the_same_run_is_notified_again(tmp_pat
     o.yard["person"] = True
     _tick(o, clock, n=2)                              # back two minutes later, no restart
     assert len(o.notifier.msgs) == 2
+
+
+# -- the after-dark guard (#20) ----------------------------------------------------------------------------------
+ANNAPOLIS = (38.97, -76.50)                       # a public landmark, not a yard
+NIGHT = calendar.timegm((2026, 10, 20, 23, 30, 0))  # about an hour after sunset there
+DAY = calendar.timegm((2026, 10, 20, 17, 0, 0))
+
+
+def _dark_ops(tmp_path, monkeypatch, when, gates=None):
+    o, clock = _ops(tmp_path, monkeypatch, gates or {})
+    clock[0] = when
+    o.rec.gps_ref = ANNAPOLIS
+    o.rec.set(RETURNING, "charging_break")         # charging mid-plan
+    _tick(o, clock)
+    return o, clock
+
+
+def test_leaving_the_charger_after_dark_is_sent_home(tmp_path, monkeypatch):
+    o, clock = _dark_ops(tmp_path, monkeypatch, NIGHT)
+    o.rec.set(TRANSIT, "transit")                  # full again: heading back out by itself
+    _tick(o, clock, n=2)
+    assert o.controller.sent == ["cmd_recharge"]
+    assert any("after dark" in t and "next schedule window" in t for t, _ in o.notifier.msgs)
+
+
+def test_leaving_the_charger_in_daylight_is_left_alone(tmp_path, monkeypatch):
+    o, clock = _dark_ops(tmp_path, monkeypatch, DAY)
+    o.rec.set(TRANSIT, "transit")
+    _tick(o, clock, n=3)
+    assert o.controller.sent == []
+
+
+def test_a_mow_that_runs_into_dusk_without_charging_is_left_alone(tmp_path, monkeypatch):
+    o, clock = _ops(tmp_path, monkeypatch, {})
+    clock[0] = NIGHT
+    o.rec.gps_ref = ANNAPOLIS
+    o.rec.set(MOWING, "mowing")
+    _tick(o, clock, n=3)
+    assert o.controller.sent == []
+
+
+def test_the_after_dark_guard_can_only_notify(tmp_path, monkeypatch):
+    o, clock = _dark_ops(tmp_path, monkeypatch, NIGHT, {"guard_after_dark": "notify"})
+    o.rec.set(TRANSIT, "transit")
+    _tick(o, clock, n=2)
+    assert o.controller.sent == [] and any("after dark" in t for t, _ in o.notifier.msgs)
+
+
+def test_without_the_yards_location_the_after_dark_guard_stays_quiet(tmp_path, monkeypatch):
+    o, clock = _dark_ops(tmp_path, monkeypatch, NIGHT)
+    o.rec.gps_ref = None
+    o.rec.set(TRANSIT, "transit")
+    _tick(o, clock, n=2)
+    assert o.controller.sent == []

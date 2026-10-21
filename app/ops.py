@@ -5,7 +5,7 @@ import logging
 import time
 from datetime import datetime
 
-from . import control, maintenance, telemetry
+from . import conditions, control, maintenance, telemetry
 from . import why as reasons
 from .cloud import CloudTransport
 from .control import Controller
@@ -33,6 +33,8 @@ STUCK_CLEAR_M = 3.0       # a stuck alert clears once the robot is this far from
 NOT_PAUSABLE = {"paused", "charging_break", "returning", "docking", "docked", "idle"}
 NOT_DOCKABLE = {"charging_break", "returning", "docking", "docked"}
 BUSY = {"mowing", "transit", "planning", "moving"}
+AFTER_CHARGE_S = 120      # the robot counts as leaving its charger if it was charging mid-plan this recently (it can
+                          # pass through idle for a moment on its way out)
 
 
 def point_in_ring(lon: float, lat: float, ring: list) -> bool:
@@ -66,6 +68,7 @@ class Ops:
         self.presence_cache = (0.0, None)
         # Guard conditions during a plan: key -> {active, since, clear_since, why, acted, acted_at, tries}
         self.guards: dict[str, dict] = {}
+        self._charged_at, self._night_out = 0.0, None      # the after-dark guard (_left_charger_after_dark)
         self._guard_saved: dict[str, float] = {}     # when each active detection was last written (guard_detections)
         self._guard_boot: dict | None = None         # what the previous process kept (read once, on first use)
         self._guard_cmd_at = 0.0          # last guard resume attempt
@@ -305,7 +308,25 @@ class Ops:
         if g["guard_everyone_left"] != "ignore":
             present = await self.presence()
             out["away"] = (None if present is None else present is False, "everyone left (Alarmo armed away)")
+        if g.get("guard_after_dark", "ignore") != "ignore":
+            out["dark"] = (self._left_charger_after_dark(),
+                           "it left the charger after dark (the plan ends; the next schedule window starts it again)")
         return out
+
+    def _left_charger_after_dark(self) -> bool:
+        """A plan that stopped to charge heads back out by itself when the battery is full, at any hour (seen on a
+        real mow at 20:36 in October). True from the moment it leaves the charger while it is dark at the yard
+        until sunrise, so a second try to go out in the same night is sent home too. Unknown location: False."""
+        r, now = self.rec, time.time()
+        if r.activity == "charging_break":
+            self._charged_at = now
+        ref = getattr(r, "gps_ref", None)
+        dark = conditions.is_dark(now, *ref) if ref else None
+        if not dark:
+            self._night_out = None
+        elif r.activity in BUSY and now - getattr(self, "_charged_at", 0.0) < AFTER_CHARGE_S:
+            self._night_out = r.run_id
+        return bool(dark) and getattr(self, "_night_out", None) is not None and self._night_out == r.run_id
 
     @staticmethod
     def _new_guard() -> dict:
@@ -329,11 +350,13 @@ class Ops:
         if not (r.run_id or r.plan_active()):
             self.guards.clear()
             self._resume = None
+            self._night_out = None
             return
         if not self.controller.enabled():
             self._drop_ownership("control switched off")
         g = control.gates(self.store)
-        actions = {"person": g["guard_person"], "rain": g["guard_rain"], "away": g["guard_everyone_left"]}
+        actions = {"person": g["guard_person"], "rain": g["guard_rain"], "away": g["guard_everyone_left"],
+                   "dark": g.get("guard_after_dark", "ignore")}
         conds = await self._guard_conditions(g)
         now = time.time()
         for key in [k for k in self.guards if k not in conds]:      # switched to "ignore" since

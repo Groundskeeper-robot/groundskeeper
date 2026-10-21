@@ -34,6 +34,11 @@ Every attempt, sent or refused, is in [Events](#events) with the checks it passe
 
 Every 5 seconds while it mows: a person or pet on a yard camera, rain starting, or everyone leaving home can pause
 it, dock it, or just notify ([Settings → Run rules](#settings/rules)). With control off they only notify.
+
+**After dark:** a plan that stopped to charge heads back out by itself as soon as the battery is full, even at
+night. When that happens between sunset and sunrise at your yard (worked out from the robot's map), the panel sends
+it home again (Return to dock, the default) or just notifies you. Sending it home ends the plan; the next schedule
+window starts it again in the morning, once the run rules pass.
 Resuming after a guard is off unless you switch it on, because resuming spins the blades.
 
 ## Map writes
