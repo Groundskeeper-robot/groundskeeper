@@ -52,13 +52,27 @@ More: [Map imagery](docs/user/imagery.md), [the catalog](catalog/SOURCES.md).
 Groundskeeper talks to the robot two ways, and you choose how far to go.
 
 - **Local:** it listens to the robot's own MQTT broker on your network: position about once a second while it
-  mows, battery, RTK, the map, plans and every reply. Recording, maps, coverage and alerts work with no Yarbo account and no
-  internet. It only ever reads there.
+  mows, battery, RTK, the map, plans and every reply. Recording, maps, coverage and alerts work with no Yarbo
+  account and no internet. It only ever reads there.
 - **Cloud:** sign in to your Yarbo account in Settings, the same route the official app uses, and the panel can
   start, pause, resume, stop and dock the robot, and write map changes, each behind its checks.
 - **Works alongside the Yarbo app:** a mow started from the phone is recorded like any other, and the panel notes
   the commands other clients send.
 - Control stays off until you switch it on, so you can run local-only for as long as you like.
+
+### Your Frigate cameras keep watch
+
+Tick the Frigate cameras that see the yard and draw the ground each one covers on the map. Then:
+
+- **The yard must be clear to start:** no person, dog or cat on a yard camera for the last 10 minutes (you choose
+  the time and the labels).
+- **Guards while it mows:** a person or pet in a camera's coverage pauses the robot, docks it or just notifies you,
+  your choice (acting needs control on). Resuming on its own afterwards is off unless you switch it on.
+- **Follow-cam:** live video from whichever camera's coverage holds the robot, switching as it moves. The camera
+  layout puts it full size with two-tap Pause, Stop and Return to dock buttons beside it.
+- **Snapshots** in the "ready to mow" notification, so you can see the yard before you confirm a start.
+
+More: [Integrations](docs/user/integrations.md), [Safety](docs/user/safety.md).
 
 ### Home Assistant and your weather station
 
