@@ -332,9 +332,10 @@ Before a route is trusted for control it is proved with a harmless command:
    move.
 2. **Local control:** a harmless setting whose result the robot reports, on the local broker. Done 2026-10-21 with
    `set_sound_param` (as the app sends it): accepted, with no handshake and no cloud (`docs/dev/protocol.md` →
-   Access control). Run commands have not been tried locally yet, so the panel still sends them through the cloud,
-   and `transport_local.py` still publishes only reads. Moving commands to the local broker is a design change of
-   its own (#31 would then mostly disappear).
+   Access control). Run commands work locally too (start, pause, stop and return to dock, each seen in the robot's
+   state within about 2 s, against up to a minute through the cloud on a weak link). The panel still sends them
+   through the cloud and `transport_local.py` still publishes only reads: moving commands to the local broker is a
+   design change of its own (#31 would then mostly disappear).
 
 The control route follows the result; it is a code-level decision, not a setting a user can flip.
 
