@@ -68,7 +68,8 @@ class Ops:
         self.presence_cache = (0.0, None)
         # Guard conditions during a plan: key -> {active, since, clear_since, why, acted, acted_at, tries}
         self.guards: dict[str, dict] = {}
-        self._charged_at, self._night_out = 0.0, None      # the after-dark guard (_left_charger_after_dark)
+        # The after-dark guard (_left_charger_after_dark): last seen charging mid-plan, when it left, which run is out
+        self._charged_at, self._charged_saved, self._left_at, self._night_out, self._dark_kept = 0.0, 0.0, None, None, None
         self._guard_saved: dict[str, float] = {}     # when each active detection was last written (guard_detections)
         self._guard_boot: dict | None = None         # what the previous process kept (read once, on first use)
         self._guard_cmd_at = 0.0          # last guard resume attempt
@@ -309,24 +310,43 @@ class Ops:
             present = await self.presence()
             out["away"] = (None if present is None else present is False, "everyone left (Alarmo armed away)")
         if g.get("guard_after_dark", "ignore") != "ignore":
-            out["dark"] = (self._left_charger_after_dark(),
-                           "it left the charger after dark (the plan ends; the next schedule window starts it again)")
+            out["dark"] = (self._left_charger_after_dark(), "it left the charger after dark")
         return out
 
     def _left_charger_after_dark(self) -> bool:
         """A plan that stopped to charge heads back out by itself when the battery is full, at any hour (seen on a
-        real mow at 20:36 in October). True from the moment it leaves the charger while it is dark at the yard
-        until sunrise, so a second try to go out in the same night is sent home too. Unknown location: False."""
+        real mow at 20:36 in October). True from the moment it leaves the charger mid-plan while it is dark at the
+        yard, until sunrise, so a second try the same night is sent home too. Not when a person sent it out (their
+        command came around the departure), not when it left before sunset, not without the yard's location. The
+        armed state and the last charging time are kept in the database, so a panel restart mid-departure keeps it."""
         r, now = self.rec, time.time()
-        if r.activity == "charging_break":
-            self._charged_at = now
         ref = getattr(r, "gps_ref", None)
+        if self._night_out is None and self._dark_kept is None:
+            self._dark_kept = self.store.setting("guard_after_dark_state") or {}
+            if self._dark_kept.get("run") == r.run_id and now < (self._dark_kept.get("until") or 0):
+                self._night_out = r.run_id
+            self._charged_at = max(self._charged_at, float(self._dark_kept.get("charged_at") or 0))
+        if r.activity == "charging_break":
+            self._charged_at, self._left_at = now, None
+            if now - self._charged_saved >= 60:
+                self._charged_saved = now
+                self._keep_dark(charged_at=now)
+        elif (r.activity in BUSY and self._left_at is None and 0 < now - self._charged_at < AFTER_CHARGE_S):
+            self._left_at = now
+            person = self._people_cmd_at() >= self._charged_at - AFTER_CHARGE_S
+            if ref and conditions.is_dark(now, *ref) and not person:
+                self._night_out = r.run_id
+                self._keep_dark(run=r.run_id, until=conditions.next_sunrise_ts(now, *ref) or now + 12 * 3600)
         dark = conditions.is_dark(now, *ref) if ref else None
-        if not dark:
+        if not dark and self._night_out is not None:
             self._night_out = None
-        elif r.activity in BUSY and now - getattr(self, "_charged_at", 0.0) < AFTER_CHARGE_S:
-            self._night_out = r.run_id
-        return bool(dark) and getattr(self, "_night_out", None) is not None and self._night_out == r.run_id
+            self._keep_dark(run=None, until=None)
+        return bool(dark) and self._night_out is not None and self._night_out == r.run_id
+
+    def _keep_dark(self, **change) -> None:
+        kept = {**(self.store.setting("guard_after_dark_state") or {}), **change}
+        self.store.set_setting("guard_after_dark_state", kept)
+        self._dark_kept = kept
 
     @staticmethod
     def _new_guard() -> dict:
@@ -350,13 +370,14 @@ class Ops:
         if not (r.run_id or r.plan_active()):
             self.guards.clear()
             self._resume = None
-            self._night_out = None
             return
         if not self.controller.enabled():
             self._drop_ownership("control switched off")
         g = control.gates(self.store)
+        # After dark, a pause would leave the robot on the lawn all night: only dock, notify or ignore apply.
+        dark = g.get("guard_after_dark", "ignore")
         actions = {"person": g["guard_person"], "rain": g["guard_rain"], "away": g["guard_everyone_left"],
-                   "dark": g.get("guard_after_dark", "ignore")}
+                   "dark": "dock" if dark == "pause" else dark}
         conds = await self._guard_conditions(g)
         now = time.time()
         for key in [k for k in self.guards if k not in conds]:      # switched to "ignore" since
@@ -446,7 +467,7 @@ class Ops:
     async def _guard_confirmations(self) -> None:
         """Watch the robot's state for the guard commands sent with wait=False."""
         r, now = self.rec, time.time()
-        for st in self.guards.values():
+        for key, st in self.guards.items():
             p = st["pending"]
             if not p:
                 continue
@@ -458,7 +479,9 @@ class Ops:
                         and r.plan.session is not None)
                 st.update(pending=None, acted=p["action"], acted_at=now, warned=False, tries=0,
                           owner={"activity_at": r.activity_at, "session": r.plan.session} if ours else None)
-                await self.notifier.send("guard", f"Guard: {st['why']}", f"{p['action']}: done, {meaning}")
+                await self.notifier.send("guard", f"Guard: {st['why']}", f"{p['action']}: done, {meaning}" + (
+                    ". On a real mow, Return to dock ended the plan: the next schedule window starts it again"
+                    if key == "dark" else ""))
             elif now - p["at"] > timeout:
                 st["pending"] = None
                 if st["tries"] in (1, 3):

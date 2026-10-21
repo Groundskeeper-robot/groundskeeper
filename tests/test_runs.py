@@ -1,10 +1,12 @@
 """Plan-aware runs, command confirmation and the during-run guards (2026-10-05)."""
 import asyncio
 import calendar
+import math
+import time
 
 import pytest
 
-from app import control, ops as ops_mod
+from app import conditions, control, ops as ops_mod
 from app.ops import Ops
 from app.recorder import Recorder
 from app.runs import (PAUSE_CAP_S, PLAN_BLIP_S, RunDetector, RunStats, activity, end_reason, parse_plan_feedback,
@@ -317,6 +319,7 @@ def _ops(tmp_path, monkeypatch, gates):
     o.rec = FakeRec(clock)
     o.controller, o.notifier = FakeController(o.rec), FakeNotifier()
     o.guards, o._guard_cmd_at, o._resume, o.phone_app_at, o._guard_saved, o._guard_boot = {}, 0.0, None, 0.0, {}, None
+    o._charged_at, o._charged_saved, o._left_at, o._night_out, o._dark_kept = 0.0, 0.0, None, None, None
     o.yard = {"person": False}
 
     async def yard_status(minutes, labels):
@@ -930,6 +933,7 @@ def test_a_person_who_comes_back_later_in_the_same_run_is_notified_again(tmp_pat
 ANNAPOLIS = (38.97, -76.50)                       # a public landmark, not a yard
 NIGHT = calendar.timegm((2026, 10, 20, 23, 30, 0))  # about an hour after sunset there
 DAY = calendar.timegm((2026, 10, 20, 17, 0, 0))
+SUNSET = calendar.timegm((2026, 10, 20, 22, 18, 0))  # about two minutes before sunset there
 
 
 def _dark_ops(tmp_path, monkeypatch, when, gates=None):
@@ -941,18 +945,46 @@ def _dark_ops(tmp_path, monkeypatch, when, gates=None):
     return o, clock
 
 
+def _heads_out(o, clock, n=2):
+    o.rec.set(TRANSIT, "transit")                  # full again: heading back out by itself
+    _tick(o, clock, n=n)
+
+
 def test_leaving_the_charger_after_dark_is_sent_home(tmp_path, monkeypatch):
     o, clock = _dark_ops(tmp_path, monkeypatch, NIGHT)
-    o.rec.set(TRANSIT, "transit")                  # full again: heading back out by itself
-    _tick(o, clock, n=2)
+    _heads_out(o, clock)
     assert o.controller.sent == ["cmd_recharge"]
-    assert any("after dark" in t and "next schedule window" in t for t, _ in o.notifier.msgs)
+    assert any("after dark" in t for t, _ in o.notifier.msgs)
+    assert any("next schedule window" in b for _, b in o.notifier.msgs)
+
+
+def test_an_idle_moment_on_the_way_out_still_counts(tmp_path, monkeypatch):
+    o, clock = _dark_ops(tmp_path, monkeypatch, NIGHT)
+    o.rec.set(PAUSED, "idle")
+    _tick(o, clock, secs=20)
+    _heads_out(o, clock)
+    assert o.controller.sent == ["cmd_recharge"]
+
+
+def test_a_second_departure_the_same_night_is_sent_home_again(tmp_path, monkeypatch):
+    o, clock = _dark_ops(tmp_path, monkeypatch, NIGHT)
+    _heads_out(o, clock)
+    o.rec.set(RETURNING, "charging_break")
+    _tick(o, clock, secs=600, n=2)
+    _heads_out(o, clock, n=3)
+    assert o.controller.sent.count("cmd_recharge") >= 2
 
 
 def test_leaving_the_charger_in_daylight_is_left_alone(tmp_path, monkeypatch):
     o, clock = _dark_ops(tmp_path, monkeypatch, DAY)
-    o.rec.set(TRANSIT, "transit")
-    _tick(o, clock, n=3)
+    _heads_out(o, clock, n=3)
+    assert o.controller.sent == []
+
+
+def test_leaving_just_before_sunset_is_left_alone_after_it(tmp_path, monkeypatch):
+    o, clock = _dark_ops(tmp_path, monkeypatch, SUNSET)
+    _heads_out(o, clock, n=1)
+    _tick(o, clock, secs=60, n=5)                  # sunset passes while it mows
     assert o.controller.sent == []
 
 
@@ -965,16 +997,71 @@ def test_a_mow_that_runs_into_dusk_without_charging_is_left_alone(tmp_path, monk
     assert o.controller.sent == []
 
 
+def test_a_person_who_resumes_it_after_dark_is_not_overruled(tmp_path, monkeypatch):
+    o, clock = _dark_ops(tmp_path, monkeypatch, NIGHT)
+    o.controller.human("resume")                   # the person's own resume from the charging break
+    _tick(o, clock, n=3)
+    assert o.controller.sent == []
+
+
 def test_the_after_dark_guard_can_only_notify(tmp_path, monkeypatch):
     o, clock = _dark_ops(tmp_path, monkeypatch, NIGHT, {"guard_after_dark": "notify"})
-    o.rec.set(TRANSIT, "transit")
-    _tick(o, clock, n=2)
+    _heads_out(o, clock)
     assert o.controller.sent == [] and any("after dark" in t for t, _ in o.notifier.msgs)
+
+
+def test_a_stored_pause_acts_as_dock_after_dark(tmp_path, monkeypatch):
+    o, clock = _dark_ops(tmp_path, monkeypatch, NIGHT, {"guard_after_dark": "pause"})
+    _heads_out(o, clock)
+    assert o.controller.sent == ["cmd_recharge"]
+
+
+def test_a_restart_after_it_left_keeps_the_guard(tmp_path, monkeypatch):
+    o, clock = _dark_ops(tmp_path, monkeypatch, NIGHT)
+    o.controller.refuse = 5                        # the dock does not get through before the restart
+    _heads_out(o, clock)
+    o.guards, o._charged_at, o._left_at, o._night_out, o._dark_kept = {}, 0.0, None, None, None   # a new process
+    o.controller.refuse = 0
+    _tick(o, clock, n=2)
+    assert o.controller.sent == ["cmd_recharge"]
 
 
 def test_without_the_yards_location_the_after_dark_guard_stays_quiet(tmp_path, monkeypatch):
     o, clock = _dark_ops(tmp_path, monkeypatch, NIGHT)
     o.rec.gps_ref = None
-    o.rec.set(TRANSIT, "transit")
-    _tick(o, clock, n=2)
+    _heads_out(o, clock)
     assert o.controller.sent == []
+
+
+def _elevation(ts, lat, lon):
+    """The sun's elevation in degrees (NOAA's general solar position formulas): an independent check on is_dark."""
+    t = time.gmtime(ts)
+    g = 2 * math.pi / 365 * (t.tm_yday - 1 + (t.tm_hour - 12 + t.tm_min / 60) / 24)
+    eqt = 229.18 * (0.000075 + 0.001868 * math.cos(g) - 0.032077 * math.sin(g) - 0.014615 * math.cos(2 * g)
+                    - 0.040849 * math.sin(2 * g))
+    decl = (0.006918 - 0.399912 * math.cos(g) + 0.070257 * math.sin(g) - 0.006758 * math.cos(2 * g)
+            + 0.000907 * math.sin(2 * g) - 0.002697 * math.cos(3 * g) + 0.00148 * math.sin(3 * g))
+    tst = t.tm_hour * 60 + t.tm_min + eqt + 4 * lon
+    ha = math.radians(tst / 4 - 180)
+    la = math.radians(lat)
+    return math.degrees(math.asin(math.sin(la) * math.sin(decl) + math.cos(la) * math.cos(decl) * math.cos(ha)))
+
+
+@pytest.mark.parametrize("place", [ANNAPOLIS, (41.88, -87.63), (39.74, -104.99), (47.61, -122.33), (51.5, -0.13),
+                                   (-33.87, 151.21)])
+def test_is_dark_agrees_with_the_suns_elevation_all_year(place):
+    """Every 20 minutes for a year; samples within 10 minutes of sunrise or sunset are left out (the two methods
+    differ by a minute or two). Before the unwrap fix, US places had one whole night a year read as light."""
+    start, wrong = calendar.timegm((2026, 1, 1, 0, 0, 0)), []
+    for k in range(0, 365 * 72):
+        ts = start + k * 1200
+        el = _elevation(ts, *place)
+        if abs(el + 0.833) < 2.0:
+            continue
+        if conditions.is_dark(ts, *place) != (el < -0.833):
+            wrong.append(time.strftime("%m-%d %H:%M", time.gmtime(ts)))
+    assert not wrong, wrong[:5]
+
+
+def test_the_late_summer_midnight_ut_night_is_dark():
+    assert conditions.is_dark(calendar.timegm((2026, 8, 16, 1, 0, 0)), *ANNAPOLIS) is True

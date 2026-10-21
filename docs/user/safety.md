@@ -37,8 +37,10 @@ it, dock it, or just notify ([Settings → Run rules](#settings/rules)). With co
 
 **After dark:** a plan that stopped to charge heads back out by itself as soon as the battery is full, even at
 night. When that happens between sunset and sunrise at your yard (worked out from the robot's map), the panel sends
-it home again (Return to dock, the default) or just notifies you. Sending it home ends the plan; the next schedule
-window starts it again in the morning, once the run rules pass.
+it home again (Return to dock, the default) or just notifies you. Not when you sent it out yourself, and not when
+it left before sunset. On a real mow, Return to dock ended the plan; the next schedule window then starts it again
+in the morning, once the run rules pass. If a plan stays open instead, every try to go out before sunrise is sent
+home too.
 Resuming after a guard is off unless you switch it on, because resuming spins the blades.
 
 ## Map writes

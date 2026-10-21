@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
-from app import main
+from app import control, main
 from app.conditions import ConditionsConfig
 from app.config import Config
 from app.runtime import Runtime
@@ -306,3 +306,11 @@ def test_a_change_to_the_run_rules_is_logged(tmp_path):
     assert len(ev) == 1 and "guard_resume off → on" in ev[0]["detail"] and "guard_person pause → notify" in ev[0]["detail"]
     run(main.put_setting(req, "gates", {"guard_resume": True}))                  # nothing changed: nothing logged
     assert len([e for e in r.store.events(10) if e["kind"] == "gates_changed"]) == 1
+
+
+def test_the_after_dark_guard_takes_dock_notify_or_ignore_but_not_pause(tmp_path):
+    req, r, _ = fake_request(tmp_path)
+    with pytest.raises(HTTPException):
+        run(main.put_setting(req, "gates", {"guard_after_dark": "pause"}))
+    run(main.put_setting(req, "gates", {"guard_after_dark": "notify"}))
+    assert control.gates(r.store)["guard_after_dark"] == "notify"
