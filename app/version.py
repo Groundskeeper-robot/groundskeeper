@@ -1,5 +1,6 @@
 """The panel's version. Bump it with each release that changes behaviour, move CHANGELOG.md's "Unreleased" entry
-under the new number in the same commit, and tag the commit `v<version>`. The build (git commit) comes from the
+under the new number in the same commit, and tag the commit `v<version>`. A release bumps the last number
+(0.19.0 → 0.19.1); the middle one only when a maintainer decides a release is a big step (CONTRIBUTING.md → Releases). The build (git commit) comes from the
 image: scripts/deploy.sh passes it as PANEL_BUILD."""
 import os
 import re

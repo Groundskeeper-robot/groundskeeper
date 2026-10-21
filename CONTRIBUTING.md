@@ -118,6 +118,9 @@ The panel learns new robot commands only from the official app, never by guessin
 ## Releases (maintainers)
 
 Versions follow [semver](https://semver.org). `CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com).
+A release normally bumps the last number (0.19.0 → 0.19.1), whatever it holds: fixes and new features alike. The
+middle number goes up only when a maintainer decides a release is a big step (a new way of reaching the robot, say,
+or a change people must act on).
 
 1. Bump `__version__` in `app/version.py`.
 2. In `CHANGELOG.md`, rename `## Unreleased` to `## X.Y.Z — YYYY-MM-DD` and start a new empty `## Unreleased`
