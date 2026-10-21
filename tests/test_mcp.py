@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
-from mcp.server.fastmcp.exceptions import ToolError
+from mcp.server.mcpserver.exceptions import ToolError
 from starlette.applications import Starlette
 
 from app import mcp_server
@@ -47,10 +47,12 @@ def env(tmp_path):
 def call(env, name, **args):
     """A tool call as an MCP client makes it; returns the structured result."""
     out = asyncio.run(env.server.mcp.call_tool(name, args))
-    if isinstance(out, tuple):
-        out = out[1]
-        return out.get("result", out) if isinstance(out, dict) and set(out) == {"result"} else out
-    return json.loads(out[0].text)
+    if out.is_error:                                   # mcp 2.x returns a tool's error instead of raising it
+        raise ToolError(" ".join(getattr(c, "text", "") for c in out.content))
+    data = out.structured_content
+    if data is not None:
+        return data.get("result", data) if isinstance(data, dict) and set(data) == {"result"} else data
+    return json.loads(out.content[0].text)
 
 
 def names(env):
