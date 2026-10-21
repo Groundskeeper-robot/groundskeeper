@@ -870,7 +870,7 @@ def test_a_command_the_robot_acts_on_late_is_logged_as_confirmed_late(tmp_path, 
     asyncio.run(go())
     assert any(e["kind"] == "command_confirmed_late" for e in store.events(10))
     assert store.control_log()[0]["result"]["confirmed"] is True and store.control_log()[0]["result"]["late"]
-    assert c.cloud.sent == ["resume"]                     # nothing sent again
+    assert c.link.t.sent == ["resume"]                    # nothing sent again
 
 
 def test_the_plan_blip_when_leaving_a_charging_break_does_not_end_the_run():

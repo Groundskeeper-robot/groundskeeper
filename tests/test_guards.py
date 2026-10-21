@@ -37,11 +37,14 @@ def js_code(text: str) -> str:
 
 # -- Safety ---------------------------------------------------------------------------------------------------------
 
-# The only modules that may call .publish(): the two transports, the controller (every run command, behind the
-# interlocks) and the map writer (WRITE_COMMANDS only, read back after). AGENTS.md → Rules → Safety.
-PUBLISHERS = {"app/transport_local.py", "app/cloud.py", "app/control.py", "app/mapwrite.py"}
-# Where the cloud transport's publish may be handed out: the controller, and ops wiring it into the map writer.
-CLOUD_PUBLISH_USERS = {"app/control.py", "app/ops.py"}
+# The only modules that may call .publish(): the two transports, the link that picks between them, the controller
+# (its cloud-only adapter) and the map writer (WRITE_COMMANDS only, read back after). AGENTS.md → Rules → Safety.
+PUBLISHERS = {"app/transport_local.py", "app/cloud.py", "app/link.py", "app/control.py", "app/mapwrite.py"}
+# Only the link reaches the cloud transport's publish.
+CLOUD_PUBLISH_USERS = {"app/link.py"}
+# Only the link reaches LocalTransport.command; only the controller and the map writer (wired in ops) reach the link's.
+LOCAL_COMMAND_USERS = {"app/link.py"}
+LINK_COMMAND_USERS = {"app/control.py", "app/ops.py"}
 
 
 def _publish_calls(p: Path) -> int:
@@ -58,10 +61,32 @@ def test_only_known_modules_publish_to_the_robot():
                        "See AGENTS.md → Rules → Safety.")
 
 
-def test_cloud_publish_is_only_handed_to_the_controller_and_map_writer():
+def test_only_the_link_reaches_the_cloud_publish():
     users = {rel(p) for p in APP if re.search(r"\bcloud\.publish\b", read(p))}
     extra = users - CLOUD_PUBLISH_USERS
-    assert not extra, f"{sorted(extra)} reach cloud.publish directly; use Controller.send() (AGENTS.md → Safety)"
+    assert not extra, (f"{sorted(extra)} reach cloud.publish directly; commands go Controller/MapWriter → "
+                       "app.link.RobotLink (AGENTS.md → Safety)")
+
+
+def test_only_the_link_sends_commands_on_the_local_broker():
+    users = {rel(p) for p in APP if re.search(r"\btransport\.command\(", read(p))}
+    assert users <= LOCAL_COMMAND_USERS, f"{sorted(users - LOCAL_COMMAND_USERS)} reach LocalTransport.command"
+    users = {rel(p) for p in APP if re.search(r"\blink\.command\(", read(p))}
+    assert users <= LINK_COMMAND_USERS, (f"{sorted(users - LINK_COMMAND_USERS)} send commands through the link; only "
+                                         "Controller.send() and MapWriter do (AGENTS.md → Safety)")
+
+
+@pytest.mark.parametrize("cmd", ["cmd_vel", "set_sound_param", "light_ctrl", "get_controller", "shutdown"])
+def test_the_local_broker_refuses_anything_but_run_commands_and_captured_writes(cmd):
+    from app.transport_local import ReadOnlyViolation, check_command
+    with pytest.raises(ReadOnlyViolation):
+        check_command(cmd)
+
+
+@pytest.mark.parametrize("cmd", sorted(control.CATALOGUE))
+def test_the_local_broker_takes_the_run_commands(cmd):
+    from app.transport_local import check_command
+    check_command(cmd)
 
 
 def test_manual_driving_stays_blocked():

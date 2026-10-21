@@ -330,7 +330,7 @@ function sectionStatus(id, d) {
 const SETUP_STEPS = {
   robot: ["Connect to the robot", "The panel listens to the robot's own MQTT broker on your network. Let it find the robot, or type its address and press Connect. The serial and the map are read from the robot.",
           (d) => robotCards(d).conn],
-  cloud: ["Sign in to Yarbo cloud", "Only needed to send commands (start, pause, dock) and to write the map: Yarbo accepts commands through its cloud only. Type your own Yarbo password; it goes straight to Yarbo's SDK and is never stored. Skip this to use the panel as a recorder and map.",
+  cloud: ["Sign in to Yarbo cloud (optional)", "The panel talks to the robot over your network. Signing in adds the Yarbo cloud as a fallback, for when the robot drops to 4G or local access is closed. Type your own Yarbo password; it goes straight to Yarbo's SDK and is never stored. Skip it to run on your network alone.",
           (d) => robotCards(d).cloud],
   assistant: ["Connect an AI assistant (optional)", "An assistant over MCP can read the panel and help you with it by conversation: check on the robot, tighten the run rules, or hunt down a sharper aerial map of your yard. Skip it if you don't use one.",
               (d) => secAssistant(d)],
@@ -552,7 +552,7 @@ function robotConnection(d, ig, t, r) {
       h("span", { class: "row gap" }, addr,
         disable(sbtn(ui.testing ? "Checking…" : "Connect", () => robotConnect(addr.value.trim(), ival(ig.port) || null), "btn"), busy))),
     adv,
-    sfoot("The panel only listens to the robot's own MQTT broker and asks it for data; it never sends it commands from here."));
+    sfoot("Finding and connecting only listen and read: nothing is sent to the robot from this card."));
 }
 
 function robotCards(d) {
@@ -562,6 +562,7 @@ function robotCards(d) {
   const cloudColor = cloud.state === "connected" ? GREEN : cloud.state === "needs login" ? CORAL : signedIn ? AMBER : MUTED;
   const seen = s.ops?.phone_app_seen_s;
   return { conn: robotConnection(d, ig, t, r),
+    route: routeCard(d),
     robot: scard("Robot",
       srow("Phone app", "The Yarbo app keeps the robot awake while it is open; the panel waits for it to go quiet before a start.",
         seen === null || seen === undefined ? "not seen" : `seen ${dur(seen)} ago`),
@@ -572,7 +573,7 @@ function robotCards(d) {
         selCtl({ key: "wifi_survey", value: d.st.wifi_survey || "off",
                  options: [["off", "Off"], ["next", "Next run only"], ["on", "Every run"]], onsave: (v) => saveSetting("wifi_survey", v) }))),
     cloud: scard("Yarbo cloud",
-      snote("Commands can only be sent through Yarbo's cloud, so control needs a signed-in session. The password goes straight to ",
+      snote("Optional: a fallback route for when the robot can't be reached on your network. The password goes straight to ",
             "Yarbo's SDK and is never stored; only the session tokens are kept on the server."),
       srow("Session", ["connecting", "reconnecting"].includes(cloud.state)
           ? "Signing in to Yarbo's cloud broker usually takes under a minute; this page updates by itself." : null,
@@ -589,7 +590,26 @@ function robotCards(d) {
             }, "btn"))
         : loginForm(cloud)) };
 }
-function secRobot(d) { const c = robotCards(d); return [c.conn, c.robot, c.cloud]; }
+function secRobot(d) { const c = robotCards(d); return [c.conn, c.route, c.robot, c.cloud]; }
+
+// Which way reads and commands go: the robot's own broker on your network first, the Yarbo cloud as a fallback.
+function routeCard(d) {
+  const lk = d.s.ops?.link || {}, mode = d.st.robot_route || "auto";
+  const name = (r) => r === "local" ? "your network" : r === "cloud" ? "the Yarbo cloud" : "nothing";
+  const color = (r) => r === "local" ? GREEN : r === "cloud" ? AMBER : CORAL;
+  return scard("Route to the robot",
+    snote("Commands and reads go over your network to the robot first. When the robot can't be reached there (it drops ",
+          "to 4G where its HaLow link is weak, or a firmware update closes local access) they go through the Yarbo cloud ",
+          "instead, if you are signed in below. Either one alone is enough."),
+    srow("Reads", null, sstate(color(lk.reads), name(lk.reads)),
+      lk.local_reads_paused_s ? h("span", { class: "muted small" }, ` · your network not answering, trying again in ${dur(lk.local_reads_paused_s)}`) : null),
+    srow("Commands", null, sstate(color(lk.commands), name(lk.commands))),
+    srow("Cloud fallback", "Ready when both routes are up and the route is Automatic.",
+      sstate(lk.fallback_ready ? GREEN : MUTED, lk.fallback_ready ? "ready" : lk.cloud ? "not used (route set below)" : "not signed in")),
+    srow("Route", "Automatic: your network first, the cloud as a fallback. The other two use one route only (for testing).",
+      selCtl({ key: "robot_route", value: mode, options: [["auto", "Automatic"], ["local", "Your network only"], ["cloud", "Yarbo cloud only"]],
+               onsave: (v) => saveSetting("robot_route", v) })));
+}
 
 function loginForm(cloud) {
   return h("form", { class: "login", onsubmit: async (e) => {

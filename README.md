@@ -49,15 +49,16 @@ sharpest free one that covers your yard.
 
 More: [Map imagery](docs/user/imagery.md), [the catalog](catalog/SOURCES.md).
 
-### Local first, cloud when you want control
+### Local first, the cloud as a fallback
 
-Groundskeeper talks to the robot two ways, and you choose how far to go.
+Groundskeeper talks to the robot over your own network, and can use Yarbo's cloud as a second route.
 
-- **Local:** it listens to the robot's own MQTT broker on your network: position about once a second while it
-  mows, battery, RTK, the map, plans and every reply. Recording, maps, coverage and alerts work with no Yarbo
-  account and no internet. It only ever reads there.
-- **Cloud:** sign in to your Yarbo account in Settings, the same route the official app uses, and the panel can
-  start, pause, resume, stop and dock the robot, and write map changes, each behind its checks.
+- **Local:** the robot's own MQTT broker on your network carries everything: position about once a second while it
+  mows, battery, RTK, the map, plans, and the commands to start, pause, resume, stop and dock, each behind its
+  checks. No Yarbo account and no internet needed.
+- **Cloud, optional:** sign in to your Yarbo account and the panel falls back to the cloud when the robot can't be
+  reached on your network (it drops to 4G where its HaLow link is weak) or if a firmware update ever closes local
+  access. Either route alone is enough, and the panel shows which one it is using.
 - **Works alongside the Yarbo app:** a mow started from the phone is recorded like any other, and the panel notes
   the commands other clients send.
 - Control stays off until you switch it on, so you can run local-only for as long as you like.
@@ -137,7 +138,7 @@ docker compose up -d
 
 Open `http://<host>:8425` and set the admin password. The setup code it asks for is in the log:
 `docker logs groundskeeper`. Then the setup guide walks you through the robot's address and serial, the Yarbo cloud
-sign-in (needed only for control), the imagery, cameras, Home Assistant and safety settings. All data stays in
+sign-in (optional: a fallback route), the imagery, cameras, Home Assistant and safety settings. All data stays in
 `./data`. It includes your yard's location, so back it up and keep it private.
 
 **Updating:** run `docker compose pull && docker compose up -d`. To stay on one release line, pin the image tag in
@@ -159,8 +160,10 @@ set those to your own user if you want to edit `./data` by hand. An Unraid examp
   enough battery, the phone app isn't driving it, and the yard is clear. Soft checks, such as a wet lawn, need a
   person to override them.
 - Guards that resume a paused robot on their own are opt-in.
-- The robot's local MQTT broker is used read-only. Control goes through the Yarbo cloud, the same route the
-  official SDK uses.
+- Commands go to the robot's own broker on your network first, and through the Yarbo cloud (the official SDK's
+  route) only as a fallback. Either way they pass the same checks and are logged with the route they took.
+- The robot's local broker accepts commands from any device on your network, without a password: that is the
+  robot's own behaviour. Put the robot on its own network (an IoT VLAN) that only the panel's host can reach.
 
 ## Documentation
 

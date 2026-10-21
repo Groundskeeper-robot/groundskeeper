@@ -8,6 +8,7 @@ from datetime import datetime
 from . import conditions, control, maintenance, telemetry
 from . import why as reasons
 from .cloud import CloudTransport
+from .link import RobotLink
 from .control import Controller
 from .backups import Backups
 from .mapwrite import MapWriter
@@ -51,12 +52,18 @@ class Ops:
     def __init__(self, cfg, rec):
         self.cfg, self.rec, self.store = cfg, rec, rec.store
         self.cloud = CloudTransport(cfg.data_dir, rec.sn, self._from_cloud)
+        # Local first, the cloud as a fallback, for reads and commands alike (app/link.py).
+        self.link = RobotLink(rec, self.cloud, self.store)
+        self.link.on_change = self._route_changed
+        rec.link = self.link
         self.frigate = Frigate(cfg.frigate_url)
         self.notifier = Notifier(self.store, cfg.ha_url, cfg.ha_token)
         rec.on_sn = self.robot_changed
-        self.controller = Controller(self.store, self.cloud, self.context, self.expect_reply, lambda: self.rec.t)
+        self.controller = Controller(self.store, self.link, self.context, self.expect_reply, lambda: self.rec.t)
         self.scheduler = Scheduler(self.store)
-        self.map_writer = MapWriter(self.store, self.cloud.publish, self.expect_reply, rec.reload_map,
+        self.map_writer = MapWriter(self.store, lambda cmd, payload, route=None: self.link.command(
+                                        cmd, payload, route=route or self.link.write_route()),
+                                    self.expect_reply, rec.reload_map,
                                     rec.read_pathway_params, lambda: self.cloud.username, rec.read_area_records,
                                     rec.read_deadend_params)
         self.backups = Backups(self.store, self.map_writer,
@@ -92,6 +99,21 @@ class Ops:
             if time.time() - self.rec._sent.get(parts[3], 0) > 5:
                 self.phone_app_at = ts
         self.rec._from_thread(topic, data, ts)
+
+    def _route_changed(self, what: str, before: str, after: str) -> None:
+        """A route to the robot changed (local <-> cloud): say so once, so a firmware lockout or a 4G spell shows."""
+        self.store.event("route_changed", f"{what} now go through the {after} (were {before})")
+
+    def phone_app_active(self, quiet: float) -> bool | None:
+        """Is the Yarbo app open on someone's phone? The robot streams DeviceMSG about once a second only while the app
+        is connected (seen on the local broker, 2026-10-21; the panel's own reads come back on data_feedback), and the
+        app's own keep-awake shows on the cloud. Unknown only when neither the local broker nor the cloud is up."""
+        now = time.time()
+        local = self.link.local_up() if self.link else False
+        cloud = self.cloud.state == "connected"
+        if not (local or cloud):
+            return None
+        return (now - self.rec.app_stream_at < quiet) or (cloud and now - self.phone_app_at < quiet)
 
     def expect_reply(self, cmd: str) -> asyncio.Future:
         fut = self.rec.loop.create_future()
@@ -175,13 +197,13 @@ class Ops:
         quiet = g["phone_app_quiet_s"]
         return {
             "snapshot_age_s": snap_age,
-            "cloud_state": self.cloud.state,
+            "route_state": self.link.state,
             "plans": r.plans,
             "error_code": int(t.get("error_code") or 0),
             "battery": t.get("battery"),
             "running": bool(r.run_id) or bool(r.plan_active()),
             "yard": await self.yard_status(args.get("yard_minutes") or g["yard_clear_minutes"], g["yard_labels"]),
-            "phone_app_active": None if self.cloud.state != "connected" else time.time() - self.phone_app_at < quiet,
+            "phone_app_active": self.phone_app_active(quiet),
             "conditions": (r.conditions or {}).get("state"),
             "presence": await self.presence(),
         }
@@ -192,9 +214,9 @@ class Ops:
             return False, [], "no plan chosen for this window"
         ctx = await self.context({"plan_id": w["plan_id"]})
         checks = control.check("start_plan", {"plan_id": w["plan_id"]}, ctx, control.gates(self.store), "scheduler")
-        # Raising a confirmation does not need the cloud link (confirming does); keep that check visible but soft.
+        # Raising a confirmation does not need a route to the robot (confirming does); keep that check visible but soft.
         for c in checks:
-            if c["name"] == "Cloud connected":
+            if c["name"] == "Route to the robot":
                 c["hard"] = False
                 c["ok"] = c["ok"] or None
         ok, reason = control.verdict(checks, override=False)
@@ -764,5 +786,6 @@ class Ops:
                 "map_write_enabled": bool(self.store.setting("map_write_enabled", False)),
                 "frigate": self.frigate.status(), "notify": self.notifier.channels(),
                 "pending": self.scheduler.pending(), "guards": self.guard_status(),
-                "last_command": self.controller.last, "phone_app_seen_s":
-                    round(time.time() - self.phone_app_at) if self.phone_app_at else None}
+                "last_command": self.controller.last, "link": self.link.status(),
+                "phone_app_seen_s": (round(time.time() - max(self.phone_app_at, self.rec.app_stream_at))
+                                     if max(self.phone_app_at, self.rec.app_stream_at) else None)}

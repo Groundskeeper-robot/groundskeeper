@@ -109,6 +109,8 @@ class Recorder:
         self.loop: asyncio.AbstractEventLoop | None = None
         self.queue: asyncio.Queue = asyncio.Queue()
         self.transport: LocalTransport | None = None     # made by apply_robot() once there is an address
+        self.link = None             # app.link.RobotLink, set by Ops: reads fall back to the cloud through it
+        self.app_stream_at = 0.0     # last unrequested DeviceMSG: the robot streams them only while the phone app is open
         self.robot_error = ""                            # why there is no local connection
         self.on_sn: Callable[[str], None] | None = None  # told when the serial is found or changed (Ops follows)
         self._robot_lock = asyncio.Lock()
@@ -241,18 +243,39 @@ class Recorder:
             self.evaluate_conditions()
             await asyncio.sleep(300)
 
+    def can_read(self) -> bool:
+        """Some route can carry a read: the local broker, or (through the link) the cloud."""
+        if self.link is not None:
+            return self.link.read_route() is not None
+        return bool(self.transport and self.transport.connected)
+
+    def _send_read(self, cmd: str, payload: dict | None = None) -> str | None:
+        """Publish a read request the way the link says (local first, the cloud as a fallback)."""
+        if self.link is not None:
+            return self.link.read(cmd, payload)
+        self.transport.request(cmd, payload)
+        return "local"
+
     async def request(self, cmd: str, timeout: float = 15, payload: dict | None = None, replies: tuple = ()):
         """Send a read request and wait for its data_feedback reply (on `cmd` or any of `replies`)."""
-        if not self.transport:
+        if not self.transport and not self.can_read():
             raise ConnectionError(self.robot_error or "the robot is not set up")
         fut = self.loop.create_future()
         names = (cmd, *replies)
         for n in names:
             self._pending.setdefault(n, []).append(fut)
         self._sent[cmd] = time.time()
-        self.transport.request(cmd, payload)
+        route = None
         try:
-            return await asyncio.wait_for(fut, timeout)
+            route = self._send_read(cmd, payload)
+            reply = await asyncio.wait_for(fut, timeout)
+            if self.link is not None:
+                self.link.note_read(route, True)
+            return reply
+        except asyncio.TimeoutError:
+            if self.link is not None:
+                self.link.note_read(route, False)
+            raise
         finally:
             for n in names:
                 waiters = self._pending.get(n, [])
@@ -414,6 +437,8 @@ class Recorder:
                 self.replies[reply_to] = {"ts": ts, "changed": ts if changed else previous.get("changed", ts),
                                           "data": body}
         elif channel == "device" and name == "DeviceMSG" and isinstance(data, dict):
+            if not getattr(self.cfg, "demo", False):     # the demo robot streams them all the time
+                self.app_stream_at = ts      # the panel never asks for these (its reads come back on data_feedback)
             self._ingest(data, ts, full=False)
         elif channel == "device" and name == "heart_beat" and isinstance(data, dict):
             self.heartbeat, self.heartbeat_at = data, ts
@@ -956,13 +981,15 @@ class Recorder:
                 if self.cfg.yarbo_host and now - self._discover_at > 60 and not self._robot_lock.locked():
                     self._robot_task = asyncio.create_task(self.apply_robot())
                     self._robot_task.add_done_callback(_log_failure)
-                continue
-            if self.transport.connected and (self.run_id or self._plan_due or plan_flags_active(self.t)):
+                if not self.can_read():
+                    continue
+            readable = self.can_read()
+            if readable and (self.run_id or self._plan_due or plan_flags_active(self.t)):
                 if now - self._plan_asked > (5 if self._plan_due else PLAN_POLL_S):
                     self._plan_asked, self._plan_due = now, False
                     try:
                         self._sent["get_plan_feedback"] = now
-                        self.transport.request("get_plan_feedback")
+                        self._send_read("get_plan_feedback")
                     except Exception as exc:
                         log.warning("plan status request failed: %s", exc)
             if plan_flags_active(self.t) and self._plan_asked and now - max(self.plan_at, self.activity_at) > 300:
@@ -977,18 +1004,18 @@ class Recorder:
             except Exception:
                 log.exception("Wi-Fi survey poll failed")
             interval = self.cfg.poll_active_s if self.run_id else self.cfg.poll_idle_s
-            if (self.transport.connected and now - self.snapshot_at > interval
+            if (readable and now - self.snapshot_at > interval
                     and now - self.last_poll_at > max(1.0, interval / 2)):
                 self.last_poll_at = now
                 try:
                     self._sent["get_device_msg"] = now
-                    self.transport.request("get_device_msg")
+                    self._send_read("get_device_msg")
                 except Exception as exc:
                     log.warning("poll failed: %s", exc)
 
     async def _refresh_loop(self) -> None:
         while True:
-            if self.transport and self.transport.connected:
+            if self.can_read():
                 try:
                     await self.refresh_map()
                     await asyncio.sleep(self.cfg.map_refresh_s)

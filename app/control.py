@@ -4,8 +4,9 @@ Every request passes, in order:
 1. the catalogue (five official run commands; anything else, including manual drive, is refused),
 2. the master switch (setting `control_enabled`, default False),
 3. the interlocks for that command (§10.3), enforced here and not only in the UI,
-then goes out over the cloud transport and is written to the audit log with its result, whatever happened.
-Local control stays off until the beep test (§10.2) shows it works without the phone app's controller handshake.
+then goes out through app.link.RobotLink (the robot's local broker first, the Yarbo cloud as a fallback) and is
+written to the audit log with its route and result, whatever happened. The robot accepts run commands on its local
+broker with no handshake (§10.2, proved 2026-10-21).
 
 The robot sends no reply to run commands (seen 2026-10-05: nothing for start_plan or pause on either broker), so a
 command is confirmed by the robot's state changing the way the command should change it (CONFIRM below).
@@ -94,7 +95,8 @@ def check(cmd: str, args: dict, ctx: dict, cfg: dict, actor: str) -> list[dict]:
 
     add("Robot online", ctx["snapshot_age_s"] is not None and ctx["snapshot_age_s"] < 120,
         f"last snapshot {ctx['snapshot_age_s']} s ago" if ctx["snapshot_age_s"] is not None else "no data")
-    add("Cloud connected", ctx["cloud_state"] == "connected", ctx["cloud_state"])
+    route = ctx.get("route_state", ctx.get("cloud_state"))
+    add("Route to the robot", route == "connected", route)
     if cmd == "resume" and actor in ("guard", "mcp"):
         # Nobody pressed this here (a guard, or an AI assistant): every check is hard and unknown counts as a fail
         # (blades start spinning).
@@ -131,9 +133,11 @@ def check(cmd: str, args: dict, ctx: dict, cfg: dict, actor: str) -> list[dict]:
     else:
         add("Yard clear (Frigate)", yc["ok"] if yc["ok"] is not None else None, yc["detail"], hard=yc["ok"] is not None)
     pa = ctx["phone_app_active"]
+    # Unknown (no route that shows the app) blocks the starts nobody is watching (scheduler, assistant); a person's
+    # start from the panel goes ahead with the unknown shown.
     add("Phone app not driving it", (pa is False) if strict else (None if pa is None else not pa),
-        "unknown (cloud not connected)" if pa is None else ("phone app active" if pa else "quiet"),
-        hard=strict or pa is not None)
+        "unknown (no link to the robot)" if pa is None else ("phone app active" if pa else "quiet"),
+        hard=strict or pa is not None or actor == "scheduler")
     cond = ctx["conditions"]
     ok_states = {"Dry", "Damp"} if cfg["allow_damp"] else {"Dry"}
     if strict and cfg["require_dry"]:
@@ -175,12 +179,39 @@ def verdict(checks: list[dict], override: bool) -> tuple[bool, str]:
     return True, "ok"
 
 
+# Commands that are safe to send twice: if one is not seen in the robot's state within REROUTE_AFTER_S, it goes once
+# more by the other route (local <-> cloud). A start or a resume is never repeated: a late first one plus a second
+# could restart a plan.
+SAFE_TO_REPEAT = ("pause", "stop", "cmd_recharge")
+REROUTE_AFTER_S = 10
+
+
+class _CloudOnly:
+    """A transport with only publish() (a cloud transport, or a test's), used as a link with one route."""
+
+    def __init__(self, t):
+        self.t = t
+
+    @property
+    def state(self):
+        return self.t.state
+
+    def command(self, cmd, payload, route=None):
+        self.t.publish(cmd, payload)
+        return "cloud"
+
+    def other_route(self, route):
+        return None
+
+
 class Controller:
-    def __init__(self, store, cloud, context_fn, expect_reply_fn, state_fn=None):
-        """context_fn(args) -> ctx dict (async). expect_reply_fn(cmd) -> Future resolved by the matching
-        data_feedback; registered BEFORE publishing so a fast reply cannot be missed. state_fn() -> the robot's
-        latest flat telemetry, used to confirm a command took effect (None = no confirmation)."""
-        self.store, self.cloud = store, cloud
+    def __init__(self, store, link, context_fn, expect_reply_fn, state_fn=None):
+        """link: app.link.RobotLink (or anything with publish(), used as the cloud alone). context_fn(args) -> ctx
+        dict (async). expect_reply_fn(cmd) -> Future resolved by the matching data_feedback; registered BEFORE
+        publishing so a fast reply cannot be missed. state_fn() -> the robot's latest flat telemetry, used to confirm
+        a command took effect (None = no confirmation)."""
+        self.store = store
+        self.link = link if hasattr(link, "command") else _CloudOnly(link)
         self._context, self._expect, self._state = context_fn, expect_reply_fn, state_fn
         self._lock = asyncio.Lock()
         self.poll_s = 0.5
@@ -288,10 +319,10 @@ class Controller:
                     raise Refused(reason, checks)
                 payload = payload_for(cmd, args)
                 fut = self._expect(cmd)
-                self.cloud.publish(cmd, payload)
+                route = self.link.command(cmd, payload)
                 if actor != "guard":
                     self.last_human_cmd_at = time.time()
-                result = {"sent": True, "cmd": cmd, "payload": payload, "checks": checks}
+                result = {"sent": True, "cmd": cmd, "payload": payload, "checks": checks, "route": route}
             except Refused as r:
                 result = {"sent": False, "cmd": cmd, "refused": r.reason, "checks": r.checks,
                           "why": ([why.control_off()] if not self.enabled() else [])
@@ -313,7 +344,9 @@ class Controller:
             reply = result.get("reply") or {}
             result.update(state=reply.get("state"), msg=reply.get("msg") or result["confirm"])
         result["latency_ms"] = round((time.time() - started) * 1000)
-        rowid = self.store.log_control(actor, "cloud", cmd, json.dumps(args), result)
+        rowid = self.store.log_control(actor, result.get("route") or "none", cmd, json.dumps(args), result)
+        if result["sent"] and cmd in SAFE_TO_REPEAT:
+            self._spawn(self._reroute(cmd, result["payload"], result["route"]))
         if background:
             task = asyncio.get_running_loop().create_task(self._watch(cmd, fut, self.last, rowid, dict(result)))
         elif result.get("confirmed") is False and not result.get("reply"):
@@ -324,3 +357,25 @@ class Controller:
             self._tasks.add(task)                       # keep a reference until it finishes
             task.add_done_callback(self._tasks.discard)
         return result
+
+    def _spawn(self, coro) -> None:
+        task = asyncio.get_running_loop().create_task(coro)
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+
+    async def _reroute(self, cmd: str, payload: dict, route: str) -> None:
+        """A pause, stop or return to dock not seen within REROUTE_AFTER_S goes once more by the other route: the robot
+        may have dropped to 4G (the local broker cannot reach it) or the local broker may refuse commands."""
+        timeout, test, meaning = CONFIRM.get(cmd, (15, None, ""))
+        other = self.link.other_route(route)
+        if test is None or self._state is None or other is None:
+            return
+        await asyncio.sleep(REROUTE_AFTER_S)
+        if test(self._state() or {}):
+            return
+        try:
+            self.link.command(cmd, payload, route=other)
+            self.store.event("command_rerouted", f"{cmd}: not seen {REROUTE_AFTER_S} s after going {route}; sent again "
+                                                 f"through {other}")
+        except Exception as exc:
+            self.store.event("command_rerouted", f"{cmd}: not seen after going {route}; {other} failed too ({exc})")

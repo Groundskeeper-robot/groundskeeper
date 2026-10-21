@@ -1,7 +1,10 @@
-"""Read-only client for the robot's on-board MQTT broker.
+"""Client for the robot's on-board MQTT broker on the home network.
 
-The only messages this module will ever publish are the read requests in READ_ONLY_COMMANDS. Anything else
-raises ReadOnlyViolation before the network is touched. There is no code path that sends a control command.
+`request()` publishes only the read requests in READ_ONLY_COMMANDS; anything else raises ReadOnlyViolation before the
+network is touched. `command()` publishes only what the panel may send to the robot: the run commands in
+control.CATALOGUE and the captured writes in mapwrite.WRITE_COMMANDS, never cmd_vel. It is called only by
+app.link.RobotLink, which only Controller and MapWriter call, after their own checks (tests/test_guards.py).
+Since 2026-10-21 the robot is known to accept action and run commands here (docs/dev/protocol.md → Access control).
 """
 import logging
 import secrets
@@ -47,6 +50,13 @@ def check_read_only(cmd: str) -> None:
         raise ReadOnlyViolation(f"refusing to publish {cmd!r}: only read requests are allowed")
 
 
+def check_command(cmd: str) -> None:
+    """A command the panel may send: a run command or a captured write. cmd_vel never."""
+    from . import control, mapwrite          # imported here: both modules sit above this one
+    if cmd in control.HARD_BLOCKED or cmd not in (set(control.CATALOGUE) | set(mapwrite.WRITE_COMMANDS)):
+        raise ReadOnlyViolation(f"refusing to publish {cmd!r}: not a run command or a captured write")
+
+
 def _client(prefix: str) -> mqtt.Client:
     return mqtt.Client(client_id=f"{prefix}-{secrets.token_hex(3)}",
                        callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
@@ -85,7 +95,7 @@ def discover_sn(host: str, port: int, timeout: float = 30) -> str:
 
 
 class LocalTransport:
-    """Subscribes to everything under snowbot/{sn}/ and publishes read requests only."""
+    """Subscribes to everything under snowbot/{sn}/; publishes read requests, and commands only for RobotLink."""
 
     def __init__(self, host: str, port: int, sn: str, on_message: Callable[[str, object, float], None]):
         self.host, self.port, self.sn = host, port, sn
@@ -94,6 +104,7 @@ class LocalTransport:
         self.connected_since = 0.0
         self.last_message_at = 0.0
         self.published = 0
+        self.commands_sent = 0
         self.received = 0
         self.last_error = ""
         self._client = _client("yarbo-panel-ro")
@@ -140,3 +151,11 @@ class LocalTransport:
             raise ConnectionError("local broker is not connected")
         self._client.publish(f"snowbot/{self.sn}/app/{cmd}", encode(payload or {}))
         self.published += 1
+
+    def command(self, cmd: str, payload: dict) -> None:
+        """Only app.link.RobotLink calls this (the checks are Controller's and MapWriter's)."""
+        check_command(cmd)
+        if not self.connected:
+            raise ConnectionError("local broker is not connected")
+        self._client.publish(f"snowbot/{self.sn}/app/{cmd}", encode(payload))
+        self.commands_sent += 1

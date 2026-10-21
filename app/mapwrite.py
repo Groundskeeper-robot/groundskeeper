@@ -34,6 +34,7 @@ The robot assigns ids itself and returns the saved feature in its reply.
 """
 import asyncio
 import copy
+import inspect
 import json
 import time
 
@@ -580,10 +581,31 @@ def _audit_args(cmd: str, payload: dict) -> str:
     return json.dumps(payload)
 
 
+class _WriteLock:
+    """The writer's lock. While it is held one route carries the whole write (local or cloud, picked at the first
+    send): a write is never split across the two brokers."""
+
+    def __init__(self, writer):
+        self._lock, self._writer = asyncio.Lock(), writer
+
+    async def __aenter__(self):
+        await self._lock.acquire()
+        self._writer.route = None
+        return self
+
+    async def __aexit__(self, *exc):
+        self._writer.route = None
+        self._lock.release()
+
+    def locked(self) -> bool:
+        return self._lock.locked()
+
+
 class MapWriter:
     """Runs a plan. The I/O comes in as functions so tests can stand in for the robot:
-    publish(cmd, payload); expect_reply(cmd) -> Future registered BEFORE publishing; read_map() -> raw map (a fresh
-    get_map); read_params(pathway_id) -> dict | None; account() -> the cloud account email."""
+    publish(cmd, payload[, route]) -> the route it went (app.link.RobotLink.command); expect_reply(cmd) -> Future
+    registered BEFORE publishing; read_map() -> raw map (a fresh get_map); read_params(pathway_id) -> dict | None;
+    account() -> the cloud account email (only for the optional cloud backup after a write)."""
 
     def __init__(self, store, publish, expect_reply, read_map, read_params, account, read_areas=None,
                  read_deadend=None):
@@ -591,7 +613,9 @@ class MapWriter:
         self.read_map, self.read_params, self.account = read_map, read_params, account
         self.read_areas = read_areas            # async () -> {id: live area record} (read_all_clean_area)
         self.read_deadend = read_deadend        # async (id) -> a dead end's settings (read_deadend_params)
-        self.lock = asyncio.Lock()
+        self.lock = _WriteLock(self)
+        self.route: str | None = None           # the route this write goes by (set at its first send)
+        self._routed = "route" in inspect.signature(publish).parameters
 
     async def _send(self, cmd: str, payload: dict) -> dict:
         if cmd not in WRITE_COMMANDS:
@@ -599,7 +623,10 @@ class MapWriter:
         fut = self.expect(cmd)
         started = time.time()
         try:
-            self.publish(cmd, payload)
+            if self._routed:
+                self.route = self.publish(cmd, payload, route=self.route) or self.route
+            else:
+                self.publish(cmd, payload)
             reply = await asyncio.wait_for(fut, REPLY_TIMEOUT_S)
             result = {"sent": True, "ok": reply.get("state") == 0, "state": reply.get("state"), "msg": reply.get("msg"),
                       "data": reply.get("data")}
@@ -609,7 +636,7 @@ class MapWriter:
             fut.cancel()
             result = {"sent": False, "ok": False, "error": f"{type(exc).__name__}: {exc}"}
         result["latency_ms"] = round((time.time() - started) * 1000)
-        self.store.log_control("map", "cloud", cmd, _audit_args(cmd, payload),
+        self.store.log_control("map", self.route or ("cloud" if not self._routed else "none"), cmd, _audit_args(cmd, payload),
                                {k: v for k, v in result.items() if k != "data"})
         return result
 

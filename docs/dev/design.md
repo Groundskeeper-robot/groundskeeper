@@ -117,13 +117,14 @@ which says nothing about which dead end it is; such an answer is trusted only wh
 | Class | Route | Why |
 |---|---|---|
 | Telemetry, reads | local | Fast, no account needed |
-| Control (run commands) | cloud | The route the official app uses (§10.2) |
-| Writes (map/plan/schedule) | cloud | The route the captured app writes used |
+| Control (run commands) | local, the cloud as a fallback | Proved locally 2026-10-21 (§10.2); `app/link.py` |
+| Writes (map/plan/schedule) | cloud first, local without it | Local writes not proved yet (`link.LOCAL_WRITES_PROVED`) |
 | Capture | both at once | The app talks to the cloud; other local clients talk to the robot |
 
-The local client is **read-only by construction**: `transport_local.py` publishes only commands in its
-`READ_ONLY_COMMANDS` allow-list (plus named compute-only requests such as the route preview) and raises before the
-network is touched for anything else. Transport health shows as chips in the top bar and as a Home Assistant sensor.
+The local client's `request()` publishes only the `READ_ONLY_COMMANDS` allow-list (plus named compute-only requests
+such as the route preview) and raises before the network is touched for anything else. Its `command()` takes only
+the run commands and captured writes, never `cmd_vel`, and only `app/link.py` calls it. Reads also fall back to the
+cloud: after two unanswered local reads in a row they go through the cloud for 5 minutes. Transport health shows as chips in the top bar and as a Home Assistant sensor.
 
 ### 5.3 Cloud session
 The rotated refresh token is persisted after **every** refresh. A failed refresh means **needs sign-in**: stop

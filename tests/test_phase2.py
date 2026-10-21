@@ -93,7 +93,7 @@ def test_bad_plan_ids_never_become_a_plan(tmp_path, bad):
     ({"running": True}, "Not already running"),
     ({"error_code": 7}, "No active error"),
     ({"snapshot_age_s": 900}, "Robot online"),
-    ({"cloud_state": "needs login"}, "Cloud connected"),
+    ({"cloud_state": "needs login"}, "Route to the robot"),
     ({"yard": {"ok": False, "detail": "person on back_yard", "events": [1]}}, "Yard clear"),
     ({"phone_app_active": True}, "Phone app"),
 ])
