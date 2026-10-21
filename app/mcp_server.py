@@ -265,7 +265,8 @@ class PanelMCP:
         self.app = app
         self._call = api or self._asgi
         self._state = state or (lambda: app.state)
-        self.mcp = MCPServer("groundskeeper", instructions=INSTRUCTIONS, version=version.__version__)
+        # No subscriptions: the panel publishes no resources, and a standing stream would outlive a revoked token.
+        self.mcp = MCPServer("groundskeeper", instructions=INSTRUCTIONS, version=version.__version__, subscriptions=False)
         self._register()
 
     # -- plumbing ----------------------------------------------------------------------------------------------------
@@ -606,7 +607,9 @@ class PanelMCP:
 
 
 class _Guarded:
-    """ASGI wrapper: 404 while MCP is off (no token), 401 without the right bearer token."""
+    """ASGI wrapper: 404 while MCP is off (no token), 401 without the right bearer token, 405 for anything but POST.
+    The server is stateless JSON: a GET would only open a standing event stream, which a later revoke would not close
+    (the token is checked when a request starts)."""
 
     def __init__(self, app, store):
         self.app, self.store = app, store
@@ -615,6 +618,11 @@ class _Guarded:
         if scope["type"] == "http":
             header = dict(scope.get("headers") or []).get(b"authorization", b"").decode("latin-1") or None
             ok = authorised(self.store(), header)
+            if ok is True and scope.get("method") != "POST":
+                await send({"type": "http.response.start", "status": 405,
+                            "headers": [(b"content-type", b"application/json"), (b"allow", b"POST")]})
+                await send({"type": "http.response.body", "body": json.dumps({"detail": "POST only"}).encode()})
+                return
             if ok is not True:
                 code, msg = (404, "MCP is off: create a token in Settings → AI assistant") if ok is None \
                     else (401, "a bearer token is required (Settings → AI assistant)")

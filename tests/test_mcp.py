@@ -46,9 +46,7 @@ def env(tmp_path):
 
 def call(env, name, **args):
     """A tool call as an MCP client makes it; returns the structured result."""
-    out = asyncio.run(env.server.mcp.call_tool(name, args))
-    if out.is_error:                                   # mcp 2.x returns a tool's error instead of raising it
-        raise ToolError(" ".join(getattr(c, "text", "") for c in out.content))
+    out = asyncio.run(env.server.mcp.call_tool(name, args))        # a tool's ToolError is raised from here
     data = out.structured_content
     if data is not None:
         return data.get("result", data) if isinstance(data, dict) and set(data) == {"result"} else data
@@ -298,10 +296,12 @@ def test_the_endpoint_is_off_without_a_token_and_needs_the_right_one(env):
                 token = mcp_server.new_token(env.store)
                 wrong = await post({"Authorization": "Bearer wrong"})
                 right = await post({"Authorization": f"Bearer {token}"})
-                return off, wrong, right
+                get = await c.get("/mcp", headers={"Accept": "text/event-stream", "Authorization": f"Bearer {token}"})
+                return off, wrong, right, get
 
-    off, wrong, right = asyncio.run(go())
+    off, wrong, right, get = asyncio.run(go())
     assert off.status_code == 404 and wrong.status_code == 401
+    assert get.status_code == 405, "a GET would open a standing stream that a revoked token would not close"
     assert right.status_code == 200, right.text
     tools = {t["name"] for t in right.json()["result"]["tools"]}
     assert "status" in tools and "robot_command" in tools
