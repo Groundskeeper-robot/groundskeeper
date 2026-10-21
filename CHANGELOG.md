@@ -5,6 +5,8 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ## Unreleased
 
+## 0.17.0 — 2026-10-20
+
 ### Added
 - **Find the robot on your network:** Settings → Robot (and the setup guide) has **Find it on my network**, which
   looks on the panel's own network for a Yarbo announcing itself and offers **Use this**. It only listens; nothing
