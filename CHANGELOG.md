@@ -5,6 +5,8 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ## Unreleased
 
+## 0.19.0 — 2026-10-21
+
 ### Changed
 - **Local first, the cloud as a fallback.** Commands (start, pause, resume, stop, return to dock) now go to the
   robot's own broker on your network, so they work with no Yarbo account and take effect in about 2 seconds. Reads
