@@ -5,7 +5,7 @@ import os
 import re
 
 __version__ = "0.16.0"
-_build = (os.environ.get("PANEL_BUILD") or "").strip()
+_build = (os.environ.get("PANEL_BUILD") or "").strip().lower()
 BUILD = (_build[:7] if re.fullmatch(r"[0-9a-f]{8,40}", _build) else _build[:20]) or None   # a full commit id is cut to 7
 
 

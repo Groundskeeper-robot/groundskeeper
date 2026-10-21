@@ -1232,13 +1232,15 @@ _SCAN_LOCK = asyncio.Lock()
 @app.post("/api/robot/discover")
 async def robot_discover(request: Request, body: dict = Body(None)):
     """Look for the robot on the local network (Settings → Robot → Find it on my network): the panel's own /24, or a
-    private /24 the user names. Connects and subscribes only; nothing is sent to anything it finds. One at a time."""
+    home-network (RFC 1918) /24 the user names. Connects and subscribes only; nothing is sent to anything it finds.
+    One at a time; about 20 s."""
     cfg = request.app.state.cfg
     if cfg.demo:
         return {"network": "demo", "brokers": 1, "found": [{"host": "demo", "port": 1883, "sn": rec(request).sn}], "note": None}
     if _SCAN_LOCK.locked():
         raise HTTPException(409, "a search is already running")
-    network = (body or {}).get("network") or None
+    network = (body or {}).get("network")
+    network = None if network in (None, "") else network
     async with _SCAN_LOCK:
         try:
             return await robotscan.scan(int(cfg.yarbo_port or 1883), network)

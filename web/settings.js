@@ -39,6 +39,8 @@ const slink = (href, text) => h("a", { href }, text);
 const sbtn = (label, onclick, cls = "btn slim") => h("button", { type: "button", class: cls, onclick }, label);
 const sstate = (color, text) => h("span", { class: "state" }, dot(color), text);
 const disable = (el, off) => { el.disabled = Boolean(off); return el; };
+// The switches that let the panel act on the robot are switched on only by typing ENABLE.
+const enableWithPrompt = (key, text, msg) => { if (prompt(text) === "ENABLE") saveSetting(key, true, msg); };
 
 function switchCtl(name, on, onchange, key) {
   return h("label", { class: "switch" },
@@ -91,8 +93,9 @@ async function saveIntegration(group, values, msg) {
     const data = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(data.detail || `${r.status}`);
     toast(data.note ? `${msg || "Saved."} ${data.note[0].toUpperCase()}${data.note.slice(1)}.` : (msg || "Saved."));
-  } catch (e) { toast(e.message); }
+  } catch (e) { toast(e.message); await renderSettings(); return false; }
   await renderSettings();
+  return true;
 }
 
 async function testIntegration(group, values, out, button) {
@@ -174,28 +177,39 @@ async function renderSettings(section, auto = false) {
     return;
   }
   if (ticket !== setUI.ticket || state.view !== "settings") return;   // a newer render or another view took over
+  if (auto && (setUI.dirty || $("#p-settings .ssec details.sadvanced[open]"))) return;   // typing or Advanced opened meanwhile
   setUI.data = d;
   drawSettings(d, true);
 }
 
-// While something is on its way (the robot connecting, its serial, the cloud signing in, the yard imagery, the first
-// Tempest reading), the open section re-reads every 3 s so nobody has to reload; Robot and the guide also every 15 s. A field the
-// user has typed in and not saved is never overwritten: refreshing waits until the next save or navigation.
-const SETTINGS_LIVE = new Set(["setup", "robot", "imagery", "lawn", "cameras", "ha", "alerts"]);
-function settingsPending(d) {
+// While something the open page waits for is on its way (Robot / the guide's robot and cloud steps: the robot and
+// its serial, the cloud signing in; Map imagery and the guide's imagery step: the yard imagery; Lawn conditions and
+// the guide's weather step: the first Tempest reading), the page re-reads every 3 s so nobody has to reload, backing
+// off to 15 s after 2 minutes and 60 s after 10. Robot and the guide's robot and cloud steps also re-read every 15 s.
+// A field typed in and not saved, or an open Advanced fold, is never redrawn: refreshing waits for the next save
+// or navigation.
+function settingsWaitsFor(d) {
   const t = d.s.transport?.local || {}, cloud = d.s.ops?.cloud || {}, tp = d.s.tempest || {};
-  const weather = setUI.section === "lawn" || (setUI.section === "setup" && setUI.step === "weather");
-  return Boolean((t.host && (!t.connected || !d.s.sn)) || ["connecting", "reconnecting"].includes(cloud.state)
-    || (t.connected && !d.imgs?.yard?.source) || (weather && (tp.last_obs_age_s === null || tp.last_obs_age_s === undefined)));
+  const sec = setUI.section, step = sec === "setup" ? setUI.step : null;
+  const robot = t.host && (!t.connected || !d.s.sn), signingIn = ["connecting", "reconnecting"].includes(cloud.state);
+  if (sec === "robot" || step === "robot" || step === "cloud") return Boolean(robot || signingIn);
+  if (sec === "imagery" || step === "imagery") return Boolean(t.connected && d.imgs && !d.imgs.yard?.source);
+  if (sec === "lawn" || step === "weather") return Boolean(tp.listening_port && (tp.last_obs_age_s === null || tp.last_obs_age_s === undefined));
+  return false;
 }
 document.addEventListener("input", (e) => {
   if (e.target.closest?.("#p-settings .ssec") && !["checkbox", "radio", "range"].includes(e.target.type)) setUI.dirty = true;
 });
 setInterval(() => {
-  if (state.view !== "settings" || document.hidden || !setUI.data || setUI.dirty || !SETTINGS_LIVE.has(setUI.section)) return;
-  const pending = settingsPending(setUI.data), steady = setUI.section === "robot" || (setUI.section === "setup" && setUI.step !== "imagery");
-  if (!pending && !steady) return;                                // e.g. an open imagery picker is left alone once loaded
-  if (Date.now() - (setUI.at || 0) >= (pending ? 3000 : 15000)) renderSettings(undefined, true);
+  if (state.view !== "settings" || document.hidden || !setUI.data || setUI.dirty) return;
+  if ($("#p-settings .ssec details.sadvanced[open]")) return;     // an open Advanced fold stays open
+  const waiting = settingsWaitsFor(setUI.data);
+  if (!waiting) setUI.waitSince = null;
+  else if (!setUI.waitSince) setUI.waitSince = Date.now();
+  const steady = setUI.section === "robot" || (setUI.section === "setup" && ["robot", "cloud"].includes(setUI.step));
+  const waited = waiting ? Date.now() - setUI.waitSince : 0;
+  const every = waiting ? (waited < 120000 ? 3000 : waited < 600000 ? 15000 : 60000) : steady ? 15000 : 0;
+  if (every && Date.now() - (setUI.at || 0) >= every) renderSettings(undefined, true);
 }, 1000);
 
 // Redraws the list and the open section. A save redraws while the user may already be typing in the next field, so
@@ -410,12 +424,11 @@ function setupSafety(d) {
   const g = d.st.gates, on = d.st.control_enabled, mw = d.st.map_write_enabled;
   const safe = !on && !mw && g.yard_clear_required && !g.guard_resume;
   const gate = (k, v) => saveSetting("gates", { [k]: v });
-  const enable = (key, text, msg) => { if (prompt(text) === "ENABLE") saveSetting(key, true, msg); };
   const rec = (ok, text) => ok ? null : h("span", { class: "muted small" }, `recommended: ${text}`);
   const master = (key, value, name, help, onText, offMsg, onMsg) => srow(name, help,
     rec(!value, "off"), sstate(value ? AMBER : MUTED, value ? "ON" : "off"),
     value ? sbtn("Switch off", () => saveSetting(key, false, offMsg), "btn")
-          : sbtn("Switch on…", () => enable(key, onText, onMsg), "btn"));
+          : sbtn("Switch on…", () => enableWithPrompt(key, onText, onMsg), "btn"));
   return scard("Safety switches",
     master("control_enabled", on, "Control", "Lets the panel start, pause, resume, stop and dock the robot. Leave it off until you have watched a run or two: the panel still records and plans.",
            "Type ENABLE to let the panel send commands to the robot.", "Control switched off.", "Control switched on."),
@@ -470,24 +483,26 @@ async function robotUse(host, sn, port) {
   const values = { host };
   if (sn) values.sn = sn;
   if (port) values.port = port;
-  await saveIntegration("robot", values, `Saved; connecting to ${host}.`);
-  setUI.robot = null;
+  const ok = await saveIntegration("robot", values, `Saved; connecting to ${host}.`);
+  setUI.robot = ok ? null : { error: `Could not save ${host}.` };
+  if (setUI.data) drawSettings(setUI.data, false);
 }
 
 async function robotConnect(host, port) {
   if (!host) { toast("Type the robot's address first."); return; }
   setUI.robot = { testing: host };
   drawSettings(setUI.data, false);
+  let data;
   try {
-    const r = await fetch("/api/integrations/robot/test", { method: "POST", headers: { "Content-Type": "application/json" },
-                                                            body: JSON.stringify({ host, port: port || undefined }) });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok || !data.ok) throw new Error(data.detail || `${r.status}`);
-    await robotUse(host, data.sn, port);
+    data = await postJSON("/api/integrations/robot/test", { host, port: port || undefined });
+    if (!data?.ok) throw new Error(data?.detail || "no answer");
   } catch (e) {
-    setUI.robot = { error: `No robot at ${host}: ${e.message}` };
+    const why = typeof e.message === "string" && e.message !== "[object Object]" ? e.message : "the address was not accepted";
+    setUI.robot = { error: `No robot at ${host}: ${why}` };
     drawSettings(setUI.data, false);
+    return;
   }
+  await robotUse(host, data.sn, port);
 }
 
 function robotConnection(d, ig, t, r) {
@@ -595,7 +610,6 @@ function loginForm(cloud) {
 /* ------------------------------------------------------------- safety */
 function secSafety(d) {
   const on = d.st.control_enabled, mw = d.st.map_write_enabled, ai = d.st.mcp_control_enabled, mcp = d.st.mcp || {};
-  const enable = (key, text, msg) => { if (prompt(text) === "ENABLE") saveSetting(key, true, msg); };
   return [
     scard("Control",
       srow("Master switch", ["Lets the panel send commands to the robot: start plan, pause, resume, stop and return to dock. Nothing else ",
@@ -603,20 +617,20 @@ function secSafety(d) {
                              slink("#settings/rules", "Run rules"), " and is logged in ", slink("#events/commands", "Events → Commands"), "."],
         sstate(on ? AMBER : MUTED, on ? "ON" : "Off"),
         on ? sbtn("Switch control off", () => saveSetting("control_enabled", false, "Control switched off."), "btn")
-           : sbtn("Switch control on…", () => enable("control_enabled", "Type ENABLE to let the panel send commands to the robot.", "Control switched on."), "btn pri"))),
+           : sbtn("Switch control on…", () => enableWithPrompt("control_enabled", "Type ENABLE to let the panel send commands to the robot.", "Control switched on."), "btn pri"))),
     scard("Map writing",
       srow("Map switch", ["Lets ", slink("#studio", "Map Studio"), " send no-go zones and pathways, area and no-vision zone edits (in place), ",
                           "and pathway mow settings to the robot. Each write is read back and compared; a mismatch is undone. ",
                           "Areas and no-vision zones are never added or deleted."],
         sstate(mw ? AMBER : MUTED, mw ? "ON" : "Off"),
         mw ? sbtn("Switch map writing off", () => saveSetting("map_write_enabled", false, "Map writing is off."), "btn")
-           : sbtn("Switch map writing on…", () => enable("map_write_enabled", "Type ENABLE to let the panel change the robot's map (no-go zones, pathways, area and no-vision zone edits, pathway mow settings).", "Map writing is on."), "btn pri"))),
+           : sbtn("Switch map writing on…", () => enableWithPrompt("map_write_enabled", "Type ENABLE to let the panel change the robot's map (no-go zones, pathways, area and no-vision zone edits, pathway mow settings).", "Map writing is on."), "btn pri"))),
     scard("AI assistants",
       srow("Assistant commands", ["Lets a connected AI assistant (", slink("#help/mcp", "MCP"), ") start, pause, resume, stop and dock the robot ",
                                   "when you ask it. Control must be on too; every check still applies and cannot be overridden."],
         sstate(ai ? AMBER : MUTED, ai ? "ON" : "Off"),
         ai ? sbtn("Switch assistant commands off", () => saveSetting("mcp_control_enabled", false, "Assistant commands are off."), "btn")
-           : sbtn("Switch assistant commands on…", () => enable("mcp_control_enabled", "Type ENABLE to let a connected AI assistant send commands to the robot.", "Assistant commands are on."),
+           : sbtn("Switch assistant commands on…", () => enableWithPrompt("mcp_control_enabled", "Type ENABLE to let a connected AI assistant send commands to the robot.", "Assistant commands are on."),
                   mcp.enabled ? "btn pri" : "btn"))),
   ];
 }

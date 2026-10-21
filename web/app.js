@@ -1039,8 +1039,13 @@ async function endAlign(save) {
 // Aligning happens on Live's map. It starts from Live's Align tool, Settings → Map imagery or the setup guide; from
 // the last two the page goes back there when it is saved or cancelled.
 function beginAlign() {
-  if (state.view !== "live") { state.alignReturn = location.hash || null; location.hash = "#live"; }
-  setTimeout(() => { if (!state.align) startAlign(); }, 150);
+  const back = state.view !== "live" ? location.hash || null : null;
+  if (back) location.hash = "#live";
+  setTimeout(() => {
+    if (state.align) return;
+    startAlign();
+    state.alignReturn = state.align ? back : null;     // only once aligning really started (the imagery was loaded)
+  }, 150);
 }
 
 /* ------------------------------------------------------------- status */
