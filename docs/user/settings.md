@@ -72,4 +72,6 @@ answer that takes more than 12 seconds is counted but not put on the map: the ro
 ## Yarbo cloud sign-in
 
 You type your Yarbo password in Settings → Robot. It goes straight to Yarbo's own SDK and is never stored or
-logged; only the session is kept on the server. Control needs the cloud; reading the robot does not.
+logged; only the session is kept on the server. It is optional: the panel reads and commands the robot over your
+network, and uses the cloud only as a fallback when the robot can't be reached there (Settings → Robot → Route to
+the robot shows which way each goes).

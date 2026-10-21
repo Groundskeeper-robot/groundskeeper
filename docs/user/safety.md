@@ -23,7 +23,8 @@ Each one is checked, in order:
 
 1. It is one of those five.
 2. Control is on.
-3. The robot is online (data under 2 minutes old) and the Yarbo cloud is connected.
+3. The robot is online (data under 2 minutes old) and the panel can reach it: on your network, or through the
+   Yarbo cloud as a fallback.
 4. For a start, also: the plan exists, no active error, enough battery, not already running, the yard is clear on
    the cameras, the phone app is not driving it, the lawn is dry, and someone is home.
 

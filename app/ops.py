@@ -8,6 +8,7 @@ from datetime import datetime
 from . import conditions, control, maintenance, telemetry
 from . import why as reasons
 from .cloud import CloudTransport
+from .link import RobotLink
 from .control import Controller
 from .backups import Backups
 from .mapwrite import MapWriter
@@ -51,12 +52,20 @@ class Ops:
     def __init__(self, cfg, rec):
         self.cfg, self.rec, self.store = cfg, rec, rec.store
         self.cloud = CloudTransport(cfg.data_dir, rec.sn, self._from_cloud)
+        # Local first, the cloud as a fallback, for reads and commands alike (app/link.py).
+        self.link = RobotLink(rec, self.cloud, self.store, mark_sent=lambda cmd: rec._sent.__setitem__(cmd, time.time()))
+        self.link.on_change = self._route_changed
+        rec.link = self.link
         self.frigate = Frigate(cfg.frigate_url)
         self.notifier = Notifier(self.store, cfg.ha_url, cfg.ha_token)
         rec.on_sn = self.robot_changed
-        self.controller = Controller(self.store, self.cloud, self.context, self.expect_reply, lambda: self.rec.t)
+        self.controller = Controller(self.store, self.link, self.context, self.expect_reply, lambda: self.rec.t)
+        # Another client's command, other than the one being watched (whose late echo may look like someone else's).
+        self.controller.others_at = lambda cmd: max(
+            (t for name, t in (getattr(self.rec, "foreign_cmds", None) or {}).items() if name != cmd), default=0.0)
         self.scheduler = Scheduler(self.store)
-        self.map_writer = MapWriter(self.store, self.cloud.publish, self.expect_reply, rec.reload_map,
+        self.map_writer = MapWriter(self.store, self.link.write_command,
+                                    self.expect_reply, rec.reload_map,
                                     rec.read_pathway_params, lambda: self.cloud.username, rec.read_area_records,
                                     rec.read_deadend_params)
         self.backups = Backups(self.store, self.map_writer,
@@ -93,6 +102,27 @@ class Ops:
                 self.phone_app_at = ts
         self.rec._from_thread(topic, data, ts)
 
+    def _route_changed(self, what: str, before: str, after: str) -> None:
+        """A route to the robot changed (local <-> cloud): say so once, so a firmware lockout or a 4G spell shows."""
+        self.store.event("route_changed", f"{what} now go through the {after} (were {before})")
+
+    def phone_app_active(self, quiet: float) -> bool | None:
+        """Is the Yarbo app open on someone's phone? The robot streams DeviceMSG about once a second while the app is
+        connected (seen on the local broker, 2026-10-21; the panel's own reads come back on data_feedback), and the app's
+        own keep-awake shows on the cloud. A stream is proof the app is open; its absence is not yet proof it is closed
+        (not shown for every kind of app session), so without the cloud "no stream" is unknown, which still blocks the
+        starts nobody watches (scheduler, assistant, guard resume). Right after the panel starts or a route comes up,
+        quiet is unknown until the route has been up for the quiet window."""
+        now = time.time()
+        streaming = now - self.rec.app_stream_at < quiet
+        if self.cloud.state == "connected" and now - getattr(self.cloud, "connected_since", 0.0) >= quiet:
+            return streaming or now - self.phone_app_at < quiet
+        return True if streaming else None
+
+    def phone_app_seen_at(self) -> float:
+        """The last sign of the phone app on either route (its keep-awake on the cloud, its stream locally)."""
+        return max(self.phone_app_at, self.rec.app_stream_at)
+
     def expect_reply(self, cmd: str) -> asyncio.Future:
         fut = self.rec.loop.create_future()
         waiters = self.rec._pending.setdefault(cmd, [])
@@ -111,6 +141,10 @@ class Ops:
         await asyncio.gather(self._scheduler_loop(), self._guard_loop(), self._alert_loop())
 
     async def close(self) -> None:
+        tasks = list(self.controller._tasks)
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
         self.cloud.stop()
         await self.frigate.close()
         await self.notifier.close()
@@ -175,13 +209,13 @@ class Ops:
         quiet = g["phone_app_quiet_s"]
         return {
             "snapshot_age_s": snap_age,
-            "cloud_state": self.cloud.state,
+            "route_state": self.link.state,
             "plans": r.plans,
             "error_code": int(t.get("error_code") or 0),
             "battery": t.get("battery"),
             "running": bool(r.run_id) or bool(r.plan_active()),
             "yard": await self.yard_status(args.get("yard_minutes") or g["yard_clear_minutes"], g["yard_labels"]),
-            "phone_app_active": None if self.cloud.state != "connected" else time.time() - self.phone_app_at < quiet,
+            "phone_app_active": self.phone_app_active(quiet),
             "conditions": (r.conditions or {}).get("state"),
             "presence": await self.presence(),
         }
@@ -192,11 +226,14 @@ class Ops:
             return False, [], "no plan chosen for this window"
         ctx = await self.context({"plan_id": w["plan_id"]})
         checks = control.check("start_plan", {"plan_id": w["plan_id"]}, ctx, control.gates(self.store), "scheduler")
-        # Raising a confirmation does not need the cloud link (confirming does); keep that check visible but soft.
-        for c in checks:
-            if c["name"] == "Cloud connected":
-                c["hard"] = False
-                c["ok"] = c["ok"] or None
+        # Raising a confirmation does not need a route to the robot or to know about the phone app (confirming does);
+        # keep those checks visible but soft.
+        # Only for a window that asks first: an auto-start window sends at once, and the send keeps them hard.
+        if not w.get("auto_start"):
+            for c in checks:
+                if c["name"] == "Route to the robot" or (c["name"] == "Phone app not driving it" and c["ok"] is None):
+                    c["hard"] = False
+                    c["ok"] = c["ok"] or None
         ok, reason = control.verdict(checks, override=False)
         return ok, checks, reason
 
@@ -475,7 +512,7 @@ class Ops:
             if test(r.t):
                 # Own the pause only if it is clearly ours: it landed after we sent it and nobody else spoke since.
                 ours = (r.activity_at >= p["at"] - 1 and self._people_cmd_at() < p["at"]
-                        and self.phone_app_at < p["at"] and r.plan is not None and r.plan.active
+                        and self.phone_app_seen_at() < p["at"] and r.plan is not None and r.plan.active
                         and r.plan.session is not None)
                 st.update(pending=None, acted=p["action"], acted_at=now, warned=False, tries=0,
                           owner={"activity_at": r.activity_at, "session": r.plan.session} if ours else None)
@@ -514,7 +551,7 @@ class Ops:
                 or any(st["owner"] is None or st["owner"]["activity_at"] != r.activity_at for st in sts)):
             self._drop_ownership(f"the robot is now {r.status()['state']}")
             return
-        if self._people_cmd_at() > first or self.phone_app_at > first:
+        if self._people_cmd_at() > first or self.phone_app_seen_at() > first:
             self._drop_ownership("someone else sent the robot a command")
             return
         if any(not st["owner"]["session"] for st in sts):
@@ -764,5 +801,6 @@ class Ops:
                 "map_write_enabled": bool(self.store.setting("map_write_enabled", False)),
                 "frigate": self.frigate.status(), "notify": self.notifier.channels(),
                 "pending": self.scheduler.pending(), "guards": self.guard_status(),
-                "last_command": self.controller.last, "phone_app_seen_s":
-                    round(time.time() - self.phone_app_at) if self.phone_app_at else None}
+                "last_command": self.controller.last, "link": self.link.status(),
+                "phone_app_seen_s": (round(time.time() - max(self.phone_app_at, self.rec.app_stream_at))
+                                     if max(self.phone_app_at, self.rec.app_stream_at) else None)}

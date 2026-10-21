@@ -2,9 +2,10 @@
 
 Local rules for the Python side. The top-level `AGENTS.md` comes first.
 
-- **Who may talk to the robot.** `transport_local.py` publishes only `READ_ONLY_COMMANDS`. `cloud.py` publishes, but
-  only `control.Controller.send()` and `mapwrite.MapWriter` call it (`ops.py` wires the writer). Nothing else calls
-  `.publish()`; `tests/test_guards.py` checks this.
+- **Who may talk to the robot.** `transport_local.request()` publishes only `READ_ONLY_COMMANDS`;
+  `transport_local.command()` and `cloud.publish()` are reached only through `link.RobotLink`, which only
+  `control.Controller.send()` and `mapwrite.MapWriter` call (`ops.py` wires the writer). `tests/test_guards.py` checks
+  this.
 - **Interlocks** are in `control.check` and run on the server for every sender (UI, scheduler, guards, MCP). A new
   one fails closed: unknown or missing state blocks. The reason shown to the user goes through `why.py`.
 - **Writes** to the robot run under `MapWriter.lock`, are read back, compared and put back on a mismatch. A per-id

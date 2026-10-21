@@ -58,8 +58,9 @@ These come on top of the rules below, which apply to everyone.
 | `app/main.py` | Every HTTP route, the sign-in middleware, startup (`lifespan`), `SETTINGS_DEFAULTS` |
 | `app/auth.py` | Password, sessions, API tokens, signed links, the gate (`OPEN_PATHS`, `needs_auth`) |
 | `app/recorder.py` | Listens to the robot's local broker, keeps state, records telemetry, detects runs, stall alert |
-| `app/transport_local.py` | The read-only MQTT client (`READ_ONLY_COMMANDS`, `COMPUTE_ONLY`) |
-| `app/cloud.py`, `app/control.py` | Cloud transport; the only path that commands the robot (`CATALOGUE`, `check`, `GATE_DEFAULTS`) |
+| `app/transport_local.py` | The robot's local MQTT client: reads (`READ_ONLY_COMMANDS`, `COMPUTE_ONLY`) and, for the link only, commands |
+| `app/link.py` | `RobotLink`: local first, the cloud as a fallback, for reads and commands |
+| `app/cloud.py`, `app/control.py` | Cloud transport; the controller, the only sender of run commands (`CATALOGUE`, `check`, `GATE_DEFAULTS`) |
 | `app/ops.py`, `app/scheduler.py` | Scheduler, guards, notifications, maintenance: things that act over time |
 | `app/runs.py`, `app/coverage.py`, `app/problems.py`, `app/insights.py`, `app/planned.py` | Run analysis |
 | `app/mapstudio.py`, `app/mapwrite.py`, `app/areasettings.py`, `app/tidy.py`, `app/backups.py` | Map Studio: drafts, writes with read-back, settings |
@@ -123,11 +124,14 @@ labels with tooltips, works at phone width. Regenerate the screenshots.
 ### Safety
 - **No new robot command without a capture from the official app or SDK.** Never guess a command or a payload.
   Formats and where they came from go in `docs/dev/protocol.md` or `docs/dev/map-writes.md` first.
-- `cmd_vel` (manual driving) stays blocked. The local broker is read-only: a new read goes in
-  `READ_ONLY_COMMANDS` (`app/transport_local.py`), and a request that only computes goes in `COMPUTE_ONLY` too.
-  Nothing else is ever published there.
+- `cmd_vel` (manual driving) stays blocked on every route. A new read goes in `READ_ONLY_COMMANDS`
+  (`app/transport_local.py`), and a request that only computes goes in `COMPUTE_ONLY` too.
 - Only `app.control.Controller.send()` (run commands) and `app.mapwrite.MapWriter` (map and settings writes) send
-  to the robot. Interlocks live in `control.check`, are enforced on the server (never only in the UI), and new ones
+  commands, and only through `app.link.RobotLink` (`command()` for run commands, `write_command()` for captured
+  writes), which alone reaches `LocalTransport.command` and `CloudTransport.publish`. Every send is marked as the
+  panel's own, so its echo is never taken for a person's. A command that may be repeated on the other route is listed
+  in `control.SAFE_TO_REPEAT` (never a start or a resume); the repeat runs under the controller's lock, only while
+  control is on and no newer command was sent, and is logged. A map write keeps one route from start to end. Interlocks live in `control.check`, are enforced on the server (never only in the UI), and new ones
   fail closed: an unknown state blocks.
 - Never loosen a default. A new install has control, map writing, guard auto-resume, assistant commands and the
   MCP server all off.
@@ -184,9 +188,11 @@ Don't "fix" these; each is how the robot behaves or a choice made on purpose.
 - **Telemetry is stamped on arrival.** After a network gap samples bunch up; speed, slip and distance skip bursts.
 - **An ArcGIS `exportImage` with no coverage returns a black image with HTTP 200**, hence the blank detection.
 - **`httpx` drops a URL's own query when `params=` is given**; use `merge_query` in `app/imagery/common.py`.
-- **The panel only reads on the robot's local broker**, even where it might accept more (see
-  `docs/dev/protocol.md` → Access control). Commands go through the cloud broker, as the official app's do, and
-  through `control`, where the interlocks are.
+- **Two routes for the same commands.** The robot accepts commands on its local broker and through the cloud
+  (`docs/dev/protocol.md` → Access control). The panel goes local first and keeps the cloud as a fallback, so a 4G
+  spell or a firmware change to either route does not stop it (`app/link.py`).
+- **Map writes go only through the cloud for now** (`link.LOCAL_WRITES_PROVED`): run commands are proved locally,
+  writes not yet.
 
 ## Glossary
 

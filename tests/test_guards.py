@@ -37,11 +37,11 @@ def js_code(text: str) -> str:
 
 # -- Safety ---------------------------------------------------------------------------------------------------------
 
-# The only modules that may call .publish(): the two transports, the controller (every run command, behind the
-# interlocks) and the map writer (WRITE_COMMANDS only, read back after). AGENTS.md → Rules → Safety.
-PUBLISHERS = {"app/transport_local.py", "app/cloud.py", "app/control.py", "app/mapwrite.py"}
-# Where the cloud transport's publish may be handed out: the controller, and ops wiring it into the map writer.
-CLOUD_PUBLISH_USERS = {"app/control.py", "app/ops.py"}
+# The only modules that may call .publish(): the two transports, the link that picks between them, and the map
+# writer (WRITE_COMMANDS only, through the link's write_command, read back after). AGENTS.md → Rules → Safety.
+PUBLISHERS = {"app/transport_local.py", "app/cloud.py", "app/link.py", "app/mapwrite.py"}
+# Only the link reaches the cloud transport's publish.
+CLOUD_PUBLISH_USERS = {"app/link.py"}
 
 
 def _publish_calls(p: Path) -> int:
@@ -58,10 +58,97 @@ def test_only_known_modules_publish_to_the_robot():
                        "See AGENTS.md → Rules → Safety.")
 
 
-def test_cloud_publish_is_only_handed_to_the_controller_and_map_writer():
+def test_only_the_link_reaches_the_cloud_publish():
     users = {rel(p) for p in APP if re.search(r"\bcloud\.publish\b", read(p))}
     extra = users - CLOUD_PUBLISH_USERS
-    assert not extra, f"{sorted(extra)} reach cloud.publish directly; use Controller.send() (AGENTS.md → Safety)"
+    assert not extra, (f"{sorted(extra)} reach cloud.publish directly; commands go Controller/MapWriter → "
+                       "app.link.RobotLink (AGENTS.md → Safety)")
+
+
+def _uses(p: Path, attr: str) -> list[tuple[str, int]]:
+    """(qualified place, line) of every `<anything>.<attr>` in a module: a call, a bound method handed on, however the
+    object is named or aliased. The place is Class.method; a lambda is its own place ("...<lambda>"), so a lambda
+    built inside an allowed method and handed out is not allowed."""
+    tree, out, skip = ast.parse(read(p)), [], set()
+
+    def walk(node, place):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            outer = place.rsplit(".", 1)[0] if "." in place else "<module>"
+            heads = [*getattr(node, "decorator_list", []), *node.args.defaults, *[d for d in node.args.kw_defaults if d]]
+            for head in heads:                    # evaluated where the def stands, not inside it
+                for sub_node in ast.walk(head):
+                    skip.add(id(sub_node))
+                    if isinstance(sub_node, ast.Attribute) and sub_node.attr == attr:
+                        out.append((outer, sub_node.lineno))
+        for child in ast.iter_child_nodes(node):
+            if id(child) in skip:
+                continue
+            here = place
+            if isinstance(child, ast.ClassDef):
+                here = child.name if place == "<module>" else f"{place}.{child.name}"
+            elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                here = child.name if place == "<module>" else f"{place}.{child.name}"
+            elif isinstance(child, ast.Lambda):
+                here = f"{place}.<lambda>"
+            if isinstance(child, ast.Attribute) and child.attr == attr:
+                out.append((place, child.lineno))
+            walk(child, here)
+    walk(tree, "<module>")
+    return out
+
+
+# Where a run command may be sent through the link (Controller: a send, and the follow-up that may repeat a safe one),
+# and where the link's write door may be handed out (Ops wiring the map writer). Anywhere else is a bypass.
+COMMAND_USES = {"app/link.py": None, "app/control.py": {"Controller.send", "Controller._follow_up"}}
+WRITE_DOOR = {"app/link.py": None, "app/ops.py": {"Ops.__init__"}}
+
+
+def test_only_the_controller_sends_commands_through_the_link():
+    for p in APP:
+        allowed = COMMAND_USES.get(rel(p), set())
+        bad = [(f, n) for f, n in _uses(p, "command") if allowed is not None and f not in allowed]
+        assert not bad, (f"{rel(p)} uses .command at {bad}: only Controller.send (and its follow-up) send run "
+                         "commands, through app.link.RobotLink (AGENTS.md → Safety)")
+
+
+def test_only_the_map_writer_gets_the_write_door():
+    for p in APP:
+        allowed = WRITE_DOOR.get(rel(p), set())
+        bad = [(f, n) for f, n in _uses(p, "write_command") if allowed is not None and f not in allowed]
+        assert not bad, f"{rel(p)} uses .write_command at {bad}: only MapWriter writes, wired in Ops.__init__"
+
+
+def test_the_guard_sees_handoffs_and_lambdas(tmp_path):
+    bad = tmp_path / "bad.py"
+    bad.write_text("class Controller:\n"
+                   "    def send(self):\n"
+                   "        f = lambda: self.link.command('pause', {})\n"
+                   "        return f\n"
+                   "class Ops:\n"
+                   "    def tick(self):\n"
+                   "        MapWriter(self.store, self.link.command)\n", encoding="utf-8")
+    assert _uses(bad, "command") == [("Controller.send.<lambda>", 3), ("Ops.tick", 7)]
+
+
+def test_the_guard_places_defaults_and_decorators_outside_the_function(tmp_path):
+    bad = tmp_path / "bad.py"
+    bad.write_text("class Controller:\n"
+                   "    def send(self, cb=link.command):\n"
+                   "        return cb\n", encoding="utf-8")
+    assert _uses(bad, "command") == [("Controller", 2)]
+
+
+@pytest.mark.parametrize("cmd", ["cmd_vel", "set_sound_param", "light_ctrl", "get_controller", "shutdown"])
+def test_the_local_broker_refuses_anything_but_run_commands_and_captured_writes(cmd):
+    from app.transport_local import ReadOnlyViolation, check_command
+    with pytest.raises(ReadOnlyViolation):
+        check_command(cmd)
+
+
+@pytest.mark.parametrize("cmd", sorted(control.CATALOGUE))
+def test_the_local_broker_takes_the_run_commands(cmd):
+    from app.transport_local import check_command
+    check_command(cmd)
 
 
 def test_manual_driving_stays_blocked():

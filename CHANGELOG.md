@@ -5,6 +5,30 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ## Unreleased
 
+### Changed
+- **Local first, the cloud as a fallback.** Commands (start, pause, resume, stop, return to dock) now go to the
+  robot's own broker on your network, so they work with no Yarbo account and take effect in about 2 seconds. Reads
+  and commands fall back to the Yarbo cloud when the robot can't be reached on your network (a 4G spell where HaLow
+  is weak), or after two quick reads or two commands in a row go unanswered there, if you are signed in. A pause,
+  stop or return to dock not seen within 10 s is sent once more by the other route (unless a newer command was sent
+  meanwhile or control was switched off); a start or resume never is. Settings → Robot shows which route reads
+  and commands use and lets you pin one; every change of route is logged in Events.
+- **The Yarbo cloud sign-in is optional** for commands and reads. Map, settings and plan writes still go only through
+  the cloud until a local write has been proved.
+- **The phone app is also seen on your network:** the robot streams its status about once a second while the app
+  is open, which the panel now reads as "app open" without the cloud. Without the cloud a missing stream is not yet
+  taken as "closed": scheduled, assistant and guard starts wait while the panel cannot tell; a start from the panel
+  shows the unknown.
+- **Confirming a command is a pop-up** over the page, instead of a panel under the buttons that could open out of
+  sight (on a phone, or in the camera layout). It says up front whether the command would go and why not; Send is
+  offered only when it would.
+- **The two-tap buttons** (camera layout) turn fully amber when armed, say "Tap again to …", and show a bar running
+  down the 4 seconds; a line under them says which button is armed.
+
+### Fixed
+- The Control and camera-layout buttons were greyed out whenever the Yarbo cloud was not connected, even with the
+  robot reachable on your network; they now follow the route to the robot.
+
 ## 0.18.0 — 2026-10-20
 
 ### Added

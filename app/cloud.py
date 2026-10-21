@@ -36,6 +36,7 @@ class CloudTransport:
         self.error = ""
         self.connected = False
         self.published = 0
+        self.connected_since = 0.0
         self._client = None          # YarboClient
         self._mqtt: mqtt.Client | None = None
         self._stop = threading.Event()
@@ -224,13 +225,15 @@ class CloudTransport:
         with self._lock:
             self._mqtt = client
         self.connected, self.state, self.error = True, "connected", ""
+        self.connected_since = time.time()
         self._last_refresh = time.time()
         log.info("Yarbo cloud connected via the %s broker", self.broker.split()[0])
 
     _last_refresh = 0.0
 
     def publish(self, cmd: str, payload: dict) -> None:
-        """Only Controller and MapWriter call this, after their own checks. Raises if not connected."""
+        """Only app.link.RobotLink calls this (for Controller and MapWriter, after their checks, and for reads).
+        Raises if not connected."""
         with self._lock:
             client = self._mqtt
         if not (client and self.connected):

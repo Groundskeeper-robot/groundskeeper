@@ -291,8 +291,8 @@ async def write(writer, aid: int, changes: dict, read, gps_ref, check=None) -> d
                 pass
             return {"ok": True, "before": before, "after": after, "problems": problems}
         old = params_payload(before, aid)
-        back = await writer._send(SAVE, old)
-        await writer._send(AREA_SAVE, area_record(record))
+        back = await writer._send(SAVE, old, rollback=True)
+        await writer._send(AREA_SAVE, area_record(record), rollback=True)
         restored, _ = await read_settings(read, aid)
         rollback_ok = bool(back["ok"] and restored is not None and not differs(restored, old))
         writer.store.event("area_settings_failed", f"area {aid}: read back differs ({', '.join(wrong)}); previous "

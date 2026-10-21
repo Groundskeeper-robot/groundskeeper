@@ -1033,7 +1033,7 @@ async def setup_status(request: Request):
         step("robot", "Robot", local.get("connected") and r.map_geojson,
              "connected, map read" if local.get("connected") and r.map_geojson else "connected, waiting for the map"
              if local.get("connected") else "no address yet" if not cfg.yarbo_host else "not found at its address"),
-        step("cloud", "Yarbo cloud", cloud == "connected", f"cloud {cloud or 'signed out'} (needed for commands and map writes)", True),
+        step("cloud", "Yarbo cloud", cloud == "connected", f"cloud {cloud or 'signed out'} (optional: a fallback route)", True),
         step("imagery", "Map imagery", src, (src or {}).get("name", "picked") if src else "no imagery yet"),
         step("cameras", "Cameras", o.frigate.enabled and yard and all(c in polys for c in yard),
              "Frigate not set up" if not o.frigate.enabled else f"{len(yard)} yard cameras, {sum(1 for c in yard if c in polys)} with coverage", True),
@@ -1127,6 +1127,7 @@ SETTINGS_DEFAULTS = {
     "ha_notify_service": None,
     "webhook_url": None,
     "wifi_survey": "off",
+    "robot_route": "auto",           # app/link.py: local first with the cloud as a fallback, or one route only
 }
 
 
@@ -1373,6 +1374,15 @@ async def put_setting(request: Request, key: str, value: Any = Body(None)):
             raise HTTPException(400, "true or false")
         r.store.set_setting(key, value)
         r.store.event("mcp_control_switched", "AI assistant commands switched ON" if value else "AI assistant commands switched off")
+        return {key: value}
+    if key == "robot_route":
+        from .link import ROUTE_MODES
+        if value not in ROUTE_MODES:
+            raise HTTPException(400, f"one of {', '.join(ROUTE_MODES)}")
+        before = r.store.setting("robot_route") or "auto"
+        r.store.set_setting(key, value)
+        if before != value:
+            r.store.event("route_setting_changed", f"route to the robot: {before} → {value}")
         return {key: value}
     if key == "wifi_survey":
         from .recorder import WIFI_MODES

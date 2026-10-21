@@ -18,8 +18,9 @@ def reason(code: str, title: str, fix: str, detail: str = "", link: str | None =
 CHECKS = {
     "Robot online": ("offline", "The robot is not reporting",
                      "Check that it is powered on and on the network (HaLow or Wi-Fi)", "#settings/robot"),
-    "Cloud connected": ("cloud", "The Yarbo cloud is not connected",
-                        "Sign in again in Settings → Robot", "#settings/robot"),
+    "Route to the robot": ("no_route", "The panel cannot reach the robot",
+                           "Check the robot's local broker in Settings → Robot, or sign in to the Yarbo cloud there as a "
+                           "fallback", "#settings/robot"),
     "Plan exists": ("plan_missing", "That plan is not on the robot",
                     "Pick another plan, or make it again in the Yarbo app", "#help/not-yet"),
     "No active error": ("robot_error", "The robot has an active error",
@@ -29,7 +30,9 @@ CHECKS = {
     "Yard clear (Frigate)": ("yard", "Someone (or an animal) is in the yard, or the cameras cannot tell",
                              "Wait until the yard is clear; check Frigate if the cameras are down", "#settings/cameras"),
     "Phone app not driving it": ("phone_app", "The Yarbo app is driving it, or the panel cannot tell",
-                                 "Close the robot's screen in the Yarbo app; check the cloud link", "#settings/robot"),
+                                 "Close the robot's screen in the Yarbo app. If the panel cannot tell, sign in to the "
+                                 "Yarbo cloud (it shows the app's keep-awake) or start from the panel yourself",
+                                 "#settings/robot"),
     "Lawn dry": ("lawn", "The lawn is not dry", "Wait for it to dry; the expected time is on Live", "#settings/lawn"),
     "Someone home (Alarmo)": ("presence", "Nobody is home, or Home Assistant cannot tell",
                               "Starts need someone home; check Home Assistant if it is down", "#settings/ha"),

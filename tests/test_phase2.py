@@ -4,6 +4,7 @@ from datetime import datetime
 import pytest
 
 from app import control, maintenance, scheduler
+from tests.fakelink import FakeLink
 from app import geo
 from app.ops import point_in_ring
 from app.store import Store
@@ -18,7 +19,7 @@ class FakeCloud:
 
 
 def good_ctx(**over):
-    ctx = {"snapshot_age_s": 5, "cloud_state": "connected", "plans": [{"id": 1, "name": "Mow All"}], "error_code": 0,
+    ctx = {"snapshot_age_s": 5, "route_state": "connected", "plans": [{"id": 1, "name": "Mow All"}], "error_code": 0,
            "battery": 90, "running": False, "yard": {"ok": True, "detail": "clear", "events": []},
            "phone_app_active": False, "conditions": "Dry", "presence": True}
     ctx.update(over)
@@ -29,7 +30,7 @@ def make_controller(tmp_path, ctx=None, enabled=False, reply=None):
     store = Store(str(tmp_path))
     if enabled:
         store.set_setting("control_enabled", True)
-    cloud = FakeCloud((ctx or good_ctx())["cloud_state"])
+    cloud = FakeCloud((ctx or good_ctx())["route_state"])
 
     async def context(args):
         return ctx or good_ctx()
@@ -39,7 +40,7 @@ def make_controller(tmp_path, ctx=None, enabled=False, reply=None):
         fut.set_result(reply if reply is not None else {"topic": cmd, "state": 0, "msg": "ok"})
         return fut
 
-    return store, cloud, control.Controller(store, cloud, context, expect)
+    return store, cloud, control.Controller(store, FakeLink(cloud), context, expect)
 
 
 def run(coro):
@@ -93,7 +94,7 @@ def test_bad_plan_ids_never_become_a_plan(tmp_path, bad):
     ({"running": True}, "Not already running"),
     ({"error_code": 7}, "No active error"),
     ({"snapshot_age_s": 900}, "Robot online"),
-    ({"cloud_state": "needs login"}, "Cloud connected"),
+    ({"route_state": "needs login"}, "Route to the robot"),
     ({"yard": {"ok": False, "detail": "person on back_yard", "events": [1]}}, "Yard clear"),
     ({"phone_app_active": True}, "Phone app"),
 ])
