@@ -330,9 +330,11 @@ Before a route is trusted for control it is proved with a harmless command:
 
 1. **Cloud control:** `cmd_recharge` (return to dock) through the SDK while the robot is already docked. Nothing can
    move.
-2. **Local control:** docked → `get_controller` → buzzer or light → observe. The official app sends action commands
-   only after a `get_controller` handshake, and the local broker's ACLs for actions were tightened by a firmware
-   update, so the panel does not use local control. `transport_local.py` cannot publish anything but reads.
+2. **Local control:** a harmless setting whose result the robot reports, on the local broker. Done 2026-10-21 with
+   `set_sound_param` (as the app sends it): accepted, with no handshake and no cloud (`docs/dev/protocol.md` →
+   Access control). Run commands have not been tried locally yet, so the panel still sends them through the cloud,
+   and `transport_local.py` still publishes only reads. Moving commands to the local broker is a design change of
+   its own (#31 would then mostly disappear).
 
 The control route follows the result; it is a code-level decision, not a setting a user can flip.
 
