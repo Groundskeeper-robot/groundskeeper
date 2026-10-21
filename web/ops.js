@@ -228,8 +228,13 @@ function drawCamStage(d, s) {
 /* The emergency block: one big button that pauses a running plan or resumes a paused one (the robot's own
    planning_paused decides which, through its activity), with Stop and Return to dock under it. The same command
    path and checks as the Control card; the confirmation is a second tap within 4 s instead of a dialog. */
+// Some route carries commands (the robot's broker on the home network, or the Yarbo cloud); the reason when none does.
+const routeOk = (o) => (o.link ? !!o.link.commands : !!(o.cloud && o.cloud.state === "connected"));
+const noRouteWhy = (o) => [o.link ? "No route to the robot: neither its broker on your network nor the Yarbo cloud is connected. "
+  : `Yarbo cloud is ${(o.cloud || {}).state}. `, h("a", { href: "#settings/robot" }, "Settings → Robot"), "."];
+
 function emergencyCard(s) {
-  const o = s.ops || {}, on = o.control_enabled, cloudOk = o.cloud && o.cloud.state === "connected";
+  const o = s.ops || {}, on = o.control_enabled;
   const act = s.activity, known = !!act && !s.lost_contact && s.state !== "waiting for data";
   const running = !!s.run || !["docked", "idle"].includes(act);
   const held = HELD.has(act);
@@ -238,22 +243,29 @@ function emergencyCard(s) {
     pause: !known || !NOT_PAUSABLE.has(act), resume: !known || held,
     stop: !known || running, cmd_recharge: !known || !NOT_DOCKABLE.has(act),
   };
-  const off = !on || !cloudOk;
+  const off = !on || !routeOk(o);
+  const arm = ops.arm && Date.now() < ops.arm.until ? ops.arm : null;
+  // Armed: the whole button turns amber, says what the second tap does, and a bar drains over the 4 s. Live redraws on
+  // every status event, so the bar starts part-way through (a negative delay) rather than over again.
   const button = (cmd, label, icon, cls) => {
-    const armed = ops.arm && ops.arm.cmd === cmd, busy = ops.sending === cmd;
+    const armed = arm && arm.cmd === cmd, busy = ops.sending === cmd;
     return h("button", { type: "button", class: `btn ${cls}${armed ? " armed" : ""}`, "data-cmd": cmd,
       disabled: off || !can[cmd] || !!ops.sending || null, "aria-live": "polite",
       onclick: () => emergencyTap(cmd, label) },
       icon ? h("span", { class: "eicon", "aria-hidden": "true" }, icon) : null,
-      busy ? `${label}…` : armed ? `Tap again to ${label.toLowerCase()}` : label);
+      busy ? `${label}…` : armed ? h("span", { class: "armtext" }, h("b", null, `Tap again to ${label.toLowerCase()}`),
+        h("small", null, "or wait to cancel")) : label,
+      armed ? h("span", { class: "armbar", "aria-hidden": "true", style: `animation-delay:-${4000 - (arm.until - Date.now())}ms` }) : null);
   };
+  const armedLabel = arm && { pause: "Pause", resume: "Resume", stop: "Stop", cmd_recharge: "Return to dock" }[arm.cmd];
   const why = !on ? ["Control is off. ", h("a", { href: "#settings/safety" }, "Switch it on"), " to use these."]
-            : !cloudOk ? [`Yarbo cloud is ${o.cloud.state}. `, h("a", { href: "#settings/robot" }, "Sign in"), "."]
+            : !routeOk(o) ? noRouteWhy(o)
             : known && !can[main[0]] ? `Nothing to ${main[1].toLowerCase()}: the robot is ${s.state}.` : null;
   return h("div", { class: "card ecard" },
     button(main[0], main[1], main[2], held ? "pri huge" : "danger huge"),
     h("div", { class: "ehalf" }, button("stop", "Stop", "■", ""), button("cmd_recharge", "Return to dock", "⌂", "")),
-    h("p", { class: "muted small", style: "margin:8px 0 0" }, why || "Tap twice: the first tap arms the button for 4 seconds."));
+    armedLabel ? h("p", { class: "armhint", role: "status" }, `Armed: tap “${armedLabel}” again within 4 seconds to send it.`)
+      : h("p", { class: "muted small", style: "margin:8px 0 0" }, why || "These need two taps: the first arms the button (it turns amber), the second sends."));
 }
 
 async function emergencyTap(cmd, label) {
@@ -460,16 +472,16 @@ function startFollowTimer() {
 
 function controlCard(s) {
   const o = s.ops || {};
-  const on = o.control_enabled, cloudOk = o.cloud && o.cloud.state === "connected";
+  const on = o.control_enabled;
   const plans = state.plansCache || [];
   // Live re-renders on every status event, so the picked plan lives in ops.planId, not in the <select>.
   if (!plans.some((p) => p.id === ops.planId)) ops.planId = plans[0]?.id ?? null;
   const plan = plans.find((p) => p.id === ops.planId);
   const startArgs = () => ({ plan_id: ops.planId });
   const startLabel = plan ? `Start ${plan.name}` : "Start plan";
-  const disabled = !on || !cloudOk;
+  const disabled = !on || !routeOk(o);
   const why = !on ? ["Control is switched off. ", h("a", { href: "#settings/safety" }, "Switch it on in Settings"), "."]
-            : !cloudOk ? [`Yarbo cloud is ${o.cloud.state}. `, h("a", { href: "#settings/robot" }, "Sign in in Settings"), "."] : null;
+            : !routeOk(o) ? noRouteWhy(o) : null;
   // Only what makes sense in the robot's state is offered; when the state is unknown, everything is (the server's
   // interlocks still decide).
   const act = s.activity, known = !!act && !s.lost_contact && s.state !== "waiting for data";
@@ -489,7 +501,7 @@ function controlCard(s) {
     why ? h("p", { class: "muted small" }, why) : null,
     plans.length ? [
       h("label", { for: "ctlplan", class: "muted small" }, "Plan"),
-      h("select", { id: "ctlplan", class: "field", onchange: (e) => { ops.planId = Number(e.target.value); ops.confirm = null; refreshLive(); } },
+      h("select", { id: "ctlplan", class: "field", onchange: (e) => { ops.planId = Number(e.target.value); closeConfirm(); refreshLive(); } },
         plans.map((p) => h("option", { value: p.id, selected: p.id === ops.planId || null }, p.name))),
       h("p", { class: "muted small", style: "margin:-4px 0 8px" }, `Mows ${planAreas(plan) || "no areas"}`),
       readinessView(plan.id)]
@@ -498,36 +510,69 @@ function controlCard(s) {
     h("div", { class: "ctlgrid" },
       h("button", { type: "button", class: "btn pri wide", disabled: disabled || !plan || !!idle.start_plan || null, title: idle.start_plan || null,
         onclick: () => openConfirm("start_plan", startLabel, startArgs()) }, plan ? `Start ${plan.name}…` : "Start plan…"),
-      btn("pause", "Pause"), btn("resume", "Resume"), btn("stop", "Stop"), btn("cmd_recharge", "Return to dock")),
-    ops.confirm ? confirmPanel() : null);
+      btn("pause", "Pause"), btn("resume", "Resume"), btn("stop", "Stop"), btn("cmd_recharge", "Return to dock")));
 }
 
+/* A command's confirmation is a modal over the page (it used to open under the buttons, below the fold on a phone or
+   in the camera layout). It lives outside Live, so the redraw on every status event leaves it alone; Esc, Cancel or a
+   tap outside closes it. Its head says whether the command would go; Send is offered only when it would (soft
+   checks: once the override is ticked), so a refused start is never a button that seems to do nothing. */
 async function openConfirm(cmd, label, args = {}, previewOnly = false) {
-  ops.confirm = { cmd, label, args, previewOnly, preview: null, override: false };
-  refreshLive();
-  try { ops.confirm.preview = await postJSON("/api/control/preview", { cmd, args }); } catch (e) { ops.confirm.error = e.message; }
-  refreshLive();
+  closeConfirm();
+  const opener = document.activeElement;
+  const box = h("div", { class: "imgdialogbox confirmbox", role: "dialog", "aria-modal": "true", "aria-labelledby": "confirm-title" });
+  const overlay = h("div", { class: "imgdialog", onclick: (e) => { if (e.target === overlay) closeConfirm(); } });
+  const onKey = (e) => { if (e.key === "Escape") closeConfirm(); };
+  const c = ops.confirm = { cmd, label, args, previewOnly, preview: null, override: false, box,
+    close: () => {
+      overlay.remove();
+      document.removeEventListener("keydown", onKey);
+      $(".shell")?.removeAttribute("inert");
+      if (opener && opener.isConnected && opener.focus) opener.focus();
+    } };
+  overlay.append(box);
+  $(".shell")?.setAttribute("inert", "");
+  document.body.append(overlay);
+  document.addEventListener("keydown", onKey);
+  drawConfirm();
+  try { c.preview = await postJSON("/api/control/preview", { cmd, args }); } catch (e) { c.error = e.message; }
+  if (ops.confirm === c) drawConfirm();
 }
 
-function confirmPanel() {
+function closeConfirm() {
+  const c = ops.confirm;
+  ops.confirm = null;
+  if (c) c.close();
+}
+
+function drawConfirm() {
   const c = ops.confirm, p = c.preview;
   const softOnly = p && !p.would_send && p.checks.every((x) => x.hard ? x.ok === true : true);
-  return h("div", { class: "confirm", role: "dialog", "aria-label": `Confirm ${c.label}` },
-    h("p", { class: "label" }, c.previewOnly ? `Gate check · ${c.label}` : `Send “${c.label}”?`),
+  const canSend = p && p.enabled && (p.would_send || (softOnly && c.override && c.cmd === "start_plan"));
+  const head = !p ? null
+    : p.would_send ? h("p", { class: "small", style: `color:${GREEN};margin:0 0 6px` }, "Every check passes.")
+    : softOnly && !c.previewOnly && c.cmd === "start_plan" ? h("p", { class: "small", style: `color:${AMBER};margin:0 0 6px` },
+        `Only soft checks fail (${p.reason}). Tick the override below to start anyway.`)
+    : h("p", { class: "small", style: `color:${CORAL};margin:0 0 6px` }, h("b", null, "Can't send: "), p.reason);
+  fill(c.box,
+    h("h3", { id: "confirm-title" }, c.previewOnly ? `Gate check · ${c.label}` : `Send “${c.label}”?`),
     c.error ? h("p", { class: "small", style: `color:${CORAL}` }, c.error) : null,
+    head,
     p ? checkList(p.checks) : h("p", { class: "muted small" }, "Checking interlocks…"),
     p && !p.enabled ? h("p", { class: "muted small" }, "Control is switched off; nothing will be sent.") : null,
     !c.previewOnly && softOnly && c.cmd === "start_plan" ? h("label", { class: "row gap small" },
-      h("input", { type: "checkbox", onchange: (e) => { c.override = e.target.checked; } }), "Override the soft checks above") : null,
-    h("div", { class: "row gap" },
-      c.previewOnly ? null : h("button", { type: "button", class: "btn pri", disabled: !p || !p.enabled || null, onclick: async (e) => {
+      h("input", { type: "checkbox", checked: c.override || null, onchange: (e) => { c.override = e.target.checked; drawConfirm(); } }),
+      "Override the soft checks above") : null,
+    h("div", { class: "row gap", style: "justify-content:flex-end;margin-top:12px" },
+      h("button", { type: "button", class: "btn", onclick: closeConfirm }, c.previewOnly ? "Close" : "Cancel"),
+      c.previewOnly ? null : h("button", { type: "button", class: "btn pri", disabled: !canSend || null, onclick: async (e) => {
         e.target.disabled = true;
         try { reportSend(await postJSON("/api/control/send", { cmd: c.cmd, args: c.args, confirm: true, override: c.override }), c.label); }
         catch (err) { toast(err.message); }
-        ops.confirm = null;
+        if (ops.confirm === c) closeConfirm();
         refreshLive();
-      } }, "Send"),
-      h("button", { type: "button", class: "btn", onclick: () => { ops.confirm = null; refreshLive(); } }, c.previewOnly ? "Close" : "Cancel")));
+      } }, "Send")));
+  if (!c.box.contains(document.activeElement)) c.box.querySelector("button:not([disabled])")?.focus();  // a redraw drops focus
 }
 
 function refreshLive() {

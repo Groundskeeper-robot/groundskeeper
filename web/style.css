@@ -250,7 +250,6 @@ a { color: var(--link); }
 .btn.on { background: var(--pressed); border-color: var(--line3); }
 .btn[disabled] { opacity: .5; cursor: not-allowed; }
 .ctlgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.confirm { margin-top: 12px; padding: 12px; border-radius: 10px; background: var(--card2); border: 1px solid var(--line2); }
 .formgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0 12px; }
 .formrow { display: flex; flex-direction: column; gap: 2px; margin-bottom: 4px; }
 .formrow .field { margin: 2px 0 6px; }
@@ -353,6 +352,8 @@ textarea.field { min-height: 80px; padding: 8px 10px; font: 12px/1.4 var(--mono)
 @media (max-width: 600px) { .wizsteps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .imgdialog { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(5, 8, 7, .74); }
 .imgdialogbox { width: 100%; max-width: 900px; max-height: calc(100vh - 32px); overflow-y: auto; display: flex; flex-wrap: wrap; gap: 20px; padding: 18px; border-radius: 14px; background: var(--card); border: 1px solid var(--line2); }
+.imgdialogbox.confirmbox { max-width: 480px; display: block; }
+.confirmbox h3 { margin: 0 0 10px; font-size: 18px; font-weight: 600; }
 .imgdialogbox.wide { max-width: 1040px; flex-direction: column; flex-wrap: nowrap; gap: 12px; }
 .imgdialogimg { flex: 1 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .imgdialogimg img { display: block; width: 100%; border-radius: 9px; }
@@ -756,7 +757,18 @@ button.subtab { border: 0; background: none; font: inherit; font-size: 13px; cur
 .ecard { border-color: color-mix(in srgb, var(--bad) 45%, var(--line)); }
 .btn.huge { width: 100%; min-height: 76px; font-size: 22px; gap: 12px; }
 .btn.danger { background: var(--bad); color: var(--on-accent); border-color: transparent; }
-.btn.armed { outline: 3px solid var(--warn); outline-offset: 2px; }
+.btn.armed, .btn.danger.armed, .btn.pri.armed { position: relative; overflow: hidden; background: var(--warn); color: var(--on-accent);
+  border-color: transparent; outline: 3px solid color-mix(in srgb, var(--warn) 45%, transparent); outline-offset: 2px;
+  padding-top: 6px; padding-bottom: 10px; }
+.btn .armtext { display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
+.btn .armtext small { font-size: 12px; font-weight: 500; opacity: .85; }
+.btn.huge .armtext small { font-size: 13px; }
+.armbar { position: absolute; left: 0; bottom: 0; height: 5px; width: 100%; background: color-mix(in srgb, var(--on-accent) 55%, transparent);
+  transform-origin: left; animation: armdrain 4s linear forwards; }
+@keyframes armdrain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) { .armbar { animation: none; } }
+.armhint { margin: 8px 0 0; padding: 6px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 12%, transparent); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); }
 .btn .eicon { font-size: .9em; }
 .ehalf { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
 .ehalf .btn { min-height: 52px; gap: 8px; }

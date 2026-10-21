@@ -19,6 +19,15 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   is open, which the panel now reads as "app open" without the cloud. Without the cloud a missing stream is not yet
   taken as "closed": scheduled, assistant and guard starts wait while the panel cannot tell; a start from the panel
   shows the unknown.
+- **Confirming a command is a pop-up** over the page, instead of a panel under the buttons that could open out of
+  sight (on a phone, or in the camera layout). It says up front whether the command would go and why not; Send is
+  offered only when it would.
+- **The two-tap buttons** (camera layout) turn fully amber when armed, say "Tap again to …", and show a bar running
+  down the 4 seconds; a line under them says which button is armed.
+
+### Fixed
+- The Control and camera-layout buttons were greyed out whenever the Yarbo cloud was not connected, even with the
+  robot reachable on your network; they now follow the route to the robot.
 
 ## 0.18.0 — 2026-10-20
 

@@ -7,7 +7,7 @@ The robot now: where it is, what it is doing, and the last 24 hours of its track
 follow-cam where the map was, with the camera chips top left, the yard check top right and the robot's state along
 the foot; the map becomes a small card in the panel. The panel then starts with the emergency buttons:
 a big red **Pause** (it turns into **Resume** while the plan is paused), with **Stop** and **Return to dock** under
-it, and the small map right under them. Each needs two taps: the first arms it for 4 seconds, the second sends. They go through the same checks as the
+it, and the small map right under them. Each needs two taps: the first arms it for 4 seconds (it turns amber and says "Tap again"), the second sends. They go through the same checks as the
 Control card and need control on. Drawing camera coverage and aligning the imagery switch back to the big map while
 they last. When no camera's coverage holds the robot (it has driven out of every camera's view, or no position yet),
 the big slot shows the map again and the camera comes back when the robot drives into view; both changes wait 10 s so
