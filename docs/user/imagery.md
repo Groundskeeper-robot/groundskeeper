@@ -11,7 +11,7 @@ The aerial photo under the robot's map. Set in [Settings → Map imagery](#setti
   **TX**) to see everything that serves it: its own state, county and city sources, then the national and worldwide
   ones that cover it.
 - **Add a source:** paste a map service address; the panel works out what it is, then **Try it at your yard**.
-- **Align:** Align on the map (in this section). Pick a spot on the robot's map, then the same spot in the photo. One pair
+- **Align:** Align on the map (in this section, or **Align** next to the imagery credit on Live's map). Pick a spot on the robot's map, then the same spot in the photo. One pair
   fixes the shift; two or more fix rotation; three or more fix scale too.
 
 ## How sharp is sharp?

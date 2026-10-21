@@ -31,7 +31,8 @@ are pink, edge passes violet.
   pathways and today's track. **Colour** switches the track between RTK fix quality and edge passes; the legend at
   the foot of the map explains the colours.
 - **Map tools** (top right): layers (imagery, zones, labels, track, cameras), Problem areas, Signal, 3D and
-  Fit yard. Aligning the imagery starts from [Settings → Map imagery](#settings/imagery).
+  Fit yard. **Align**, next to the imagery credit at the foot of the map, lines the aerial photo up with the
+  robot's map (also in [Settings → Map imagery](#settings/imagery)).
 - **3D:** tilts the map and raises the ground: the robot's own heights over the lawns (they sharpen with every mow),
   public lidar elevation (USGS 3DEP) around them. The **1× to 3×** menu next to it draws it taller so small slopes show. Right-drag, or two fingers on
   a phone, turns and tilts; the compass resets north. The same view works in Runs, for replay. In 3D the robot is a

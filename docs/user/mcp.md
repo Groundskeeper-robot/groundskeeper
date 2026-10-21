@@ -5,8 +5,8 @@ An AI assistant that speaks MCP (Claude Desktop, Claude Code, others) can read t
 the most detailed imagery for your yard, set up cameras, weather and Home Assistant, run rules, the schedule and
 maintenance, by conversation.
 
-**Optional, but the recommended second step** after the robot is connected: everything else in Settings can then be
-done by asking. Nothing depends on it, and you can set every item by hand instead.
+**Optional**, and the last step of the setup guide: everything in Settings can also be done by asking it. Nothing
+depends on it, and you can set every item by hand instead.
 
 ## Connect
 

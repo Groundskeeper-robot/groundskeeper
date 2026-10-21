@@ -25,6 +25,7 @@ from fastapi.staticfiles import StaticFiles
 from . import areasettings
 from . import auth as auth_mod
 from . import backups as backups_mod
+from . import robotscan
 from . import config, control, coverage, geo, insights, mapstudio, mapwrite, telemetry
 from . import ha as ha_mod
 from . import help as help_mod
@@ -1033,7 +1034,6 @@ async def setup_status(request: Request):
              "connected, map read" if local.get("connected") and r.map_geojson else "connected, waiting for the map"
              if local.get("connected") else "no address yet" if not cfg.yarbo_host else "not found at its address"),
         step("cloud", "Yarbo cloud", cloud == "connected", f"cloud {cloud or 'signed out'} (needed for commands and map writes)", True),
-        step("assistant", "AI assistant", mcp_server.token_status(store)["enabled"], "token made" if mcp_server.token_status(store)["enabled"] else "no token", True),
         step("imagery", "Map imagery", src, (src or {}).get("name", "picked") if src else "no imagery yet"),
         step("cameras", "Cameras", o.frigate.enabled and yard and all(c in polys for c in yard),
              "Frigate not set up" if not o.frigate.enabled else f"{len(yard)} yard cameras, {sum(1 for c in yard if c in polys)} with coverage", True),
@@ -1046,6 +1046,7 @@ async def setup_status(request: Request):
              f" · guard resume {'ON' if g.get('guard_resume') else 'off'}"),
         step("alerts", "Notifications", ch.get("ha") or ch.get("webhook"),
              " + ".join(x for x in ["HA app" if ch.get("ha") else "", "webhook" if ch.get("webhook") else ""] if x) or "Events only"),
+        step("assistant", "AI assistant", mcp_server.token_status(store)["enabled"], "token made" if mcp_server.token_status(store)["enabled"] else "no token", True),
     ]
     need = [s for s in steps if not s["optional"]]
     return {"first_run": not getattr(cfg, "demo", False) and (not cfg.yarbo_host or not r.map_geojson), "steps": steps,
@@ -1223,6 +1224,28 @@ async def put_integration(request: Request, group: str, value: dict = Body(...))
             cfg.restore(group, before)                   # not kept: it could not be put into effect
             raise HTTPException(502, f"could not apply the change, so it was not kept: {exc}")
     return {"group": group, "changed": changed, "note": note, "fields": cfg.describe()[group]}
+
+
+_SCAN_LOCK = asyncio.Lock()
+
+
+@app.post("/api/robot/discover")
+async def robot_discover(request: Request, body: dict = Body(None)):
+    """Look for the robot on the local network (Settings → Robot → Find it on my network): the panel's own /24, or a
+    home-network (RFC 1918) /24 the user names. Connects and subscribes only; nothing is sent to anything it finds.
+    One at a time; about 20 s."""
+    cfg = request.app.state.cfg
+    if cfg.demo:
+        return {"network": "demo", "brokers": 1, "found": [{"host": "demo", "port": 1883, "sn": rec(request).sn}], "note": None}
+    if _SCAN_LOCK.locked():
+        raise HTTPException(409, "a search is already running")
+    network = (body or {}).get("network")
+    network = None if network in (None, "") else network
+    async with _SCAN_LOCK:
+        try:
+            return await robotscan.scan(int(cfg.yarbo_port or 1883), network)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc))
 
 
 @app.post("/api/integrations/{group}/test")

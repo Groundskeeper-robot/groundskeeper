@@ -334,7 +334,9 @@ function imageryCredit(yard) {
   const src = yard && yard.source;
   if (!src) { el.textContent = yard?.attribution || ""; return; }
   const cm = src.m_per_px * 100;
-  el.textContent = `${src.attribution} · ${cm < 10 ? cm.toFixed(1) : Math.round(cm)} cm/px`;
+  fill(el, `${src.attribution} · ${cm < 10 ? cm.toFixed(1) : Math.round(cm)} cm/px · `,
+       h("button", { type: "button", class: "linkbtn", title: "Line the aerial photo up with the robot's map",
+                     onclick: () => { if (state.align) return; if (state.view === "live") { robot3dFollow(false); startAlign(); } else beginAlign(); } }, "Align"));
 }
 
 async function loadZones() {
@@ -1029,12 +1031,21 @@ async function endAlign(save) {
   drawAlignPairs();
   $(".alignpanel")?.remove();
   syncLiveMode();
+  const back = state.alignReturn;                   // started from the setup guide or Settings: go back there
+  state.alignReturn = null;
+  if (back) location.hash = back;
 }
 
-// Aligning is a once-in-a-while job, started from Settings → Map imagery; it happens on Live's map.
+// Aligning happens on Live's map. It starts from Live's Align tool, Settings → Map imagery or the setup guide; from
+// the last two the page goes back there when it is saved or cancelled.
 function beginAlign() {
-  if (state.view !== "live") location.hash = "#live";
-  setTimeout(() => { if (!state.align) startAlign(); }, 150);
+  const back = state.view !== "live" ? location.hash || null : null;
+  if (back) location.hash = "#live";
+  setTimeout(() => {
+    if (state.align) return;
+    startAlign();
+    state.alignReturn = state.align ? back : null;     // only once aligning really started (the imagery was loaded)
+  }, 150);
 }
 
 /* ------------------------------------------------------------- status */
