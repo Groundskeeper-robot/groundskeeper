@@ -30,6 +30,7 @@ const MAP = {
   robot: tok("--robot", "#79B8F0"), held: tok("--robot-held", "#F0B955"), error: tok("--robot-error", "#F08A6E"),
   onmap: tok("--onmap", "#F2F5F3"), road: tok("--road", "#69736E"), camera: tok("--camera", "#E8EEEA"),
   body3d: tok("--robot-body", "#6B6F6C"), track3d: tok("--robot-track", "#2A2D2B"), trim3d: tok("--robot-trim", "#F0B955"),
+  sidewalk: tok("--sidewalk", "#C9D4CE"), route: tok("--route", "#C3C9CC"), ink: tok("--map-ink", "#0E1311"),
 };
 // Neutral data (neither good nor bad) is drawn in these, never in status colours.
 const SERIES = [tok("--series-1", "#79B8F0"), tok("--series-2", "#9AA7B4"), tok("--series-3", "#B79CF0"), tok("--series-4", "#4FD1C5")];
@@ -138,11 +139,11 @@ const EDGE = MAP.edge;
 const OFFPLAN = MAP.offplan;
 // Problem areas: one colour per cause (stuck and errors are the urgent ones).
 const PROBLEM = {
-  stuck: { color: "#F08A6E", label: "Stuck / no progress" },
-  error: { color: "#E46FB8", label: "Robot error" },
-  steep: { color: "#F0B955", label: "Steep ground" },
-  position: { color: "#9AA7FF", label: "Weak positioning" },
-  effort: { color: "#D9D46A", label: "Hard going" },
+  stuck: { color: tok("--prob-stuck", "#F08A6E"), label: "Stuck / no progress" },
+  error: { color: tok("--prob-error", "#E46FB8"), label: "Robot error" },
+  steep: { color: tok("--prob-steep", "#F0B955"), label: "Steep ground" },
+  position: { color: tok("--prob-position", "#9AA7FF"), label: "Weak positioning" },
+  effort: { color: tok("--prob-effort", "#D9D46A"), label: "Hard going" },
 };
 const problemColorExpr = () => ["match", ["get", "cause"], ...Object.entries(PROBLEM).flatMap(([k, v]) => [k, v.color]), MUTED];
 const TRACK_GAP_S = 5;   // a longer gap between samples is a break in the line (lost link, parked), not a straight jump

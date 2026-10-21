@@ -10,8 +10,8 @@ headless Edge, optimises the PNGs with Pillow and stops the panel. Only the demo
 differs between runs. --keep leaves the temporary DATA_DIR for a look afterwards.
 
 Pages: live (dark, the default) and live-light, live-3d (3D ground with Follow; needs WebGL, which headless Edge
-gets from SwiftShader), runs, run (a past run with a gap), studio, schedule, robot-health, settings (Safety) and
-phone-live (390x844).
+gets from SwiftShader), runs, run (a past run with a gap), studio, schedule, robot-health, settings (Safety), imagery
+(Settings → Map imagery) and phone-live (390x844).
 """
 import argparse
 import json
@@ -155,6 +155,14 @@ def capture(base: str, out: Path) -> list[tuple[str, int]]:
             page.goto(f"{base}/#{hash_}")
             settle(page, 2500)
             save(page, name)
+
+        # Settings -> Map imagery: one card per source that covers the yard, each with its own sample of the yard.
+        page.goto(f"{base}/#settings/imagery")
+        page.wait_for_function("() => { const im = [...document.querySelectorAll('#imgpicker img')]; "
+                               "return im.length > 1 && im.every(i => i.complete && i.naturalWidth > 0); }",
+                               timeout=180000)
+        settle(page, 2000)
+        save(page, "imagery")
         ctx.close()
 
         # -- 3D with Follow (WebGL through SwiftShader)

@@ -45,6 +45,8 @@ sharpest free one that covers your yard.
 - The catalog is plain JSON, one file per source. Found a sharper service for your county?
   [Add it](catalog/README.md) and everyone there gets it.
 
+![Settings, Map imagery: a card per source that covers the yard, each with its own sample of the yard and its resolution](docs/screenshots/imagery.png)
+
 More: [Map imagery](docs/user/imagery.md), [the catalog](catalog/SOURCES.md).
 
 ### Local first, cloud when you want control
