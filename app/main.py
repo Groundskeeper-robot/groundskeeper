@@ -1401,7 +1401,8 @@ async def put_setting(request: Request, key: str, value: Any = Body(None)):
             elif isinstance(default, (int, float)):
                 bad = not _is_number(v)
             elif isinstance(default, str):
-                bad = v not in control.GUARD_ACTIONS
+                # After dark a pause would leave the robot on the lawn all night: dock, notify or ignore only.
+                bad = v not in control.GUARD_ACTIONS or (k == "guard_after_dark" and v == "pause")
             else:
                 bad = not (isinstance(v, list) and all(isinstance(x, str) for x in v))
             if bad:

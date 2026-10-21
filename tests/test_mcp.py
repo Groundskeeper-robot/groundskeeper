@@ -315,3 +315,10 @@ def test_an_assistants_resume_faces_the_full_checks():
     assert "Yard clear (Frigate)" in names("mcp") and "Yard clear (Frigate)" not in names("user")
     ok, _ = control.verdict(control.check("resume", {}, ctx, control.GATE_DEFAULTS, "mcp"), override=False)
     assert not ok                                              # an unknown yard blocks an assistant's resume
+
+
+def test_an_assistant_cannot_make_the_after_dark_guard_a_pause():
+    cur = {"guard_after_dark": "notify"}
+    assert mcp_server.tighter_gates(cur, {"guard_after_dark": "pause"})
+    assert mcp_server.tighter_gates(cur, {"guard_after_dark": "dock"}) == []
+    assert mcp_server.tighter_gates({"guard_after_dark": "dock"}, {"guard_after_dark": "notify"})
