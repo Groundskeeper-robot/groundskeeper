@@ -147,8 +147,13 @@ sign-in (optional: a fallback route), the imagery, cameras, Home Assistant and s
 [releases page](https://github.com/Groundskeeper-robot/groundskeeper/releases).
 
 **Other options** are in [`.env.example`](.env.example). The panel runs as `PUID:PGID` (1000:1000 by default), so
-set those to your own user if you want to edit `./data` by hand. An Unraid example is in
-[`deploy/`](deploy/docker-compose.unraid.yml). It runs on amd64 and arm64, including a Raspberry Pi 4 or 5.
+set those to your own user if you want to edit `./data` by hand. It runs on amd64 and arm64, including a Raspberry
+Pi 4 or 5.
+
+**On Unraid,** use the Docker template: copy [`deploy/unraid/groundskeeper.xml`](deploy/unraid/groundskeeper.xml) to
+`/boot/config/plugins/dockerMan/templates-user/my-groundskeeper.xml`, then Docker → Add Container → pick
+**groundskeeper**. The container then shows like any other Unraid app (update check, autostart, Edit), not as
+"3rd Party". A Compose Manager stack is in [`deploy/`](deploy/docker-compose.unraid.yml) if you prefer that.
 
 ## Safety
 
