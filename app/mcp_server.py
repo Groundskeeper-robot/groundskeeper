@@ -218,6 +218,8 @@ def tighter_gates(current: dict, change: dict) -> list[str]:
             if not isinstance(v, (int, float)) or isinstance(v, bool) or not math.isfinite(v) \
                     or (isinstance(cur, (int, float)) and v < cur):
                 bad.append(f"{k} may only go up (now {cur})")
+        elif k == "guard_after_dark" and v == "pause":
+            bad.append("guard_after_dark may be dock, notify or ignore (a pause would leave the robot out all night)")
         elif k.startswith("guard_"):
             if GUARD_RANK.get(v, -1) < GUARD_RANK.get(cur, 0):
                 bad.append(f"{k} may not go from {cur} to {v}")

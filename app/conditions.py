@@ -61,28 +61,44 @@ def _sun_ut_hours(day_of_year: int, lat: float, lon: float, rising: bool, zenith
     return (t_local - lng_hour) % 24
 
 
-def _sunrise_on(day_ts: float, lat: float, lon: float) -> float | None:
+def _sun_on(day_ts: float, lat: float, lon: float, rising: bool) -> float | None:
+    """The sunrise or sunset of the UT date of `day_ts`. The algorithm's hour is modulo 24, so an event that falls
+    just across midnight UT (a US evening sunset in late summer) would wrap to the wrong end of the date and that
+    night's sunset would never be produced; it is unwrapped to within 12 h of the local 6:00 or 18:00 instead."""
     day = time.gmtime(day_ts)
     midnight = calendar.timegm((day.tm_year, day.tm_mon, day.tm_mday, 0, 0, 0))
-    ut = _sun_ut_hours(day.tm_yday, lat, lon, rising=True)
-    return None if ut is None else midnight + ut * 3600
+    ut = _sun_ut_hours(day.tm_yday, lat, lon, rising=rising)
+    if ut is None:
+        return None
+    expected = (6 if rising else 18) - lon / 15
+    ut = expected + ((ut - expected + 12) % 24 - 12)
+    return midnight + ut * 3600
+
+
+def _sunrise_on(day_ts: float, lat: float, lon: float) -> float | None:
+    return _sun_on(day_ts, lat, lon, True)
+
+
+def is_dark(now: float, lat: float, lon: float) -> bool | None:
+    """Between sunset and sunrise at the yard: the latest sun event before `now` is a sunset. The algorithm's events
+    for a UT date can fall on the next UT date (an evening sunset west of Greenwich), so the events of three days are
+    compared rather than one day's. None where the sun neither rose nor set in that time (polar day or night)."""
+    events = [(ts, rising) for back in (-2, -1, 0, 1) for rising in (True, False)
+              if (ts := _sun_on(now + back * 86400, lat, lon, rising)) is not None and ts <= now]
+    if not events:
+        return None
+    return not max(events)[1]
 
 
 def sunrise_ts(now: float, lat: float, lon: float) -> float | None:
     """The most recent sunrise at or before `now`."""
-    for back in (0, 1, 2):
-        ts = _sunrise_on(now - back * 86400, lat, lon)
-        if ts is not None and ts <= now:
-            return ts
-    return None
+    found = [ts for d in (-1, 0, 1, 2) if (ts := _sunrise_on(now - d * 86400, lat, lon)) is not None and ts <= now]
+    return max(found) if found else None
 
 
 def next_sunrise_ts(now: float, lat: float, lon: float) -> float | None:
-    for ahead in (0, 1, 2):
-        ts = _sunrise_on(now + ahead * 86400, lat, lon)
-        if ts is not None and ts > now:
-            return ts
-    return None
+    found = [ts for d in (-1, 0, 1, 2) if (ts := _sunrise_on(now + d * 86400, lat, lon)) is not None and ts > now]
+    return min(found) if found else None
 
 
 # -- words -------------------------------------------------------------------------------------------------------
