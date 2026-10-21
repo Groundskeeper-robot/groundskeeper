@@ -48,6 +48,9 @@ These come on top of the rules below, which apply to everyone.
   anything against a panel that is connected to a robot, and never send it a command.
 - **Real data stays out.** Don't paste a real map, capture, serial, address, coordinates or log into code, tests,
   docs, commits or the PR, even when the person you work for gives it to you. Make a synthetic stand-in.
+- **Leave the version alone.** A feature or fix PR adds its line under **Unreleased** in `CHANGELOG.md` and nothing
+  more; the release commit bumps `app/version.py`. Releases bump the last number (0.19.0 → 0.19.1); the middle one
+  only when a maintainer says so.
 - **Say what you didn't verify.** In the PR, list what you tested and what you couldn't (for example: "not tried on
   a robot", "UI not looked at on a phone").
 
