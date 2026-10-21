@@ -17,6 +17,8 @@
   --robot: #79B8F0; --robot-held: #F0B955; --robot-error: #F08A6E;
   --robot-body: #6B6F6C; --robot-track: #2A2D2B; --robot-trim: #F0B955;     /* the 3D map's robot model */
   --onmap: #F2F5F3; --cam-label: #9FD3F0; --camera: #F2F5F3;
+  --sidewalk: #C9D4CE; --route: #C3C9CC; --map-ink: #0E1311;   /* sidewalks, a planned route, dark outlines on the map */
+  --prob-stuck: #F08A6E; --prob-error: #E46FB8; --prob-steep: #F0B955; --prob-position: #9AA7FF; --prob-effort: #D9D46A;
   --overlay: rgba(14, 19, 17, .88);
   --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
   --sans: "IBM Plex Sans", system-ui, "Segoe UI", sans-serif;

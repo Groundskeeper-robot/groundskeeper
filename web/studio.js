@@ -6,7 +6,7 @@
 "use strict";
 
 const KIND_COLOR = { areas: MAP.area, nogozones: MAP.nogo, novisionzones: MAP.novis, elec_fence: MAP.fence,
-                     pathways: "#F2F5F3", sidewalks: "#C9D4CE", deadends: MUTED };
+                     pathways: MAP.onmap, sidewalks: MAP.sidewalk, deadends: MUTED };
 const KIND_ORDER = ["areas", "nogozones", "novisionzones", "elec_fence", "pathways", "sidewalks", "deadends"];
 const KIND_NAME = { areas: "Areas", nogozones: "No-go zones", novisionzones: "No-vision zones", elec_fence: "Fences",
                     pathways: "Pathways", sidewalks: "Sidewalks", deadends: "Dead ends" };
@@ -21,7 +21,7 @@ const ADD_TOOLS = {
               help: "Click along the route, starting inside an area: the robot drives out along it and back the same way." },
 };
 const MOVABLE = new Set(["nogozones", "novisionzones"]);
-const ROUTE_GREY = "#C3C9CC";
+const ROUTE_GREY = MAP.route;
 const STUDIO_LAYERS = ["studio-overlay-fill", "studio-overlay-line", "studio-diff-fill", "studio-diff-old", "studio-diff-new",
                        "studio-sel-fill", "studio-sel-line", "studio-ghost-fill", "studio-ghost-line", "studio-work-fill",
                        "studio-work-line", "studio-work-pts", "studio-handles", "studio-hover-fill", "studio-hover-line",
@@ -148,8 +148,8 @@ function studioMapInit() {
   const map = state.map;
   for (const id of ["studio-overlay", "studio-diff", "studio-sel", "studio-ghost", "studio-work", "studio-handles", "studio-hover"]) map.addSource(id, { type: "geojson", data: EMPTY });
   const poly = ["==", ["geometry-type"], "Polygon"];
-  map.addLayer({ id: "studio-overlay-fill", type: "fill", source: "studio-overlay", filter: poly, paint: { "fill-color": "#F2F5F3", "fill-opacity": 0.06 } });
-  map.addLayer({ id: "studio-overlay-line", type: "line", source: "studio-overlay", paint: { "line-color": "#F2F5F3", "line-width": 1.5, "line-dasharray": [1, 1.5] } });
+  map.addLayer({ id: "studio-overlay-fill", type: "fill", source: "studio-overlay", filter: poly, paint: { "fill-color": MAP.onmap, "fill-opacity": 0.06 } });
+  map.addLayer({ id: "studio-overlay-line", type: "line", source: "studio-overlay", paint: { "line-color": MAP.onmap, "line-width": 1.5, "line-dasharray": [1, 1.5] } });
   map.addLayer({ id: "studio-diff-fill", type: "fill", source: "studio-diff", filter: ["all", poly, ["in", ["get", "status"], ["literal", ["added", "new", "removed"]]]],
                  paint: { "fill-color": ["match", ["get", "status"], "removed", CORAL, "added", GREEN, AMBER], "fill-opacity": 0.18 } });
   map.addLayer({ id: "studio-diff-old", type: "line", source: "studio-diff", filter: ["in", ["get", "status"], ["literal", ["removed", "old"]]],
@@ -171,7 +171,7 @@ function studioMapInit() {
                           "line-width": ["interpolate", ["linear"], ["zoom"], 15, 1, 18, 1.6, 20, 2.5, 22, 4] } });
   map.addLayer({ id: "studio-route-ends", type: "circle", source: "studio-route-ends",
                  paint: { "circle-radius": 6, "circle-color": ["match", ["get", "end"], "start", SKY, AMBER],
-                          "circle-stroke-color": "#0E1311", "circle-stroke-width": 2 } });
+                          "circle-stroke-color": MAP.ink, "circle-stroke-width": 2 } });
   map.addLayer({ id: "studio-ghost-fill", type: "fill", source: "studio-ghost", filter: poly, paint: { "fill-color": SKY, "fill-opacity": 0.12 } });
   map.addLayer({ id: "studio-ghost-line", type: "line", source: "studio-ghost", layout: { "line-join": "round" },
                  paint: { "line-color": SKY, "line-width": 2.5, "line-dasharray": [2, 1.2] } });
@@ -179,14 +179,14 @@ function studioMapInit() {
   map.addLayer({ id: "studio-work-line", type: "line", source: "studio-work", filter: ["!=", ["geometry-type"], "Point"], paint: { "line-color": SKY, "line-width": 2.5 } });
   map.addLayer({ id: "studio-work-pts", type: "circle", source: "studio-work", filter: ["==", ["geometry-type"], "Point"],
                  paint: { "circle-radius": ["case", ["boolean", ["get", "first"], false], 8, ["boolean", ["get", "snap"], false], 6, 5],
-                          "circle-color": ["case", ["boolean", ["get", "snap"], false], SKY, "#F2F5F3"],
-                          "circle-stroke-color": ["case", ["boolean", ["get", "snap"], false], "#F2F5F3", SKY], "circle-stroke-width": 2 } });
+                          "circle-color": ["case", ["boolean", ["get", "snap"], false], SKY, MAP.onmap],
+                          "circle-stroke-color": ["case", ["boolean", ["get", "snap"], false], MAP.onmap, SKY], "circle-stroke-width": 2 } });
   map.addLayer({ id: "studio-handles", type: "circle", source: "studio-handles",
                  layout: { "circle-sort-key": ["case", ["boolean", ["get", "picked"], false], 2, ["==", ["get", "role"], "vertex"], 1, 0] },   // picked corners on top, midpoints under
                  paint: { "circle-radius": ["case", ["boolean", ["get", "picked"], false], 7.5, ["==", ["get", "role"], "vertex"], 6, 4.5],
-                          "circle-color": ["case", ["boolean", ["get", "picked"], false], SKY, ["==", ["get", "role"], "vertex"], "#F2F5F3", AMBER],
+                          "circle-color": ["case", ["boolean", ["get", "picked"], false], SKY, ["==", ["get", "role"], "vertex"], MAP.onmap, AMBER],
                           "circle-opacity": ["case", ["==", ["get", "role"], "vertex"], 1, 0.8],
-                          "circle-stroke-color": "#0E1311", "circle-stroke-width": ["case", ["==", ["get", "role"], "vertex"], 2, 1] } });
+                          "circle-stroke-color": MAP.ink, "circle-stroke-width": ["case", ["==", ["get", "role"], "vertex"], 2, 1] } });
 
   if (state.view === "studio") map.boxZoom.disable();   // a page opened on Studio: Shift-drag picks corners, not zooms
   map.on("click", onStudioClick);
@@ -1670,7 +1670,7 @@ function tolSlider(onSet) {
   const label = h("span", { class: "muted small", style: "min-width:44px;text-align:right" }, `${studio.tol} cm`);
   return h("div", { class: "row gap" },
     h("input", { type: "range", min: 2, max: 30, step: 1, value: studio.tol, "aria-label": "Tidy tolerance in centimetres",
-                 style: "flex:1;accent-color:#79B8F0", title: "No part of the outline moves further than this",
+                 style: "flex:1;accent-color:var(--info)", title: "No part of the outline moves further than this",
                  oninput: (e) => { label.textContent = `${e.target.value} cm`; },
                  onchange: (e) => { setTol(Number(e.target.value)); onSet(); } }),
     label);

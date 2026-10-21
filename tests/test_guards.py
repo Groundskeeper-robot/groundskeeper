@@ -140,7 +140,7 @@ def test_nothing_loads_from_a_cdn_at_runtime():
 
 # Hard-coded colours left in the UI when this test was written. The rule is colours through the tokens in
 # web/style.css (tok(), MAP, SERIES); this only stops the number from growing. Lower a count when you remove some.
-HEX_BASELINE = {"web/app.js": 22, "web/ops.js": 1, "web/studio.js": 11, "web/index.html": 2}
+HEX_BASELINE = {"web/app.js": 17, "web/ops.js": 1, "web/index.html": 2}
 HEX = re.compile(r"#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b(?![\w-])")
 TOK_FALLBACK = re.compile(r"""tok\(\s*["']--[\w-]+["']\s*,\s*["']#[0-9a-fA-F]{3,8}["']\s*\)""")
 
