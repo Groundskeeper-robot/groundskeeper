@@ -39,17 +39,17 @@ from urllib.parse import urlsplit
 from typing import Any, Awaitable, Callable
 
 import httpx
-from mcp.server.fastmcp import FastMCP, Image
-from mcp.server.fastmcp.exceptions import ToolError
+from mcp.server.mcpserver import Image, MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 
-from . import auth
+from . import auth, version
 
-READ = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
-SETUP = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
-REACHES_OUT = ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=True)
-CONTROL = ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=True)
+READ = ToolAnnotations(read_only_hint=True, open_world_hint=False)
+SETUP = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=False)
+REACHES_OUT = ToolAnnotations(read_only_hint=False, destructive_hint=False, open_world_hint=True)
+CONTROL = ToolAnnotations(read_only_hint=False, destructive_hint=True, open_world_hint=True)
 
 TOKEN_SETTING = "mcp_token"
 SWITCH = "mcp_control_enabled"
@@ -260,17 +260,15 @@ Api = Callable[..., Awaitable[Any]]
 
 
 class PanelMCP:
-    """The FastMCP server. `api(method, path, json=None, params=None, raw=False)` calls the panel's REST handlers;
+    """The MCP server (mcp 2.x MCPServer). `api(method, path, json=None, params=None, raw=False)` calls the panel's REST handlers;
     `state()` returns app.state (store, ops). Both are injectable for tests; the route check applies to either."""
 
     def __init__(self, app=None, api: Api | None = None, state: Callable[[], Any] | None = None):
         self.app = app
         self._call = api or self._asgi
         self._state = state or (lambda: app.state)
-        self.mcp = FastMCP("groundskeeper", instructions=INSTRUCTIONS, stateless_http=True, json_response=True,
-                           streamable_http_path="/mcp",
-                           # The bearer token is the protection; the panel is reached by its LAN address.
-                           transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False))
+        # No subscriptions: the panel publishes no resources, and a standing stream would outlive a revoked token.
+        self.mcp = MCPServer("groundskeeper", instructions=INSTRUCTIONS, version=version.__version__, subscriptions=False)
         self._register()
 
     # -- plumbing ----------------------------------------------------------------------------------------------------
@@ -598,7 +596,10 @@ class PanelMCP:
     # -- the HTTP endpoint -------------------------------------------------------------------------------------------
     def routes(self):
         """The /mcp route, behind the token check. Call once; mount before any catch-all route."""
-        inner = self.mcp.streamable_http_app()
+        inner = self.mcp.streamable_http_app(
+            stateless_http=True, json_response=True, streamable_http_path="/mcp",
+            # The bearer token is the protection; the panel is reached by its LAN address, not a fixed host name.
+            transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False))
         store = lambda: self.store                                   # noqa: E731
         routes = []
         for r in inner.routes:
@@ -608,7 +609,9 @@ class PanelMCP:
 
 
 class _Guarded:
-    """ASGI wrapper: 404 while MCP is off (no token), 401 without the right bearer token."""
+    """ASGI wrapper: 404 while MCP is off (no token), 401 without the right bearer token, 405 for anything but POST.
+    The server is stateless JSON: a GET would only open a standing event stream, which a later revoke would not close
+    (the token is checked when a request starts)."""
 
     def __init__(self, app, store):
         self.app, self.store = app, store
@@ -617,6 +620,11 @@ class _Guarded:
         if scope["type"] == "http":
             header = dict(scope.get("headers") or []).get(b"authorization", b"").decode("latin-1") or None
             ok = authorised(self.store(), header)
+            if ok is True and scope.get("method") != "POST":
+                await send({"type": "http.response.start", "status": 405,
+                            "headers": [(b"content-type", b"application/json"), (b"allow", b"POST")]})
+                await send({"type": "http.response.body", "body": json.dumps({"detail": "POST only"}).encode()})
+                return
             if ok is not True:
                 code, msg = (404, "MCP is off: create a token in Settings → AI assistant") if ok is None \
                     else (401, "a bearer token is required (Settings → AI assistant)")

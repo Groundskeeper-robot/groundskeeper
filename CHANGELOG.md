@@ -12,6 +12,11 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   Return to dock ended the plan; the next schedule window starts it again. Like every guard it only sends a command
   while control is on.
 
+### Changed
+- **The AI assistant server runs on MCP's 2.x library** (`mcp` 2.3). Nothing changes in what an assistant can do or
+  see; the server now reports the panel's version and speaks the newer protocol revisions. Existing tokens and
+  connect snippets keep working.
+
 ## 0.17.0 — 2026-10-20
 
 ### Added
