@@ -50,6 +50,7 @@ no manual drive.** Those are learned by watching the official app on `snowbot/{S
 | CONNECT, no credentials | **accepted** |
 | SUBSCRIBE `#`, `$SYS/#` | **refused** (128) |
 | SUBSCRIBE `snowbot/{SN}/device/#`, `snowbot/{SN}/app/#`, `snowbot/{SN}/#` | **granted** |
+| SUBSCRIBE `snowbot/+/device/heart_beat` (serial unknown) | **granted**; heartbeats arrive every few seconds with the serial in the topic (checked 2026-10-20). Robot discovery (`app/robotscan.py`) and `discover_sn` rely on it |
 | PUBLISH read requests (`get_device_msg`, `get_map`, `read_gps_ref`, `read_all_plan`, …) | **answered** |
 | `get_controller` and action commands, locally | Not yet known; owner reports say this is what the update closed |
 | **Cloud broker** (account session): SUBSCRIBE `snowbot/{SN}/#`, `/app/#`, `/device/#` | **granted for the account's own robot**; `snowbot/#` and `#` refused. The phone app's commands are visible here. |

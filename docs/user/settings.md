@@ -7,8 +7,7 @@ restart; a field left blank goes back to the environment's value, shown as the p
 | Section | What it holds |
 |---|---|
 | [Set up](#settings/setup) | The first-run guide: every step below in order, with what each is for ([more](#help/setup)) |
-| [Robot](#settings/robot) | The robot's address, port and serial; the Yarbo cloud sign-in; the Wi-Fi survey |
-| [AI assistant](#settings/assistant) | Optional, recommended next: a token and connect snippets so an assistant can set up the rest by conversation ([more](#help/mcp)) |
+| [Robot](#settings/robot) | Find the robot on your network or type its address; port and serial; the Yarbo cloud sign-in; the Wi-Fi survey |
 | [Safety](#settings/safety) | The control and map writing switches ([more](#help/safety)) |
 | [Run rules](#settings/rules) | What must be true to start, and what each guard does during a run |
 | [Lawn conditions](#settings/lawn) | Weather from the Tempest and/or Home Assistant, soil moisture, units, the dry / damp / wet rules and the last 24 h |
@@ -16,16 +15,17 @@ restart; a field left blank goes back to the environment's value, shown as the p
 | [Map imagery](#settings/imagery) | The aerial photo under the map ([more](#help/imagery)) |
 | [Home Assistant](#settings/ha) | Address and token, presence, the entities the panel publishes |
 | [Notifications](#settings/alerts) | The HA notify service and/or a webhook |
+| [AI assistant](#settings/assistant) | Optional: a token and connect snippets so an assistant can read the panel and help by conversation ([more](#help/mcp)) |
 | [Access](#settings/access) | The admin password, signing out, and API tokens for programs such as Home Assistant |
 | [This panel](#settings/panel) | Polling, retention, version, data directory, API, theme |
 | [Raw data](#settings/data) | Every field the robot and the panel report |
 
 ## A suggested order
 
-Robot first (nothing works without it). Then, optionally, [AI assistant](#settings/assistant): once connected, it
-can read every setting and the help, and do the rest with you by conversation, including finding the most detailed
-aerial map of your yard. Then Map imagery, Cameras, Lawn conditions, Run rules, Notifications, and Safety last,
-when you are ready to let the panel act on the robot.
+Robot first (nothing works without it). Then Map imagery, Cameras, Lawn conditions, Run rules, Notifications, and
+Safety last, when you are ready to let the panel act on the robot. An [AI assistant](#settings/assistant) is
+optional at any point: once connected it can read every setting and the help, and is good at finding the most
+detailed aerial map of your yard.
 
 ## Signing in
 

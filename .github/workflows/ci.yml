@@ -57,7 +57,7 @@ jobs:
           context: .
           load: true
           tags: groundskeeper:ci
-          build-args: PANEL_BUILD=${{ github.sha }}
+          build-args: PANEL_BUILD=ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: The image starts (demo mode) and answers /health as a non-root user

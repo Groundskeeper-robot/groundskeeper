@@ -5,6 +5,29 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ## Unreleased
 
+### Added
+- **Find the robot on your network:** Settings → Robot (and the setup guide) has **Find it on my network**, which
+  looks on the panel's own network for a Yarbo announcing itself and offers **Use this**. It only listens; nothing
+  is sent to anything it finds. In Docker it needs host networking, like the Tempest.
+- **Align** next to the imagery credit on Live's map lines the aerial photo up with the robot's map. Aligning from Settings or the
+  setup guide now returns there when you save or cancel.
+
+### Changed
+- **The setup guide updates by itself** while something is on its way (the robot connecting, its serial, the cloud
+  signing in, the yard imagery, the first Tempest reading), without overwriting anything you have typed.
+- **Robot step:** type the address and press **Connect** (checked, then saved) instead of Test and Save; the serial
+  is read from the robot and shown, and the port and a typed serial moved under Advanced.
+- **Imagery step** in two parts, Pick the photo and Line it up, and says the yard's location comes from the robot's
+  map.
+- **Safety step** has the switches themselves (control, map writing, yard must be clear, resume after a guard
+  pause) instead of only showing them.
+- **AI assistant** moved to the last step of the guide and after Notifications in Settings.
+- Lawn conditions explains what to check when no Tempest is heard.
+
+### Fixed
+- The version under the nav no longer overflows: a full commit id is shortened to 7 characters, and long text is
+  cut off with "…".
+
 ## 0.16.0 — 2026-10-20
 
 ### Added

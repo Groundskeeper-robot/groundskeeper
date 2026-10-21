@@ -8,7 +8,6 @@
 const SECTIONS = [
   ["setup", "Set up", "A guided first run: each setting in order, with what it is for"],
   ["robot", "Robot", "The connection to the robot and the Yarbo cloud"],
-  ["assistant", "AI assistant", "Optional, recommended: let an AI assistant set up the rest for you over MCP"],
   ["safety", "Safety", "The switches that let the panel act on the robot"],
   ["rules", "Run rules", "What must be true for a run to start, and what stops one"],
   ["lawn", "Lawn conditions", "How the weather station decides whether the grass is dry"],
@@ -16,6 +15,7 @@ const SECTIONS = [
   ["imagery", "Map imagery", "The aerial photo under the robot's map"],
   ["ha", "Home Assistant", "The connection, presence, and the entities this panel publishes"],
   ["alerts", "Notifications", "Where alerts go"],
+  ["assistant", "AI assistant", "Optional: talk to the panel through an AI assistant over MCP"],
   ["access", "Access", "The admin password, sessions, and API tokens for other programs"],
   ["panel", "This panel", "Recording cadence, retention, and how this instance runs"],
   ["data", "Raw data", "What the robot and the panel report, as JSON"],
@@ -38,6 +38,7 @@ const sfoot = (...text) => h("p", { class: "shelp foot" }, ...text);
 const slink = (href, text) => h("a", { href }, text);
 const sbtn = (label, onclick, cls = "btn slim") => h("button", { type: "button", class: cls, onclick }, label);
 const sstate = (color, text) => h("span", { class: "state" }, dot(color), text);
+const disable = (el, off) => { el.disabled = Boolean(off); return el; };
 
 function switchCtl(name, on, onchange, key) {
   return h("label", { class: "switch" },
@@ -152,8 +153,10 @@ async function settingsData() {
   return { st, s, cams, imgs, imv, about, conds, setup, access };
 }
 
-async function renderSettings(section) {
+async function renderSettings(section, auto = false) {
   const panel = $("#p-settings");
+  if (!auto) setUI.dirty = false;                                  // a save or a navigation: what is shown is current again
+  setUI.at = Date.now();
   if (section && SECTIONS.some(([id]) => id === section)) setUI.section = section;
   if (!$(".settings", panel)) {
     fill(panel, h("div", { class: "settings" }, h("nav", { class: "snav", "aria-label": "Settings sections" }), h("section", { class: "ssec" })));
@@ -174,6 +177,26 @@ async function renderSettings(section) {
   setUI.data = d;
   drawSettings(d, true);
 }
+
+// While something is on its way (the robot connecting, its serial, the cloud signing in, the yard imagery, the first
+// Tempest reading), the open section re-reads every 3 s so nobody has to reload; Robot and the guide also every 15 s. A field the
+// user has typed in and not saved is never overwritten: refreshing waits until the next save or navigation.
+const SETTINGS_LIVE = new Set(["setup", "robot", "imagery", "lawn", "cameras", "ha", "alerts"]);
+function settingsPending(d) {
+  const t = d.s.transport?.local || {}, cloud = d.s.ops?.cloud || {}, tp = d.s.tempest || {};
+  const weather = setUI.section === "lawn" || (setUI.section === "setup" && setUI.step === "weather");
+  return Boolean((t.host && (!t.connected || !d.s.sn)) || ["connecting", "reconnecting"].includes(cloud.state)
+    || (t.connected && !d.imgs?.yard?.source) || (weather && (tp.last_obs_age_s === null || tp.last_obs_age_s === undefined)));
+}
+document.addEventListener("input", (e) => {
+  if (e.target.closest?.("#p-settings .ssec") && !["checkbox", "radio", "range"].includes(e.target.type)) setUI.dirty = true;
+});
+setInterval(() => {
+  if (state.view !== "settings" || document.hidden || !setUI.data || setUI.dirty || !SETTINGS_LIVE.has(setUI.section)) return;
+  const pending = settingsPending(setUI.data), steady = setUI.section === "robot" || (setUI.section === "setup" && setUI.step !== "imagery");
+  if (!pending && !steady) return;                                // e.g. an open imagery picker is left alone once loaded
+  if (Date.now() - (setUI.at || 0) >= (pending ? 3000 : 15000)) renderSettings(undefined, true);
+}, 1000);
 
 // Redraws the list and the open section. A save redraws while the user may already be typing in the next field, so
 // whatever is focused keeps its text, caret and focus across the redraw.
@@ -235,7 +258,7 @@ function sectionStatus(id, d) {
     case "assistant": {
       const m = st.mcp || {};
       if (m.enabled) return [GREEN, `Connected · token …${m.hint || ""}${st.mcp_control_enabled ? " · commands on" : ""}`];
-      return [AMBER, "Optional · recommended before the rest"];
+      return [MUTED, "Optional · not connected"];
     }
     case "safety":
       return [st.control_enabled || st.map_write_enabled ? AMBER : MUTED,
@@ -291,21 +314,21 @@ function sectionStatus(id, d) {
    and Back / Next. Done comes from GET /api/setup/status, read from what the panel already knows; the wizard stores
    nothing. It opens by itself on a fresh install (no robot address or no map yet), once per browser session. */
 const SETUP_STEPS = {
-  robot: ["Connect to the robot", "The panel listens to the robot's own MQTT broker on your network. Type its address and press Test: the serial comes back from the robot's heartbeat. Then the map is read on its own.",
+  robot: ["Connect to the robot", "The panel listens to the robot's own MQTT broker on your network. Let it find the robot, or type its address and press Connect. The serial and the map are read from the robot.",
           (d) => robotCards(d).conn],
   cloud: ["Sign in to Yarbo cloud", "Only needed to send commands (start, pause, dock) and to write the map: Yarbo accepts commands through its cloud only. Type your own Yarbo password; it goes straight to Yarbo's SDK and is never stored. Skip this to use the panel as a recorder and map.",
           (d) => robotCards(d).cloud],
-  assistant: ["Connect an AI assistant (optional)", "An assistant over MCP can do the rest of these steps with you by conversation, and is best at finding the sharpest aerial map of your yard. Skip it to carry on by hand.",
+  assistant: ["Connect an AI assistant (optional)", "An assistant over MCP can read the panel and help you with it by conversation: check on the robot, tighten the run rules, or hunt down a sharper aerial map of your yard. Skip it if you don't use one.",
               (d) => secAssistant(d)],
-  imagery: ["Pick the map imagery", "The aerial photo under the robot's map. The panel tries the sources that cover your yard and picks the sharpest; you can choose another, add a county or state service, and nudge it into line with the map.",
-            (d) => secImagery(d)],
+  imagery: ["Pick the map imagery", "The aerial photo under the robot's map, in two parts: pick the photo, then line it up with the map.",
+            (d) => setupImagery(d)],
   cameras: ["Cameras (optional)", "With Frigate, the yard cameras keep runs from starting while someone is out there, pause a run when a person or pet walks in, and follow the robot on Live. Switch on the cameras that see grass and draw what each covers.",
             (d) => secCameras(d)],
   ha: ["Home Assistant (optional)", "Home Assistant brings presence (is anyone home?), notifications to your phone, and weather or soil sensors. The panel also publishes its own state to HA. Paste a long-lived token from your HA profile.",
        (d) => secHA(d).slice(0, 2)],
   weather: ["Weather for Lawn conditions", "Dry, Damp or Wet decides whether a scheduled run starts. A Tempest station on your network is heard with no setup; Home Assistant sensors can stand in or add to it. The thresholds can wait: they are in Lawn conditions.",
             (d) => secLawn(d).slice(0, 2)],
-  safety: ["Safety", "Three settings matter most before the robot is ever started from here. The recommended values are the safe ones; each can be changed later in Safety and Run rules.",
+  safety: ["Safety", "Four switches matter most before the robot is ever started from here. Change them here; the recommended values are the safe ones.",
            (d) => setupSafety(d)],
   alerts: ["Notifications", "Where alerts go: a robot error, a stuck robot, a run waiting for your yes, maintenance due. Pick the Home Assistant notify service for your phone or a webhook, then send a test.",
            (d) => secAlerts(d)[0]],
@@ -351,28 +374,69 @@ function secSetup(d) {
         sbtn(next === "end" ? "Finish" : "Next", () => go(next), x.done ? "btn pri" : "btn")))];
 }
 
-// The three settings that matter before anything is started from here, with the safe value for each.
+// Imagery in the guide: 1. pick the photo (the picker, with where the yard's location came from), 2. line it up.
+function setupImagery(d) {
+  const part = setUI.imgPart || "pick", cur = d.imgs?.yard?.source;
+  const entry = cur && (d.imgs?.sources || []).find((x) => x.id === cur.id);
+  const go = (p) => { setUI.imgPart = p; drawSettings(setUI.data, false); $("#p-settings").scrollTop = 0; };
+  const tabs = h("div", { class: "subtabs setup-subtabs", role: "tablist" },
+    [["pick", "1 · Pick the photo"], ["align", "2 · Line it up"]].map(([id, label]) =>
+      h("button", { type: "button", role: "tab", class: "subtab", "aria-selected": String(part === id), "aria-current": part === id ? "step" : null, onclick: () => go(id) }, label)));
+  const [picker, alignCard] = secImagery(d);
+  if (part === "pick") {
+    return [tabs,
+      scard(null, h("p", { class: "shelp top" },
+        d.s.transport?.local?.connected
+          ? `Your yard's location comes from the robot's own map${entry?.region ? ` (${entry.region})` : ""}, so only the sources that cover it are asked. They are tried and sorted sharpest first; Automatic keeps the sharpest free one.`
+          : "Connect the robot first: its map says where your yard is, and only sources that cover it are asked."),
+        h("div", { class: "row gap wrap", style: "margin:0 0 12px" }, sbtn("Next: line it up", () => go("align"), "btn pri"))),
+      picker];
+  }
+  return [tabs,
+    scard("Line the photo up with the robot's map",
+      h("p", { class: "shelp top" }, "Aerial photos are often a metre or two off. On the map, check that the zone outlines sit on the lawn edges, paths and driveway in the photo."),
+      h("ol", { class: "howto" },
+        h("li", null, "Press ", h("b", null, "Align on the map"), ": the map opens with the align panel."),
+        h("li", null, "Pick a spot on the robot's map (a path corner, the dock), then the same spot in the photo."),
+        h("li", null, "One pair fixes the shift, two far apart fix the rotation too. Save, and you come back here.")),
+      h("div", { class: "row gap wrap", style: "margin:4px 0 14px" },
+        sbtn("Align on the map", beginAlign, "btn pri"),
+        sbtn("Back to the photos", () => go("pick"), "btn"))),
+    alignCard];
+}
+
+// The settings that matter before anything is started from here, changeable in place, each with its safe value.
 function setupSafety(d) {
-  const g = d.st.gates, on = d.st.control_enabled;
-  const safe = !on && g.yard_clear_required && !g.guard_resume;
-  const line = (name, help, ok, now) => srow(name, help, sstate(ok ? GREEN : AMBER, now));
-  return scard("Recommended",
-    line("Control", ["Off until you have watched a run or two. While it is off the panel records and plans, but sends nothing. Switch it on in ",
-                     slink("#settings/safety", "Safety"), " by typing ENABLE."], !on, on ? "ON" : "off"),
-    line("Yard must be clear", ["No start while a yard camera sees a person or pet. Needs ", slink("#settings/cameras", "yard cameras"), "; without them the check says unknown."],
-         g.yard_clear_required, g.yard_clear_required ? "on" : "OFF"),
-    line("Resume after a guard pause", "Off: after a guard pauses a run (someone walked in), it stays paused until you resume it.",
-         !g.guard_resume, g.guard_resume ? "ON" : "off"),
-    srow("Use these", safe ? "Everything is at the recommended value." : "Sets the three above to the safe values. Nothing is sent to the robot.",
+  const g = d.st.gates, on = d.st.control_enabled, mw = d.st.map_write_enabled;
+  const safe = !on && !mw && g.yard_clear_required && !g.guard_resume;
+  const gate = (k, v) => saveSetting("gates", { [k]: v });
+  const enable = (key, text, msg) => { if (prompt(text) === "ENABLE") saveSetting(key, true, msg); };
+  const rec = (ok, text) => ok ? null : h("span", { class: "muted small" }, `recommended: ${text}`);
+  const master = (key, value, name, help, onText, offMsg, onMsg) => srow(name, help,
+    rec(!value, "off"), sstate(value ? AMBER : MUTED, value ? "ON" : "off"),
+    value ? sbtn("Switch off", () => saveSetting(key, false, offMsg), "btn")
+          : sbtn("Switch on…", () => enable(key, onText, onMsg), "btn"));
+  return scard("Safety switches",
+    master("control_enabled", on, "Control", "Lets the panel start, pause, resume, stop and dock the robot. Leave it off until you have watched a run or two: the panel still records and plans.",
+           "Type ENABLE to let the panel send commands to the robot.", "Control switched off.", "Control switched on."),
+    master("map_write_enabled", mw, "Map writing", "Lets Map Studio send map edits to the robot. Each write is read back and undone on a mismatch.",
+           "Type ENABLE to let the panel change the robot's map.", "Map writing is off.", "Map writing is on."),
+    srow("Yard must be clear", ["No start while a yard camera sees a person or pet. Needs ", slink("#settings/cameras", "yard cameras"), "; without them the check says unknown."],
+      rec(g.yard_clear_required, "on"), switchCtl("Yard must be clear", g.yard_clear_required, (v) => gate("yard_clear_required", v), "yard_clear_required")),
+    srow("Resume after a guard pause", "When on, a run a guard paused (someone walked in) resumes by itself once the yard is clear again. Resuming spins the blades.",
+      rec(!g.guard_resume, "off"), switchCtl("Resume after a guard pause", g.guard_resume, (v) => gate("guard_resume", v), "guard_resume")),
+    srow("All at once", safe ? "Everything is at the recommended value." : "Sets all four to the safe values. Nothing is sent to the robot.",
       safe ? sstate(GREEN, "recommended") : sbtn("Use the recommended", async () => {
         try {
           if (on) await putJSON("/api/settings/control_enabled", false);
+          if (mw) await putJSON("/api/settings/map_write_enabled", false);
           await putJSON("/api/settings/gates", { yard_clear_required: true, guard_resume: false });
           toast("Safety set to the recommended values.");
         } catch (e) { toast(e.message); }
         renderSettings();
       }, "btn pri")),
-    sfoot("The rest of the start and stop rules (battery, dry lawn, someone home, what a guard does) are in ", slink("#settings/rules", "Run rules"), "."));
+    sfoot("Battery, dry lawn, someone home and what each guard does are in ", slink("#settings/rules", "Run rules"),
+          "; assistant commands are in ", slink("#settings/safety", "Safety"), "."));
 }
 
 /* A fresh install (no robot address or no map yet) opens the guide by itself, from Live, once per browser session. */
@@ -387,44 +451,102 @@ async function maybeOpenSetup() {
 }
 
 /* ------------------------------------------------------------- robot */
+// Connecting to the robot: find it on the network, or type its address and Connect (tested, then saved). Port and
+// serial sit under Advanced: the serial is read from the robot's heartbeat. What is in progress (a search, a connect)
+// lives in setUI.robot so the page's own refresh can redraw around it.
+async function robotFind() {
+  setUI.robot = { finding: true };
+  drawSettings(setUI.data, false);
+  try {
+    const got = await postJSON("/api/robot/discover", {});
+    setUI.robot = { found: got };
+  } catch (e) { setUI.robot = { error: e.message }; }
+  if (setUI.data) drawSettings(setUI.data, false);
+}
+
+async function robotUse(host, sn, port) {
+  setUI.robot = { connecting: host };
+  drawSettings(setUI.data, false);
+  const values = { host };
+  if (sn) values.sn = sn;
+  if (port) values.port = port;
+  await saveIntegration("robot", values, `Saved; connecting to ${host}.`);
+  setUI.robot = null;
+}
+
+async function robotConnect(host, port) {
+  if (!host) { toast("Type the robot's address first."); return; }
+  setUI.robot = { testing: host };
+  drawSettings(setUI.data, false);
+  try {
+    const r = await fetch("/api/integrations/robot/test", { method: "POST", headers: { "Content-Type": "application/json" },
+                                                            body: JSON.stringify({ host, port: port || undefined }) });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || !data.ok) throw new Error(data.detail || `${r.status}`);
+    await robotUse(host, data.sn, port);
+  } catch (e) {
+    setUI.robot = { error: `No robot at ${host}: ${e.message}` };
+    drawSettings(setUI.data, false);
+  }
+}
+
+function robotConnection(d, ig, t, r) {
+  const s = d.s, ui = setUI.robot || {};
+  const head = t.connected && s.sn
+    ? sstate(GREEN, ["Connected to ", mono(s.sn), " at ", mono(t.host), r.head ? ` · ${r.head}` : ""])
+    : t.host ? sstate(AMBER, ["Looking for the robot at ", mono(t.host), "…", t.error ? h("span", { class: "muted" }, ` (${t.error})`) : null])
+      : sstate(MUTED, "Not connected yet");
+  const busy = ui.finding || ui.testing || ui.connecting;
+  const addr = h("input", { class: "field", name: "host", "data-key": "robot_host", value: ival(ig.host), placeholder: "192.0.2.50",
+                            autocomplete: "off", spellcheck: "false", "aria-label": "Robot address" });
+  const found = ui.found;
+  const results = ui.finding ? snote("Searching your network for the robot… this takes about 20 seconds.")
+    : ui.testing ? snote(["Checking ", mono(ui.testing), " for the robot's heartbeat…"])
+      : ui.connecting ? snote(["Saved. Connecting to ", mono(ui.connecting), "…"])
+        : ui.error ? h("p", { class: "shelp" }, colored(CORAL, ui.error))
+          : found ? (found.found.length
+            ? h("div", null, found.found.map((x) => srow(["Robot ", mono(x.sn)], ["at ", mono(x.host)],
+                x.sn === s.sn && t.connected ? sstate(GREEN, "connected") : sbtn("Use this", () => robotUse(x.host, x.sn, x.port), "btn pri"))))
+            : h("p", { class: "shelp" }, colored(AMBER, found.note || "No robot found."), " Type its address below instead."))
+            : null;
+  const adv = h("details", { class: "sadvanced" }, h("summary", null, "Advanced: port and serial"),
+    h("form", { class: "login", onsubmit: (e) => {
+        e.preventDefault();
+        const f = e.target, values = {};
+        const port = f.port.value ? Number(f.port.value) : null, sn = f.sn.value.trim();
+        if (port !== (ival(ig.port) === "" ? null : ival(ig.port))) values.port = port;
+        if (sn !== String(ival(ig.sn))) values.sn = sn || emptied(ig.sn);
+        if (!Object.keys(values).length) { toast("Nothing changed."); return; }
+        saveIntegration("robot", values, "Saved; reconnecting to the robot.");
+      } },
+      whence("robot", "host", ig.host),
+      h("div", { class: "formgrid" },
+        h("label", { class: "formrow" }, h("span", { class: "muted small" }, "MQTT port"),
+          h("input", { class: "field", name: "port", "data-key": "robot_port", type: "number", min: 1, max: 65535, value: ival(ig.port), placeholder: "1883" }),
+          whence("robot", "port", ig.port)),
+        h("label", { class: "formrow" }, h("span", { class: "muted small" }, "Serial (only if it can't be read)"),
+          h("input", { class: "field", name: "sn", "data-key": "robot_sn", value: ival(ig.sn), placeholder: "read from the robot", autocomplete: "off", spellcheck: "false" }),
+          whence("robot", "sn", ig.sn))),
+      h("div", { class: "row gap wrap" }, h("button", { type: "submit", class: "btn" }, "Save"))));
+  return scard("Connection",
+    h("div", { class: "robothead" }, head),
+    srow("Find it", "Looks on your network for a Yarbo announcing itself. Nothing is sent to anything it finds.",
+      disable(sbtn(ui.finding ? "Searching…" : "Find it on my network", robotFind, t.connected ? "btn" : "btn pri"), busy)),
+    results,
+    srow("Or type its address", "Its address on your network (your router's client list shows it).",
+      h("span", { class: "row gap" }, addr,
+        disable(sbtn(ui.testing ? "Checking…" : "Connect", () => robotConnect(addr.value.trim(), ival(ig.port) || null), "btn"), busy))),
+    adv,
+    sfoot("The panel only listens to the robot's own MQTT broker and asks it for data; it never sends it commands from here."));
+}
+
 function robotCards(d) {
   const s = d.s, t = s.transport?.local || {}, cloud = s.ops?.cloud || {}, r = s.robot || {};
   const ig = d.st.integrations?.robot || {};
   const signedIn = ["connected", "connecting", "reconnecting"].includes(cloud.state);
   const cloudColor = cloud.state === "connected" ? GREEN : cloud.state === "needs login" ? CORAL : signedIn ? AMBER : MUTED;
   const seen = s.ops?.phone_app_seen_s;
-  const result = h("span", { class: "small" });
-  const form = h("form", { class: "login", onsubmit: (e) => {
-      e.preventDefault();
-      const f = e.target, values = {};
-      const host = f.host.value.trim(), port = f.port.value ? Number(f.port.value) : null, sn = f.sn.value.trim();
-      if (host !== String(ival(ig.host))) values.host = host || emptied(ig.host);
-      if (port !== (ival(ig.port) === "" ? null : ival(ig.port))) values.port = port;
-      if (sn !== String(ival(ig.sn))) values.sn = sn || emptied(ig.sn);
-      if (!Object.keys(values).length) { toast("Nothing changed."); return; }
-      saveIntegration("robot", values, "Saved; reconnecting to the robot.");
-    } },
-    h("div", { class: "formgrid" },
-      h("label", { class: "formrow" }, h("span", { class: "muted small" }, "Address on your network"),
-        h("input", { class: "field", name: "host", "data-key": "robot_host", value: ival(ig.host), placeholder: "192.0.2.50", autocomplete: "off", spellcheck: "false" }),
-        whence("robot", "host", ig.host)),
-      h("label", { class: "formrow" }, h("span", { class: "muted small" }, "MQTT port"),
-        h("input", { class: "field", name: "port", "data-key": "robot_port", type: "number", min: 1, max: 65535, value: ival(ig.port), placeholder: "1883" }),
-        whence("robot", "port", ig.port)),
-      h("label", { class: "formrow" }, h("span", { class: "muted small" }, "Serial"),
-        h("input", { class: "field", name: "sn", "data-key": "robot_sn", value: ival(ig.sn), placeholder: "blank: read from the heartbeat", autocomplete: "off", spellcheck: "false" }),
-        whence("robot", "sn", ig.sn))),
-    h("div", { class: "row gap wrap" },
-      h("button", { type: "submit", class: "btn pri" }, "Save and reconnect"),
-      sbtn("Test", (e) => testIntegration("robot", { host: form.host.value.trim(), port: form.port.value ? Number(form.port.value) : undefined }, result, e.target), "btn"),
-      result));
-  return { conn: scard("Connection",
-      snote("The robot runs its own MQTT broker; the panel listens to it and only ever sends read requests. Set the address once and ",
-            "the serial is read from the robot's heartbeat."),
-      form,
-      srow("Local broker", t.error ? colored(CORAL, t.error) : "Everything the panel records comes from here.",
-        t.host ? mono(t.host) : null, sstate(t.connected ? GREEN : t.host ? CORAL : MUTED, t.connected ? "connected" : t.host ? "down" : "not set up")),
-      srow("Serial · head", "Read from the robot; the head changes when a module is swapped.", mono(s.sn || "—"), r.head ? ` · ${r.head}` : null)),
+  return { conn: robotConnection(d, ig, t, r),
     robot: scard("Robot",
       srow("Phone app", "The Yarbo app keeps the robot awake while it is open; the panel waits for it to go quiet before a start.",
         seen === null || seen === undefined ? "not seen" : `seen ${dur(seen)} ago`),
@@ -437,7 +559,9 @@ function robotCards(d) {
     cloud: scard("Yarbo cloud",
       snote("Commands can only be sent through Yarbo's cloud, so control needs a signed-in session. The password goes straight to ",
             "Yarbo's SDK and is never stored; only the session tokens are kept on the server."),
-      srow("Session", null, sstate(cloudColor, cloud.state || "unknown")),
+      srow("Session", ["connecting", "reconnecting"].includes(cloud.state)
+          ? "Signing in to Yarbo's cloud broker usually takes under a minute; this page updates by itself." : null,
+        sstate(cloudColor, cloud.state || "unknown")),
       cloud.username ? srow("Account", null, cloud.username) : null,
       cloud.broker ? srow("Broker", null, mono(cloud.broker)) : null,
       cloud.commands_sent ? srow("Commands sent", "Through this session.", String(cloud.commands_sent)) : null,
@@ -574,6 +698,12 @@ function secLawn(d) {
         heard ? [t.station ? mono(t.station) : null, t.battery_v ? mono(`${Number(t.battery_v).toFixed(2)} V`) : null, sstate(GREEN, `heard ${dur(t.last_obs_age_s)} ago`)] : t ? sstate(CORAL, t.error || "nothing heard") : sstate(MUTED, "off"),
         numCtl({ key: "tempest_port", value: ival(wp) === "" ? null : ival(wp), min: 0, max: 65535, unit: "UDP",
                  blank: wp && wp.env !== null && wp.env !== undefined ? String(wp.env) : "off", onsave: (v) => saveIntegration("weather", { tempest_port: v }) })),
+      t && !heard && !t.packets && (d.s.uptime_s || 0) > 75
+        ? h("p", { class: "shelp" }, colored(AMBER, "Nothing heard from a Tempest yet. "),
+            `The hub broadcasts about once a minute on UDP ${t.listening_port || 50222} to its own network, so the panel must be on `,
+            "the same network (not a guest network or another VLAN). In Docker the container needs host networking (",
+            mono("network_mode: host"), "): broadcasts don't reach Docker's bridge network. No Tempest? Home Assistant sensors can stand in below.")
+        : null,
       t && (t.stations || []).length ? srow("Station", "When the hub hears more than one station, pick the one in your yard.",
         selCtl({ key: "station", value: ws.station || "", options: [["", "Any station"], ...t.stations.map((x) => [x.serial, `${x.serial} · heard ${dur(x.age_s)} ago`])],
                  onsave: (v) => saveWs({ station: v || null }) })) : null,

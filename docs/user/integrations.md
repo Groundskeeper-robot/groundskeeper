@@ -4,7 +4,9 @@
 All optional. Each is set in Settings and has a Test button.
 
 - **Tempest weather station** ([Lawn conditions](#settings/lawn)): read from the hub's local broadcast on UDP
-  50222. No account or cloud. Feeds Dry / Damp / Wet. When the hub hears several stations, pick yours.
+  50222. No account or cloud. Feeds Dry / Damp / Wet. When the hub hears several stations, pick yours. Nothing
+  heard? The panel must be on the hub's own network (not a guest network or another VLAN), and in Docker the
+  container needs host networking (`network_mode: host`): broadcasts don't reach Docker's bridge network.
 - **Weather from Home Assistant** ([Lawn conditions](#settings/lawn)): rain (a rate, a running total, an on/off
   rain sensor, or a weather entity's rainy or not), temperature (°C, °F or K) and humidity sensors can stand in for
   the Tempest or back it up; pick the source per input (Either takes the Tempest while it reports). Each input is a
