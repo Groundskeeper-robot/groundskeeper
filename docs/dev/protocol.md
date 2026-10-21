@@ -40,8 +40,9 @@ no manual drive.** Those are learned by watching the official app on `snowbot/{S
 - **Run commands get no reply** on either broker. Confirm them by the robot's state changing.
 - Other device streams seen: `device/recharge_feedback`, `device/cloud_points_feedback`, `device/combined_odom_path`
   (the trail while the app records a boundary by driving).
-- The official app sends action commands (lights, buzzer, plans) after a `get_controller` handshake. Read requests
-  and plan/map saves do not need it.
+- The official app no longer sends a `get_controller` handshake (recordings of 2026-10-21: lights, sound,
+  undocking, manual driving and return to dock, none with a handshake). It sends `set_working_state` every few seconds
+  while open, apparently a keep-awake. Read requests and plan/map saves never needed a handshake.
 
 ## Access control (after the September 2026 "cleaning up MQTT" firmware)
 
@@ -52,7 +53,8 @@ no manual drive.** Those are learned by watching the official app on `snowbot/{S
 | SUBSCRIBE `snowbot/{SN}/device/#`, `snowbot/{SN}/app/#`, `snowbot/{SN}/#` | **granted** |
 | SUBSCRIBE `snowbot/+/device/heart_beat` (serial unknown) | **granted**; heartbeats arrive every few seconds with the serial in the topic (checked 2026-10-20). Robot discovery (`app/robotscan.py`) and `discover_sn` rely on it |
 | PUBLISH read requests (`get_device_msg`, `get_map`, `read_gps_ref`, `read_all_plan`, …) | **answered** |
-| `get_controller` and action commands, locally | Not yet known; owner reports say this is what the update closed |
+| Action commands, locally | **accepted** for `set_sound_param` (2026-10-21): published on the local broker with no cloud and no handshake, it answered "Sound settings updated successfully." (state 0) on `device/data_feedback` and `StateMSG.enable_sound` followed, both ways. **Run commands too** (2026-10-21, docked, plan "Mow Side"): `start_plan {"id": 2}`, `pause`, `stop` and `cmd_recharge {"cmd": 2}` on the local broker each showed in the robot's state within about 2 s (planning 2 and off the dock; `planning_paused` 1; planning 0 with "no plan working"; `on_going_recharging` 2, then docked and charging). Still no reply to run commands: confirm by state |
+| `light_ctrl` from the official app | **ignored** on the dock and when off it (2026-10-21): `LedInfoMSG` never showed the sent values; the lights seen while driving are the robot's own (head 50, sides 150) |
 | **Cloud broker** (account session): SUBSCRIBE `snowbot/{SN}/#`, `/app/#`, `/device/#` | **granted for the account's own robot**; `snowbot/#` and `#` refused. The phone app's commands are visible here. |
 
 Re-check after any firmware update: `python tools/yarbo_local.py acl '#' 'snowbot/<SN>/app/#'`.
