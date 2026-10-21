@@ -5,6 +5,8 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ## Unreleased
 
+## 0.18.0 — 2026-10-20
+
 ### Added
 - **After-dark guard:** a plan that stopped to charge heads back out by itself when the battery is full, at any
   hour. If that happens between sunset and sunrise at your yard, the panel now sends it home (Return to dock, the
