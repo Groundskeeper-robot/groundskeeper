@@ -65,41 +65,59 @@ def test_only_the_link_reaches_the_cloud_publish():
                        "app.link.RobotLink (AGENTS.md → Safety)")
 
 
-def _uses(p: Path, attr: str, calls_only: bool) -> list[tuple[str, int]]:
-    """(enclosing function, line) of every `<anything>.<attr>` (or `<anything>.<attr>(...)`) in a module, however the
-    object is named or aliased."""
+def _uses(p: Path, attr: str) -> list[tuple[str, int]]:
+    """(qualified place, line) of every `<anything>.<attr>` in a module: a call, a bound method handed on, however the
+    object is named or aliased. The place is Class.method; a lambda is its own place ("...<lambda>"), so a lambda
+    built inside an allowed method and handed out is not allowed."""
     tree, out = ast.parse(read(p)), []
 
-    def walk(node, func):
+    def walk(node, place):
         for child in ast.iter_child_nodes(node):
-            name = child.name if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) else func
-            target = child.func if calls_only and isinstance(child, ast.Call) else None if calls_only else child
-            if isinstance(target, ast.Attribute) and target.attr == attr:
-                out.append((func, child.lineno))
-            walk(child, name)
+            here = place
+            if isinstance(child, ast.ClassDef):
+                here = child.name if place == "<module>" else f"{place}.{child.name}"
+            elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                here = child.name if place == "<module>" else f"{place}.{child.name}"
+            elif isinstance(child, ast.Lambda):
+                here = f"{place}.<lambda>"
+            if isinstance(child, ast.Attribute) and child.attr == attr:
+                out.append((place, child.lineno))
+            walk(child, here)
     walk(tree, "<module>")
     return out
 
 
-# Where a command may be sent through the link (Controller: a send, and its follow-up repeat of a safe command) and
-# where the link's write door may be handed out (Ops wiring the map writer). Anywhere else is a bypass.
-COMMAND_CALLS = {"app/link.py": None, "app/control.py": {"send", "_follow_up"}}
-WRITE_DOOR = {"app/link.py": None, "app/ops.py": {"__init__"}}
+# Where a run command may be sent through the link (Controller: a send, and the follow-up that may repeat a safe one),
+# and where the link's write door may be handed out (Ops wiring the map writer). Anywhere else is a bypass.
+COMMAND_USES = {"app/link.py": None, "app/control.py": {"Controller.send", "Controller._follow_up"}}
+WRITE_DOOR = {"app/link.py": None, "app/ops.py": {"Ops.__init__"}}
 
 
 def test_only_the_controller_sends_commands_through_the_link():
     for p in APP:
-        allowed = COMMAND_CALLS.get(rel(p), set())
-        bad = [(f, n) for f, n in _uses(p, "command", calls_only=True) if allowed is not None and f not in allowed]
-        assert not bad, (f"{rel(p)} calls .command() at {bad}: only Controller.send (and its follow-up) send run "
+        allowed = COMMAND_USES.get(rel(p), set())
+        bad = [(f, n) for f, n in _uses(p, "command") if allowed is not None and f not in allowed]
+        assert not bad, (f"{rel(p)} uses .command at {bad}: only Controller.send (and its follow-up) send run "
                          "commands, through app.link.RobotLink (AGENTS.md → Safety)")
 
 
 def test_only_the_map_writer_gets_the_write_door():
     for p in APP:
         allowed = WRITE_DOOR.get(rel(p), set())
-        bad = [(f, n) for f, n in _uses(p, "write_command", calls_only=False) if allowed is not None and f not in allowed]
+        bad = [(f, n) for f, n in _uses(p, "write_command") if allowed is not None and f not in allowed]
         assert not bad, f"{rel(p)} uses .write_command at {bad}: only MapWriter writes, wired in Ops.__init__"
+
+
+def test_the_guard_sees_handoffs_and_lambdas(tmp_path):
+    bad = tmp_path / "bad.py"
+    bad.write_text("class Controller:\n"
+                   "    def send(self):\n"
+                   "        f = lambda: self.link.command('pause', {})\n"
+                   "        return f\n"
+                   "class Ops:\n"
+                   "    def tick(self):\n"
+                   "        MapWriter(self.store, self.link.command)\n", encoding="utf-8")
+    assert _uses(bad, "command") == [("Controller.send.<lambda>", 3), ("Ops.tick", 7)]
 
 
 @pytest.mark.parametrize("cmd", ["cmd_vel", "set_sound_param", "light_ctrl", "get_controller", "shutdown"])

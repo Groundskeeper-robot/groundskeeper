@@ -141,8 +141,7 @@ The phone app keeps the robot awake (`set_working_state`) and sends its commands
 happens when both sides command the robot at once is not fully known. The rule: **a start is refused while the phone
 app has been seen in the last 60 s** (`phone_app_quiet_s`). It is seen two ways: its keep-awake on the cloud, and,
 locally, the robot streaming `DeviceMSG` about once a second, which it does only while the app is connected (seen
-2026-10-21; the panel's own reads come back on `data_feedback`, and a `DeviceMSG` within 5 s of the panel's own read is
-not counted). A stream proves the app is open; without the cloud its absence is not yet taken as "closed" (unknown),
+2026-10-21; the panel's own reads come back on `data_feedback`, so every `DeviceMSG` counts). A stream proves the app is open; without the cloud its absence is not yet taken as "closed" (unknown),
 and right after a route comes up the answer is unknown for the quiet window. Unknown blocks the starts nobody is
 watching (scheduler, assistant, guard resume); a start from the panel shows it. Observed so far: a pause from the app
 shows as paused at once, and a panel resume after an app pause is confirmed within a second.

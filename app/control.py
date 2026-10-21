@@ -187,12 +187,14 @@ REROUTE_AFTER_S = 10
 
 class Controller:
     def __init__(self, store, link, context_fn, expect_reply_fn, state_fn=None):
-        """link: app.link.RobotLink (command, other_route, note_command, state). context_fn(args) -> ctx dict (async). expect_reply_fn(cmd) -> Future resolved by the matching data_feedback; registered BEFORE
+        """link: app.link.RobotLink (command, other_route, note_command, state).
+        context_fn(args) -> ctx dict (async). expect_reply_fn(cmd) -> Future resolved by the matching data_feedback; registered BEFORE
         publishing so a fast reply cannot be missed. state_fn() -> the robot's latest flat telemetry, used to confirm
         a command took effect (None = no confirmation)."""
         self.store = store
         self.link = link
         self._seq = 0                     # bumped by every command sent: a reroute waiting on an older one stands down
+        self.others_at = lambda: 0.0      # last command from someone else (the phone app, another client); set by Ops
         self._context, self._expect, self._state = context_fn, expect_reply_fn, state_fn
         self._lock = asyncio.Lock()
         self.poll_s = 0.5
@@ -302,7 +304,7 @@ class Controller:
                 fut = self._expect(cmd)
                 route = self.link.command(cmd, payload)
                 self._seq += 1
-                self._spawn(self._follow_up(cmd, payload, route, self._seq, actor))
+                self._spawn(self._follow_up(cmd, payload, args, route, self._seq, actor))
                 if actor != "guard":
                     self.last_human_cmd_at = time.time()
                 result = {"sent": True, "cmd": cmd, "payload": payload, "checks": checks, "route": route}
@@ -344,32 +346,43 @@ class Controller:
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
 
-    async def _follow_up(self, cmd: str, payload: dict, route: str, seq: int, actor: str) -> None:
-        """After a send: was it seen in the robot's state? The answer goes to the link (local commands that are never
-        seen move commands to the cloud for a while). A pause, stop or return to dock not seen within REROUTE_AFTER_S
-        goes once more by the other route, under the lock, only while control is still on and no newer command has
-        been sent, and is logged like any other send. A start or a resume is never repeated."""
+    async def _follow_up(self, cmd: str, payload: dict, args: dict, route: str, seq: int, actor: str) -> None:
+        """After a send, watch the robot's state for up to LATE_WATCH_S. A pause, stop or return to dock not seen
+        within REROUTE_AFTER_S goes once more by the other route: under the lock, only while control is on, no newer
+        command was sent from here and nobody else (the phone app, another client) has sent one since, and logged like
+        any other send. A start or a resume is never repeated. The outcome feeds the link: a command never seen in the
+        whole window counts against the route it went (a robot acting late, within the window, does not); a rerouted
+        one that was then seen tells nothing about the first route and is not counted."""
         timeout, test, meaning = CONFIRM.get(cmd, (15, None, ""))
         if test is None or self._state is None:
             return
-        safe = cmd in SAFE_TO_REPEAT
-        await asyncio.sleep(REROUTE_AFTER_S if safe else timeout)
-        async with self._lock:
-            if self._seq != seq:
-                return                                   # a newer command: this one's state test says nothing now
-            seen = bool(test(self._state() or {}))
-            self.link.note_command(route, seen)
-            if seen or not safe or not self.enabled():
+        safe, start, rerouted = cmd in SAFE_TO_REPEAT, time.time(), False
+        while time.time() - start < LATE_WATCH_S:
+            await asyncio.sleep(self.poll_s)
+            if self._seq != seq or self.others_at() > start:
+                return                                   # a newer command (ours or someone else's): stand down
+            if test(self._state() or {}):
+                if not rerouted:
+                    self.link.note_command(route, True)
                 return
-            other = self.link.other_route(route)
-            if other is None:
-                return
-            try:
-                self.link.command(cmd, payload, route=other)
-                result = {"sent": True, "cmd": cmd, "payload": payload, "route": other, "rerouted_from": route}
-                note = f"{cmd}: not seen {REROUTE_AFTER_S} s after going {route}; sent again through {other}"
-            except Exception as exc:
-                result = {"sent": False, "cmd": cmd, "error": str(exc), "rerouted_from": route}
-                note = f"{cmd}: not seen after going {route}; {other} failed too ({exc})"
-            self.store.log_control(f"{actor} (rerouted)", other, cmd, json.dumps(payload), result)
-            self.store.event("command_rerouted", note)
+            if safe and not rerouted and time.time() - start >= REROUTE_AFTER_S:
+                async with self._lock:
+                    if self._seq != seq or self.others_at() > start or not self.enabled():
+                        return
+                    if test(self._state() or {}):
+                        self.link.note_command(route, True)
+                        return
+                    other = self.link.other_route(route)
+                    if other is None:
+                        continue
+                    rerouted = True
+                    try:
+                        self.link.command(cmd, payload, route=other)
+                        result = {"sent": True, "cmd": cmd, "payload": payload, "route": other, "rerouted_from": route}
+                        note = f"{cmd}: not seen {REROUTE_AFTER_S} s after going {route}; sent again through {other}"
+                    except Exception as exc:
+                        result = {"sent": False, "cmd": cmd, "error": str(exc), "rerouted_from": route}
+                        note = f"{cmd}: not seen after going {route}; {other} failed too ({exc})"
+                    self.store.log_control(f"{actor} (rerouted)", other, cmd, json.dumps(args), result)
+                    self.store.event("command_rerouted", note)
+        self.link.note_command(route, False)             # never seen in the whole window

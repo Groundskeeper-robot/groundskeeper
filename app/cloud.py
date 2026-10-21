@@ -232,7 +232,8 @@ class CloudTransport:
     _last_refresh = 0.0
 
     def publish(self, cmd: str, payload: dict) -> None:
-        """Only Controller and MapWriter call this, after their own checks. Raises if not connected."""
+        """Only app.link.RobotLink calls this (for Controller and MapWriter, after their checks, and for reads).
+        Raises if not connected."""
         with self._lock:
             client = self._mqtt
         if not (client and self.connected):

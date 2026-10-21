@@ -438,8 +438,9 @@ class Recorder:
                                           "data": body}
         elif channel == "device" and name == "DeviceMSG" and isinstance(data, dict):
             # The robot streams these only while the phone app is connected; the panel's own reads come back on
-            # data_feedback. A DeviceMSG right after the panel asked is not counted, nor the demo robot's.
-            if not getattr(self.cfg, "demo", False) and ts - self._sent.get("get_device_msg", 0) > 5:
+            # data_feedback, never here. Every one counts (the demo robot's aside): if one were ever caused by the
+            # panel's own read, the result is "app open", which blocks automatic starts - the safe direction.
+            if not getattr(self.cfg, "demo", False):
                 self.app_stream_at = ts
             self._ingest(data, ts, full=False)
         elif channel == "device" and name == "heart_beat" and isinstance(data, dict):

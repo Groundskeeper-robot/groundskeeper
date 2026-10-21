@@ -603,7 +603,7 @@ class _WriteLock:
 
 class MapWriter:
     """Runs a plan. The I/O comes in as functions so tests can stand in for the robot:
-    publish(cmd, payload[, route]) -> the route it went (app.link.RobotLink.command); expect_reply(cmd) -> Future
+    publish(cmd, payload[, route]) -> the route it went (app.link.RobotLink.write_command); expect_reply(cmd) -> Future
     registered BEFORE publishing; read_map() -> raw map (a fresh get_map); read_params(pathway_id) -> dict | None;
     account() -> the cloud account email (only for the optional cloud backup after a write)."""
 
@@ -630,12 +630,14 @@ class MapWriter:
             else:
                 try:
                     self.route = self.publish(cmd, payload, route=self.route) or self.route
-                except ConnectionError:
+                except ConnectionError as first:
                     if not (rollback and self.route):
                         raise
-                    gone, self.route = self.route, self.publish(cmd, payload)
-                    self.store.event("map_write_rerouted", f"putting back after a failed write: {gone} was gone, "
-                                     f"{cmd} went through {self.route}")
+                    # Putting things back: try once more, by whatever route the link offers now (the same one if it
+                    # is back, another if the write's route is gone).
+                    was, self.route = self.route, self.publish(cmd, payload)
+                    self.store.event("map_write_rerouted", f"putting back after a failed write: {cmd} failed through "
+                                     f"{was} ({first}); sent again through {self.route}")
             reply = await asyncio.wait_for(fut, REPLY_TIMEOUT_S)
             result = {"sent": True, "ok": reply.get("state") == 0, "state": reply.get("state"), "msg": reply.get("msg"),
                       "data": reply.get("data")}

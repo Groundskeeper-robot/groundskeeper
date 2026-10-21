@@ -46,6 +46,7 @@ class RobotLink:
         self.commands_route: str | None = None
         self.last_command: dict | None = None
         self._failing_noted = 0.0
+        self._changes: dict = {}
         self.on_change = None            # (what, before, after) -> None, for an event when a route changes
 
     # -- which way -------------------------------------------------------------------------------------------------
@@ -111,11 +112,11 @@ class RobotLink:
         route = self.read_route()
         if route is None:
             raise NoRoute(self._why_none())
-        self.mark_sent(cmd)
         if route == "local":
             self.rec.transport.request(cmd, payload)
         else:
             self.cloud.publish(cmd, payload or {})
+        self.mark_sent(cmd)
         self._note("reads", route)
         return route
 
@@ -149,7 +150,7 @@ class RobotLink:
         from . import control
         if cmd not in control.CATALOGUE:
             raise NoRoute(f"{cmd} is not a run command")
-        return self._send(cmd, payload, route or self.command_route(), "commands")
+        return self._send(cmd, payload, route or self.command_route(), None if route else "commands")
 
     def write_command(self, cmd: str, payload: dict, route: str | None = None) -> str:
         """A captured write (MapWriter only). Returns the route it went."""
@@ -159,28 +160,38 @@ class RobotLink:
             raise NoRoute(f"{cmd} is not a map or settings write")
         route = route or self.write_route()
         if route == "local" and not LOCAL_WRITES_PROVED:
-            raise NoRoute("writes on your network are not proved yet: they go through the Yarbo cloud")
+            raise NoRoute(self._why_no_writes())
         return self._send(cmd, payload, route, None)
 
     def _send(self, cmd: str, payload: dict, route: str | None, what: str | None) -> str:
         if route is None:
-            raise NoRoute(self._why_none() if what else "map writes need the Yarbo cloud for now (sign in)")
+            raise NoRoute(self._why_none() if what is not None or cmd not in self._writes() else self._why_no_writes())
         if not self._allowed(route):
             raise NoRoute(f"the route is set to {self.mode()} only")
         if route == "local":
             if not self.local_commands_up():
                 raise NoRoute("the robot's local broker is not connected")
-            self.mark_sent(cmd)
             self.rec.transport.command(cmd, payload)
         else:
             if not self.cloud_up():
                 raise NoRoute(f"the Yarbo cloud is {getattr(self.cloud, 'state', 'not set up')}")
-            self.mark_sent(cmd)
             self.cloud.publish(cmd, payload)
+        self.mark_sent(cmd)              # after it went: the robot's echo arrives later, on the event loop
         self.last_command = {"cmd": cmd, "route": route, "at": time.time()}
         if what:
             self._note(what, route)
         return route
+
+    @staticmethod
+    def _writes():
+        from . import mapwrite
+        return mapwrite.WRITE_COMMANDS
+
+    def _why_no_writes(self) -> str:
+        if self.mode() == "local":
+            return ("the route is set to your network only, and writes there aren't proved yet: set the route to "
+                    "Automatic or Yarbo cloud (Settings → Robot) for map and settings writes")
+        return f"map and settings writes go through the Yarbo cloud for now, and it is {getattr(self.cloud, 'state', 'not set up')}"
 
     def _why_none(self) -> str:
         m = self.mode()
@@ -191,10 +202,15 @@ class RobotLink:
         return "neither the robot's local broker nor the Yarbo cloud is connected"
 
     def _note(self, what: str, route: str) -> None:
+        """The automatically chosen route for reads or commands; a change is reported, each kind of change at most once
+        an hour (reads go back and forth while the local broker is half there)."""
         before = getattr(self, f"{what}_route")
         setattr(self, f"{what}_route", route)
         if before and before != route and self.on_change:
-            self.on_change(what, before, route)
+            key, now = (what, before, route), time.time()
+            if now - self._changes.get(key, 0) >= FAILING_NOTE_S:
+                self._changes[key] = now
+                self.on_change(what, before, route)
 
     def status(self) -> dict:
         now = time.time()

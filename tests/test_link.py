@@ -287,3 +287,64 @@ def test_an_explicit_route_respects_the_setting(tmp_path):
     lk, *_ = _link(tmp_path, "local")
     with pytest.raises(NoRoute):
         lk.command("pause", {}, route="cloud")
+
+
+def test_someone_elses_newer_command_stops_the_repeat(tmp_path, monkeypatch):
+    """Pause from here, then the phone app resumes it: the pause must not be sent again through the cloud."""
+    state = {"planning": 1, "planning_paused": 0}
+    c, rec, cl, store = _controller(tmp_path, monkeypatch, state)
+    others = [0.0]
+    c.others_at = lambda: others[0]
+
+    async def go():
+        await c.send("pause", wait=False)
+        others[0] = __import__("time").time() + 0.01     # the phone app sent something just after
+        await asyncio.sleep(0.2)
+
+    asyncio.run(go())
+    assert cl.sent == []
+
+
+def test_a_command_the_robot_acts_on_late_is_not_a_miss(tmp_path, monkeypatch):
+    state = {"planning": 0, "planning_paused": 0}
+    c, rec, cl, store = _controller(tmp_path, monkeypatch, state)
+    monkeypatch.setattr(control, "LATE_WATCH_S", 1.0)
+
+    async def go():
+        await c.send("start_plan", {"plan_id": 1}, wait=False)
+        await asyncio.sleep(0.3)
+        state.update(planning=1)                          # it starts late, inside the watch window
+        await asyncio.sleep(0.3)
+
+    asyncio.run(go())
+    assert c.link._misses["commands"] == 0 and c.link.command_route() == "local"
+
+
+def test_a_command_never_seen_counts_against_its_route(tmp_path, monkeypatch):
+    c, rec, cl, store = _controller(tmp_path, monkeypatch, {"planning": 0, "planning_paused": 0})
+    monkeypatch.setattr(control, "LATE_WATCH_S", 0.2)
+
+    async def go():
+        await c.send("start_plan", {"plan_id": 1}, wait=False)
+        await asyncio.sleep(0.4)
+
+    asyncio.run(go())
+    assert c.link._misses["commands"] == 1
+
+
+def test_an_auto_start_window_keeps_unknowns_hard(tmp_path):
+    """Softening the unknown phone-app check is only for a window that asks first; an auto-start window sends at
+    once and would be refused (and given up for the day) if the evaluation let it through."""
+    from app import ops as ops_mod
+    o = ops_mod.Ops.__new__(ops_mod.Ops)
+    o.store = Store(str(tmp_path))
+
+    async def context(args):
+        return {"snapshot_age_s": 1, "route_state": "connected", "plans": [{"id": 1}], "error_code": 0, "battery": 90,
+                "running": False, "yard": {"ok": True, "detail": "clear"}, "phone_app_active": None,
+                "conditions": "Dry", "presence": True}
+
+    o.context = context
+    asks = asyncio.run(o._evaluate_window({"plan_id": 1}))
+    auto = asyncio.run(o._evaluate_window({"plan_id": 1, "auto_start": True}))
+    assert asks[0] is True and auto[0] is False and "Phone app" in auto[2]
