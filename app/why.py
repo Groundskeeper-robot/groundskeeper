@@ -30,7 +30,9 @@ CHECKS = {
     "Yard clear (Frigate)": ("yard", "Someone (or an animal) is in the yard, or the cameras cannot tell",
                              "Wait until the yard is clear; check Frigate if the cameras are down", "#settings/cameras"),
     "Phone app not driving it": ("phone_app", "The Yarbo app is driving it, or the panel cannot tell",
-                                 "Close the robot's screen in the Yarbo app", "#settings/robot"),
+                                 "Close the robot's screen in the Yarbo app. If the panel cannot tell, sign in to the "
+                                 "Yarbo cloud (it shows the app's keep-awake) or start from the panel yourself",
+                                 "#settings/robot"),
     "Lawn dry": ("lawn", "The lawn is not dry", "Wait for it to dry; the expected time is on Live", "#settings/lawn"),
     "Someone home (Alarmo)": ("presence", "Nobody is home, or Home Assistant cannot tell",
                               "Starts need someone home; check Home Assistant if it is down", "#settings/ha"),

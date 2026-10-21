@@ -2,6 +2,7 @@
 import asyncio
 
 from app import control, coverage
+from tests.fakelink import FakeLink
 from app.edges import EdgeIndex
 from app.store import Store
 
@@ -74,12 +75,12 @@ def test_panel_commands_confirm_in_the_background(tmp_path):
     t = {"planning": 1, "planning_paused": 0}
 
     async def ctx(args):
-        return {"snapshot_age_s": 1, "cloud_state": "connected"}
+        return {"snapshot_age_s": 1, "route_state": "connected"}
 
     def expect(cmd):
         return asyncio.get_running_loop().create_future()
 
-    c = control.Controller(store, FakeCloud(), ctx, expect, lambda: t)
+    c = control.Controller(store, FakeLink(FakeCloud()), ctx, expect, lambda: t)
     c.poll_s = 0.01
 
     async def go():

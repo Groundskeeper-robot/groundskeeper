@@ -53,7 +53,7 @@ class Ops:
         self.cfg, self.rec, self.store = cfg, rec, rec.store
         self.cloud = CloudTransport(cfg.data_dir, rec.sn, self._from_cloud)
         # Local first, the cloud as a fallback, for reads and commands alike (app/link.py).
-        self.link = RobotLink(rec, self.cloud, self.store)
+        self.link = RobotLink(rec, self.cloud, self.store, mark_sent=lambda cmd: rec._sent.__setitem__(cmd, time.time()))
         self.link.on_change = self._route_changed
         rec.link = self.link
         self.frigate = Frigate(cfg.frigate_url)
@@ -61,8 +61,7 @@ class Ops:
         rec.on_sn = self.robot_changed
         self.controller = Controller(self.store, self.link, self.context, self.expect_reply, lambda: self.rec.t)
         self.scheduler = Scheduler(self.store)
-        self.map_writer = MapWriter(self.store, lambda cmd, payload, route=None: self.link.command(
-                                        cmd, payload, route=route or self.link.write_route()),
+        self.map_writer = MapWriter(self.store, self.link.write_command,
                                     self.expect_reply, rec.reload_map,
                                     rec.read_pathway_params, lambda: self.cloud.username, rec.read_area_records,
                                     rec.read_deadend_params)
@@ -105,15 +104,21 @@ class Ops:
         self.store.event("route_changed", f"{what} now go through the {after} (were {before})")
 
     def phone_app_active(self, quiet: float) -> bool | None:
-        """Is the Yarbo app open on someone's phone? The robot streams DeviceMSG about once a second only while the app
-        is connected (seen on the local broker, 2026-10-21; the panel's own reads come back on data_feedback), and the
-        app's own keep-awake shows on the cloud. Unknown only when neither the local broker nor the cloud is up."""
+        """Is the Yarbo app open on someone's phone? The robot streams DeviceMSG about once a second while the app is
+        connected (seen on the local broker, 2026-10-21; the panel's own reads come back on data_feedback), and the app's
+        own keep-awake shows on the cloud. A stream is proof the app is open; its absence is not yet proof it is closed
+        (not shown for every kind of app session), so without the cloud "no stream" is unknown, which still blocks the
+        starts nobody watches (scheduler, assistant, guard resume). Right after the panel starts or a route comes up,
+        quiet is unknown until the route has been up for the quiet window."""
         now = time.time()
-        local = self.link.local_up() if self.link else False
-        cloud = self.cloud.state == "connected"
-        if not (local or cloud):
-            return None
-        return (now - self.rec.app_stream_at < quiet) or (cloud and now - self.phone_app_at < quiet)
+        streaming = now - self.rec.app_stream_at < quiet
+        if self.cloud.state == "connected" and now - getattr(self.cloud, "connected_since", 0.0) >= quiet:
+            return streaming or now - self.phone_app_at < quiet
+        return True if streaming else None
+
+    def phone_app_seen_at(self) -> float:
+        """The last sign of the phone app on either route (its keep-awake on the cloud, its stream locally)."""
+        return max(self.phone_app_at, self.rec.app_stream_at)
 
     def expect_reply(self, cmd: str) -> asyncio.Future:
         fut = self.rec.loop.create_future()
@@ -214,9 +219,10 @@ class Ops:
             return False, [], "no plan chosen for this window"
         ctx = await self.context({"plan_id": w["plan_id"]})
         checks = control.check("start_plan", {"plan_id": w["plan_id"]}, ctx, control.gates(self.store), "scheduler")
-        # Raising a confirmation does not need a route to the robot (confirming does); keep that check visible but soft.
+        # Raising a confirmation does not need a route to the robot or to know about the phone app (confirming does);
+        # keep those checks visible but soft.
         for c in checks:
-            if c["name"] == "Route to the robot":
+            if c["name"] in ("Route to the robot",) or (c["name"] == "Phone app not driving it" and c["ok"] is None):
                 c["hard"] = False
                 c["ok"] = c["ok"] or None
         ok, reason = control.verdict(checks, override=False)
@@ -497,7 +503,7 @@ class Ops:
             if test(r.t):
                 # Own the pause only if it is clearly ours: it landed after we sent it and nobody else spoke since.
                 ours = (r.activity_at >= p["at"] - 1 and self._people_cmd_at() < p["at"]
-                        and self.phone_app_at < p["at"] and r.plan is not None and r.plan.active
+                        and self.phone_app_seen_at() < p["at"] and r.plan is not None and r.plan.active
                         and r.plan.session is not None)
                 st.update(pending=None, acted=p["action"], acted_at=now, warned=False, tries=0,
                           owner={"activity_at": r.activity_at, "session": r.plan.session} if ours else None)
@@ -536,7 +542,7 @@ class Ops:
                 or any(st["owner"] is None or st["owner"]["activity_at"] != r.activity_at for st in sts)):
             self._drop_ownership(f"the robot is now {r.status()['state']}")
             return
-        if self._people_cmd_at() > first or self.phone_app_at > first:
+        if self._people_cmd_at() > first or self.phone_app_seen_at() > first:
             self._drop_ownership("someone else sent the robot a command")
             return
         if any(not st["owner"]["session"] for st in sts):

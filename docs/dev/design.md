@@ -118,7 +118,7 @@ which says nothing about which dead end it is; such an answer is trusted only wh
 |---|---|---|
 | Telemetry, reads | local | Fast, no account needed |
 | Control (run commands) | local, the cloud as a fallback | Proved locally 2026-10-21 (§10.2); `app/link.py` |
-| Writes (map/plan/schedule) | cloud first, local without it | Local writes not proved yet (`link.LOCAL_WRITES_PROVED`) |
+| Writes (map/plan/schedule) | cloud only for now | Local writes not proved yet (`link.LOCAL_WRITES_PROVED`) |
 | Capture | both at once | The app talks to the cloud; other local clients talk to the robot |
 
 The local client's `request()` publishes only the `READ_ONLY_COMMANDS` allow-list (plus named compute-only requests
@@ -137,10 +137,15 @@ The phone app sends `set_working_state {"state":1}` about every 10 s while it is
 while the robot is docked and idle without it, so the panel does not send it.
 
 ### 5.5 Sharing the robot with the phone app
-The phone app keeps the robot awake and sends commands over the same cloud broker. What happens when both sides
-command the robot at once is not fully known. The rule: **a start is refused while the phone app's keep-awake has
-been seen in the last 60 s** (`phone_app_quiet_s`). Observed so far: a pause from the app shows as paused at once,
-and a panel resume after an app pause is confirmed within a second.
+The phone app keeps the robot awake (`set_working_state`) and sends its commands through the cloud broker. What
+happens when both sides command the robot at once is not fully known. The rule: **a start is refused while the phone
+app has been seen in the last 60 s** (`phone_app_quiet_s`). It is seen two ways: its keep-awake on the cloud, and,
+locally, the robot streaming `DeviceMSG` about once a second, which it does only while the app is connected (seen
+2026-10-21; the panel's own reads come back on `data_feedback`, and a `DeviceMSG` within 5 s of the panel's own read is
+not counted). A stream proves the app is open; without the cloud its absence is not yet taken as "closed" (unknown),
+and right after a route comes up the answer is unknown for the quiet window. Unknown blocks the starts nobody is
+watching (scheduler, assistant, guard resume); a start from the panel shows it. Observed so far: a pause from the app
+shows as paused at once, and a panel resume after an app pause is confirmed within a second.
 
 ---
 

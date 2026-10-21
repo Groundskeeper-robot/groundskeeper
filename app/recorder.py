@@ -270,11 +270,11 @@ class Recorder:
             route = self._send_read(cmd, payload)
             reply = await asyncio.wait_for(fut, timeout)
             if self.link is not None:
-                self.link.note_read(route, True)
+                self.link.note_read(cmd, route, True)
             return reply
         except asyncio.TimeoutError:
             if self.link is not None:
-                self.link.note_read(route, False)
+                self.link.note_read(cmd, route, False)
             raise
         finally:
             for n in names:
@@ -437,8 +437,10 @@ class Recorder:
                 self.replies[reply_to] = {"ts": ts, "changed": ts if changed else previous.get("changed", ts),
                                           "data": body}
         elif channel == "device" and name == "DeviceMSG" and isinstance(data, dict):
-            if not getattr(self.cfg, "demo", False):     # the demo robot streams them all the time
-                self.app_stream_at = ts      # the panel never asks for these (its reads come back on data_feedback)
+            # The robot streams these only while the phone app is connected; the panel's own reads come back on
+            # data_feedback. A DeviceMSG right after the panel asked is not counted, nor the demo robot's.
+            if not getattr(self.cfg, "demo", False) and ts - self._sent.get("get_device_msg", 0) > 5:
+                self.app_stream_at = ts
             self._ingest(data, ts, full=False)
         elif channel == "device" and name == "heart_beat" and isinstance(data, dict):
             self.heartbeat, self.heartbeat_at = data, ts
@@ -776,6 +778,7 @@ class Recorder:
             "last_message_age_s": round(now - t.last_message_at, 1) if t and t.last_message_at else None,
             "received": t.received if t else 0,
             "read_requests_sent": t.published if t else 0,
+            "commands_sent": getattr(t, "commands_sent", 0) if t else 0,
             "error": self.robot_error or (t.last_error if t else "") or ("connecting" if t and not t.connected else ""),
         }
 

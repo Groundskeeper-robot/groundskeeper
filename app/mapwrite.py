@@ -617,16 +617,25 @@ class MapWriter:
         self.route: str | None = None           # the route this write goes by (set at its first send)
         self._routed = "route" in inspect.signature(publish).parameters
 
-    async def _send(self, cmd: str, payload: dict) -> dict:
+    async def _send(self, cmd: str, payload: dict, rollback: bool = False) -> dict:
+        """rollback=True: putting things back after a failed write may take another route if the write's route is gone
+        (the write itself never switches route)."""
         if cmd not in WRITE_COMMANDS:
             raise WriteRefused(f"{cmd} is not a map-write command")
         fut = self.expect(cmd)
         started = time.time()
         try:
-            if self._routed:
-                self.route = self.publish(cmd, payload, route=self.route) or self.route
-            else:
+            if not self._routed:
                 self.publish(cmd, payload)
+            else:
+                try:
+                    self.route = self.publish(cmd, payload, route=self.route) or self.route
+                except ConnectionError:
+                    if not (rollback and self.route):
+                        raise
+                    gone, self.route = self.route, self.publish(cmd, payload)
+                    self.store.event("map_write_rerouted", f"putting back after a failed write: {gone} was gone, "
+                                     f"{cmd} went through {self.route}")
             reply = await asyncio.wait_for(fut, REPLY_TIMEOUT_S)
             result = {"sent": True, "ok": reply.get("state") == 0, "state": reply.get("state"), "msg": reply.get("msg"),
                       "data": reply.get("data")}
@@ -846,13 +855,13 @@ class MapWriter:
                     notes.append(f"NOT undone automatically: the robot created {what} {s['created']} - delete it in "
                                  f"the app (the original {what} was not changed)")
                     continue
-                r = await self._send(s["cmd"], s["original"])
+                r = await self._send(s["cmd"], s["original"], rollback=True)
                 notes.append(f"put back the {what} as it was ({s['label']}): "
                              f"{'sent' if r['ok'] else r.get('error') or r.get('msg')} - checked by the read-back below "
                              f"(shape and links{', on/off, bypass and name' if s['kind'] == 'novisionzones' else ''})")
                 continue
             if s["op"] == "add":
-                r = await self._send(DEL_CMD[s["kind"]], {"id": s["new_id"]})
+                r = await self._send(DEL_CMD[s["kind"]], {"id": s["new_id"]}, rollback=True)
                 notes.append(f"removed what was added ({s['label']}): {'ok' if r['ok'] else r.get('error') or r.get('msg')}")
             else:
                 f = mapstudio.find(before, s["kind"], s["robot_id"])

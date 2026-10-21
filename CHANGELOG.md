@@ -9,14 +9,16 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 - **Local first, the cloud as a fallback.** Commands (start, pause, resume, stop, return to dock) now go to the
   robot's own broker on your network, so they work with no Yarbo account and take effect in about 2 seconds. Reads
   and commands fall back to the Yarbo cloud when the robot can't be reached on your network (a 4G spell where HaLow
-  is weak) or local access stops answering, if you are signed in. A pause, stop or return to dock not seen within
-  10 s is sent once more by the other route; a start or resume never is. Settings → Robot shows which route reads
+  is weak), or after two quick reads or two commands in a row go unanswered there, if you are signed in. A pause,
+  stop or return to dock not seen within 10 s is sent once more by the other route (unless a newer command was sent
+  meanwhile or control was switched off); a start or resume never is. Settings → Robot shows which route reads
   and commands use and lets you pin one; every change of route is logged in Events.
-- **The Yarbo cloud sign-in is optional.** Map writes still prefer the cloud while it is connected, until a local
-  write has been proved.
-- **The phone app is seen on your network:** the robot streams its status about once a second only while the app
-  is open, so the "phone app not driving it" check no longer needs the cloud. A scheduled start now waits while the
-  panel cannot tell.
+- **The Yarbo cloud sign-in is optional** for commands and reads. Map, settings and plan writes still go only through
+  the cloud until a local write has been proved.
+- **The phone app is also seen on your network:** the robot streams its status about once a second while the app
+  is open, which the panel now reads as "app open" without the cloud. Without the cloud a missing stream is not yet
+  taken as "closed": scheduled, assistant and guard starts wait while the panel cannot tell; a start from the panel
+  shows the unknown.
 
 ## 0.18.0 — 2026-10-20
 

@@ -605,7 +605,11 @@ function routeCard(d) {
       lk.local_reads_paused_s ? h("span", { class: "muted small" }, ` · your network not answering, trying again in ${dur(lk.local_reads_paused_s)}`) : null),
     srow("Commands", null, sstate(color(lk.commands), name(lk.commands))),
     srow("Cloud fallback", "Ready when both routes are up and the route is Automatic.",
-      sstate(lk.fallback_ready ? GREEN : MUTED, lk.fallback_ready ? "ready" : lk.cloud ? "not used (route set below)" : "not signed in")),
+      sstate(lk.fallback_ready ? GREEN : lk.mode === "auto" && lk.cloud && !lk.local ? AMBER : MUTED,
+        lk.fallback_ready ? "ready" : lk.mode === "auto" && lk.cloud && !lk.local ? "in use: your network can't reach the robot"
+          : lk.cloud ? "not used (route set below)" : "not signed in")),
+    srow("Map writes", "Writes on your network aren't proved yet, so map, settings and plan writes go through the Yarbo cloud.",
+      sstate(lk.writes ? GREEN : AMBER, lk.writes ? name(lk.writes) : "need the Yarbo cloud (sign in below)")),
     srow("Route", "Automatic: your network first, the cloud as a fallback. The other two use one route only (for testing).",
       selCtl({ key: "robot_route", value: mode, options: [["auto", "Automatic"], ["local", "Your network only"], ["cloud", "Yarbo cloud only"]],
                onsave: (v) => saveSetting("robot_route", v) })));

@@ -36,6 +36,7 @@ class CloudTransport:
         self.error = ""
         self.connected = False
         self.published = 0
+        self.connected_since = 0.0
         self._client = None          # YarboClient
         self._mqtt: mqtt.Client | None = None
         self._stop = threading.Event()
@@ -224,6 +225,7 @@ class CloudTransport:
         with self._lock:
             self._mqtt = client
         self.connected, self.state, self.error = True, "connected", ""
+        self.connected_since = time.time()
         self._last_refresh = time.time()
         log.info("Yarbo cloud connected via the %s broker", self.broker.split()[0])
 

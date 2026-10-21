@@ -57,8 +57,9 @@ Groundskeeper talks to the robot over your own network, and can use Yarbo's clou
   mows, battery, RTK, the map, plans, and the commands to start, pause, resume, stop and dock, each behind its
   checks. No Yarbo account and no internet needed.
 - **Cloud, optional:** sign in to your Yarbo account and the panel falls back to the cloud when the robot can't be
-  reached on your network (it drops to 4G where its HaLow link is weak) or if a firmware update ever closes local
-  access. Either route alone is enough, and the panel shows which one it is using.
+  reached on your network (it drops to 4G where its HaLow link is weak), or if a firmware update ever closes local
+  access or makes it ignore commands. Either route alone is enough for commands and reads, and the panel shows which
+  one it is using. Map and settings writes still go through the cloud until a local write has been proved.
 - **Works alongside the Yarbo app:** a mow started from the phone is recorded like any other, and the panel notes
   the commands other clients send.
 - Control stays off until you switch it on, so you can run local-only for as long as you like.

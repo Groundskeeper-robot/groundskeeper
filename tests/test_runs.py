@@ -7,6 +7,7 @@ import time
 import pytest
 
 from app import conditions, control, ops as ops_mod
+from tests.fakelink import FakeLink
 from app.ops import Ops
 from app.recorder import Recorder
 from app.runs import (PAUSE_CAP_S, PLAN_BLIP_S, RunDetector, RunStats, activity, end_reason, parse_plan_feedback,
@@ -198,7 +199,7 @@ def _controller(tmp_path, telemetry_now, reply=None):
     store.set_setting("control_enabled", True)
 
     async def context(args):
-        return {"snapshot_age_s": 1, "cloud_state": "connected"}
+        return {"snapshot_age_s": 1, "route_state": "connected"}
 
     def expect(cmd):
         fut = asyncio.get_running_loop().create_future()
@@ -206,7 +207,7 @@ def _controller(tmp_path, telemetry_now, reply=None):
             fut.set_result(reply)
         return fut
 
-    c = control.Controller(store, FakeCloud(), context, expect, telemetry_now)
+    c = control.Controller(store, FakeLink(FakeCloud()), context, expect, telemetry_now)
     c.poll_s = 0.01
     return store, c
 
@@ -240,7 +241,7 @@ def test_a_refusal_in_a_reply_is_reported(tmp_path):
 
 
 def test_yard_clear_start_check_can_be_switched_off():
-    ctx = {"snapshot_age_s": 1, "cloud_state": "connected", "plans": [{"id": 1}], "error_code": 0, "battery": 90,
+    ctx = {"snapshot_age_s": 1, "route_state": "connected", "plans": [{"id": 1}], "error_code": 0, "battery": 90,
            "running": False, "yard": {"ok": False, "detail": "person on back", "events": []},
            "phone_app_active": False, "conditions": "Dry", "presence": True}
     on = control.check("start_plan", {"plan_id": 1}, ctx, control.GATE_DEFAULTS, "user")
@@ -257,7 +258,7 @@ class FakeRec:
         self.run_id, self.activity, self.activity_at = 7, "mowing", 0.0
         self.t, self.conditions = dict(MOWING), {"raining": False}
         self.plan = parse_plan_feedback(FEEDBACK)
-        self.foreign_cmd_at = 0.0
+        self.foreign_cmd_at, self.app_stream_at = 0.0, 0.0
         self.feedback = FEEDBACK
         self.in_plan = True
 
@@ -380,7 +381,7 @@ def test_an_unconfirmed_pause_is_sent_again(tmp_path, monkeypatch):
 def test_a_rain_pause_does_not_resume_without_the_full_checks(tmp_path, monkeypatch):
     """Review finding: a rain-held resume used to skip the yard. Now the guard-resume interlocks (in control.check)
     gate every resume; here the controller refuses and nothing goes out."""
-    ctx = {"snapshot_age_s": 1, "cloud_state": "connected", "error_code": 0, "phone_app_active": False,
+    ctx = {"snapshot_age_s": 1, "route_state": "connected", "error_code": 0, "phone_app_active": False,
            "yard": {"ok": None, "detail": "Frigate unreachable", "events": []}, "conditions": "Dry", "presence": None}
     checks = control.check("resume", {}, ctx, control.GATE_DEFAULTS, "guard")
     ok, reason = control.verdict(checks, override=True)
@@ -870,7 +871,7 @@ def test_a_command_the_robot_acts_on_late_is_logged_as_confirmed_late(tmp_path, 
     asyncio.run(go())
     assert any(e["kind"] == "command_confirmed_late" for e in store.events(10))
     assert store.control_log()[0]["result"]["confirmed"] is True and store.control_log()[0]["result"]["late"]
-    assert c.link.t.sent == ["resume"]                    # nothing sent again
+    assert c.link.sent == ["resume"]                      # nothing sent again
 
 
 def test_the_plan_blip_when_leaving_a_charging_break_does_not_end_the_run():

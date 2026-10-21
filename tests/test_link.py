@@ -60,11 +60,14 @@ def test_unanswered_local_reads_move_reads_to_the_cloud_for_a_while(tmp_path, mo
     lk, rec, cl, _ = _link(tmp_path)
     clock = [1000.0]
     monkeypatch.setattr(link_mod.time, "time", lambda: clock[0])
-    for _ in range(link_mod.LOCAL_READ_MISSES):
-        lk.note_read(lk.read("get_device_msg"), False)
+    lk.note_read("get_map", lk.read("get_map"), False)              # a slow read timing out does not count
+    lk.note_read("get_map", lk.read("get_map"), False)
+    assert lk.read("get_device_msg") == "local"
+    for _ in range(link_mod.LOCAL_MISSES):
+        lk.note_read("get_device_msg", lk.read("get_device_msg"), False)
     assert lk.read("get_device_msg") == "cloud"
     assert lk.command("pause", {}) == "local"             # commands still try local while it is connected
-    clock[0] += link_mod.LOCAL_READ_BACKOFF_S + 1
+    clock[0] += link_mod.BACKOFF_S + 1
     assert lk.read("get_device_msg") == "local"
 
 
@@ -133,7 +136,46 @@ def test_a_pause_not_seen_is_sent_again_through_the_cloud(tmp_path, monkeypatch)
     r = asyncio.run(go())
     assert r["route"] == "local" and rec.transport.commands == ["pause"] and cl.sent == ["pause"]
     assert any(e["kind"] == "command_rerouted" for e in store.events(10))
-    assert store.control_log()[0]["route"] == "local"
+    log = store.control_log()
+    assert [(r["actor"], r["route"]) for r in log[:2]] == [("user (rerouted)", "cloud"), ("user", "local")]
+
+
+def test_a_reroute_stands_down_when_a_newer_command_was_sent(tmp_path, monkeypatch):
+    """Pause, then Resume within 10 s: the pause must not go again through the cloud and undo the resume."""
+    state = {"planning": 1, "planning_paused": 0}
+    c, rec, cl, store = _controller(tmp_path, monkeypatch, state)
+
+    async def go():
+        await c.send("pause", wait=False)
+        await c.send("resume", wait=False)
+        await asyncio.sleep(0.2)
+
+    asyncio.run(go())
+    assert rec.transport.commands == ["pause", "resume"] and cl.sent == []
+
+
+def test_a_reroute_stands_down_when_control_is_switched_off(tmp_path, monkeypatch):
+    c, rec, cl, store = _controller(tmp_path, monkeypatch, {"planning": 1, "planning_paused": 0})
+
+    async def go():
+        await c.send("pause", wait=False)
+        store.set_setting("control_enabled", False)
+        await asyncio.sleep(0.2)
+
+    asyncio.run(go())
+    assert cl.sent == []
+
+
+def test_every_send_is_marked_as_the_panels_own(tmp_path):
+    """The robot echoes commands back on app/<cmd>; the recorder must see them as the panel's, not someone else's
+    (a guard would otherwise think a person had overridden it)."""
+    store = Store(str(tmp_path))
+    rec, cl, marked = FakeRec(), FakeCloud(), []
+    lk = RobotLink(rec, cl, store, mark_sent=marked.append)
+    lk.command("pause", {})
+    lk.command("pause", {}, route="cloud")
+    lk.read("get_device_msg")
+    assert marked == ["pause", "pause", "get_device_msg"]
 
 
 def test_a_pause_that_took_is_not_sent_again(tmp_path, monkeypatch):
@@ -159,12 +201,13 @@ def test_a_start_is_never_sent_again_by_the_other_route(tmp_path, monkeypatch):
 
 
 # -- map writes keep one route ---------------------------------------------------------------------------------
-def test_a_map_write_keeps_the_route_it_started_on(tmp_path):
+def test_a_map_write_keeps_the_route_it_started_on(tmp_path, monkeypatch):
+    monkeypatch.setattr(link_mod, "LOCAL_WRITES_PROVED", True)
     lk, rec, cl, store = _link(tmp_path)
     routes = []
 
     def publish(cmd, payload, route=None):
-        got = lk.command(cmd, payload, route=route)
+        got = lk.write_command(cmd, payload, route=route)
         routes.append(got)
         rec.transport.connected = False            # the local broker drops halfway through the write
         return got
@@ -181,12 +224,15 @@ def test_a_map_write_keeps_the_route_it_started_on(tmp_path):
         async with w.lock:
             first = await w._send("save_nogozone", {"id": 1})
             second = await w._send("save_nogozone", {"id": 2})
-        return first, second
+            back = await w._send("del_nogozone", {"id": 1}, rollback=True)
+        return first, second, back
 
-    first, second = asyncio.run(go())
-    assert first["ok"] and routes == ["local"] and cl.sent == []
-    # The local broker dropped mid-write: the rest of the write is refused rather than switched to the cloud.
+    first, second, back = asyncio.run(go())
+    assert first["ok"] and routes[0] == "local"
+    # The local broker dropped mid-write: the rest of the write is refused rather than switched to the cloud ...
     assert not second["sent"] and "NoRoute" in second["error"]
+    # ... but putting things back may take the cloud.
+    assert back["ok"] and cl.sent == ["del_nogozone"]
 
 
 # -- the phone app on the local broker ------------------------------------------------------------------------
@@ -198,19 +244,46 @@ def test_the_phone_app_is_seen_on_the_local_broker(tmp_path, monkeypatch):
     o.link, o.rec, o.cloud, o.phone_app_at = lk, rec, cl, 0.0
     clock = [5000.0]
     monkeypatch.setattr(ops_mod.time, "time", lambda: clock[0])
-    assert o.phone_app_active(60) is False                     # local is up, no stream: the app is closed
+    assert o.phone_app_active(60) is None                      # no cloud, no stream: not proof the app is closed
     rec.app_stream_at = clock[0] - 2
     assert o.phone_app_active(60) is True                      # the robot streams DeviceMSG: the app is open
-    rec.transport.connected = False
-    assert o.phone_app_active(60) is None                      # neither route: unknown
+    cl.state = "connected"
+    rec.app_stream_at = 0.0
+    assert o.phone_app_active(60) is False                     # with the cloud: no stream, no keep-awake = closed
 
 
-def test_writes_prefer_the_cloud_until_local_writes_are_proved(tmp_path, monkeypatch):
+def test_writes_go_only_through_the_cloud_until_local_writes_are_proved(tmp_path, monkeypatch):
     lk, rec, cl, _ = _link(tmp_path)
     monkeypatch.setattr(link_mod, "LOCAL_WRITES_PROVED", False)
     assert lk.write_route() == "cloud"
     cl.state, cl.connected = "signed out", False
-    assert lk.write_route() == "local"
+    assert lk.write_route() is None
+    with pytest.raises(NoRoute):
+        lk.write_command("save_nogozone", {"id": 1})
+    with pytest.raises(NoRoute):
+        lk.write_command("save_nogozone", {"id": 1}, route="local")
     monkeypatch.setattr(link_mod, "LOCAL_WRITES_PROVED", True)
     cl.state, cl.connected = "connected", True
     assert lk.write_route() == "local"
+
+
+def test_commands_and_writes_have_separate_doors(tmp_path):
+    lk, *_ = _link(tmp_path)
+    with pytest.raises(NoRoute):
+        lk.command("save_nogozone", {"id": 1})                 # a write is not a run command
+    with pytest.raises(NoRoute):
+        lk.write_command("start_plan", {"id": 1})              # a run command is not a write
+
+
+def test_a_local_broker_that_ignores_commands_moves_them_to_the_cloud(tmp_path):
+    lk, rec, cl, store = _link(tmp_path)
+    for _ in range(link_mod.LOCAL_MISSES):
+        lk.note_command("local", False)
+    assert lk.command_route() == "cloud"
+    assert any(e["kind"] == "route_local_failing" for e in store.events(10))
+
+
+def test_an_explicit_route_respects_the_setting(tmp_path):
+    lk, *_ = _link(tmp_path, "local")
+    with pytest.raises(NoRoute):
+        lk.command("pause", {}, route="cloud")

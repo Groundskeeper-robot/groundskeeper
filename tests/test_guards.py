@@ -37,14 +37,11 @@ def js_code(text: str) -> str:
 
 # -- Safety ---------------------------------------------------------------------------------------------------------
 
-# The only modules that may call .publish(): the two transports, the link that picks between them, the controller
-# (its cloud-only adapter) and the map writer (WRITE_COMMANDS only, read back after). AGENTS.md → Rules → Safety.
-PUBLISHERS = {"app/transport_local.py", "app/cloud.py", "app/link.py", "app/control.py", "app/mapwrite.py"}
+# The only modules that may call .publish(): the two transports, the link that picks between them, and the map
+# writer (WRITE_COMMANDS only, through the link's write_command, read back after). AGENTS.md → Rules → Safety.
+PUBLISHERS = {"app/transport_local.py", "app/cloud.py", "app/link.py", "app/mapwrite.py"}
 # Only the link reaches the cloud transport's publish.
 CLOUD_PUBLISH_USERS = {"app/link.py"}
-# Only the link reaches LocalTransport.command; only the controller and the map writer (wired in ops) reach the link's.
-LOCAL_COMMAND_USERS = {"app/link.py"}
-LINK_COMMAND_USERS = {"app/control.py", "app/ops.py"}
 
 
 def _publish_calls(p: Path) -> int:
@@ -68,12 +65,41 @@ def test_only_the_link_reaches_the_cloud_publish():
                        "app.link.RobotLink (AGENTS.md → Safety)")
 
 
-def test_only_the_link_sends_commands_on_the_local_broker():
-    users = {rel(p) for p in APP if re.search(r"\btransport\.command\(", read(p))}
-    assert users <= LOCAL_COMMAND_USERS, f"{sorted(users - LOCAL_COMMAND_USERS)} reach LocalTransport.command"
-    users = {rel(p) for p in APP if re.search(r"\blink\.command\(", read(p))}
-    assert users <= LINK_COMMAND_USERS, (f"{sorted(users - LINK_COMMAND_USERS)} send commands through the link; only "
-                                         "Controller.send() and MapWriter do (AGENTS.md → Safety)")
+def _uses(p: Path, attr: str, calls_only: bool) -> list[tuple[str, int]]:
+    """(enclosing function, line) of every `<anything>.<attr>` (or `<anything>.<attr>(...)`) in a module, however the
+    object is named or aliased."""
+    tree, out = ast.parse(read(p)), []
+
+    def walk(node, func):
+        for child in ast.iter_child_nodes(node):
+            name = child.name if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) else func
+            target = child.func if calls_only and isinstance(child, ast.Call) else None if calls_only else child
+            if isinstance(target, ast.Attribute) and target.attr == attr:
+                out.append((func, child.lineno))
+            walk(child, name)
+    walk(tree, "<module>")
+    return out
+
+
+# Where a command may be sent through the link (Controller: a send, and its follow-up repeat of a safe command) and
+# where the link's write door may be handed out (Ops wiring the map writer). Anywhere else is a bypass.
+COMMAND_CALLS = {"app/link.py": None, "app/control.py": {"send", "_follow_up"}}
+WRITE_DOOR = {"app/link.py": None, "app/ops.py": {"__init__"}}
+
+
+def test_only_the_controller_sends_commands_through_the_link():
+    for p in APP:
+        allowed = COMMAND_CALLS.get(rel(p), set())
+        bad = [(f, n) for f, n in _uses(p, "command", calls_only=True) if allowed is not None and f not in allowed]
+        assert not bad, (f"{rel(p)} calls .command() at {bad}: only Controller.send (and its follow-up) send run "
+                         "commands, through app.link.RobotLink (AGENTS.md → Safety)")
+
+
+def test_only_the_map_writer_gets_the_write_door():
+    for p in APP:
+        allowed = WRITE_DOOR.get(rel(p), set())
+        bad = [(f, n) for f, n in _uses(p, "write_command", calls_only=False) if allowed is not None and f not in allowed]
+        assert not bad, f"{rel(p)} uses .write_command at {bad}: only MapWriter writes, wired in Ops.__init__"
 
 
 @pytest.mark.parametrize("cmd", ["cmd_vel", "set_sound_param", "light_ctrl", "get_controller", "shutdown"])

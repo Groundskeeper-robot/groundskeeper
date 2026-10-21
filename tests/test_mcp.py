@@ -70,7 +70,7 @@ def test_tools_cover_reading_setup_and_control_but_nothing_forbidden(env):
 
 def test_an_assistants_start_counts_every_unknown_as_a_fail():
     from app import control
-    ctx = {"snapshot_age_s": 5, "cloud_state": "connected", "error_code": None, "plans": [{"id": 1}], "battery": 90,
+    ctx = {"snapshot_age_s": 5, "route_state": "connected", "error_code": None, "plans": [{"id": 1}], "battery": 90,
            "running": False, "yard": {"ok": None, "detail": "Frigate unreachable"}, "phone_app_active": None,
            "conditions": None, "presence": None}
     ok_user, _ = control.verdict(control.check("start_plan", {"plan_id": 1}, ctx, control.GATE_DEFAULTS, "user"), False)
@@ -309,7 +309,7 @@ def test_the_endpoint_is_off_without_a_token_and_needs_the_right_one(env):
 
 def test_an_assistants_resume_faces_the_full_checks():
     from app import control
-    ctx = {"snapshot_age_s": 5, "cloud_state": "connected", "error_code": None,
+    ctx = {"snapshot_age_s": 5, "route_state": "connected", "error_code": None,
            "yard": {"ok": None, "detail": "unknown"}, "phone_app_active": None, "conditions": "Dry", "presence": True}
     names = lambda actor: {c["name"] for c in control.check("resume", {}, ctx, control.GATE_DEFAULTS, actor)}  # noqa: E731
     assert "Yard clear (Frigate)" in names("mcp") and "Yard clear (Frigate)" not in names("user")
