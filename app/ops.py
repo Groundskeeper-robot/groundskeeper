@@ -60,7 +60,9 @@ class Ops:
         self.notifier = Notifier(self.store, cfg.ha_url, cfg.ha_token)
         rec.on_sn = self.robot_changed
         self.controller = Controller(self.store, self.link, self.context, self.expect_reply, lambda: self.rec.t)
-        self.controller.others_at = lambda: getattr(self.rec, "foreign_cmd_at", 0.0) or 0.0
+        # Another client's command, other than the one being watched (whose late echo may look like someone else's).
+        self.controller.others_at = lambda cmd: max(
+            (t for name, t in (getattr(self.rec, "foreign_cmds", None) or {}).items() if name != cmd), default=0.0)
         self.scheduler = Scheduler(self.store)
         self.map_writer = MapWriter(self.store, self.link.write_command,
                                     self.expect_reply, rec.reload_map,
@@ -139,8 +141,10 @@ class Ops:
         await asyncio.gather(self._scheduler_loop(), self._guard_loop(), self._alert_loop())
 
     async def close(self) -> None:
-        for task in list(self.controller._tasks):
+        tasks = list(self.controller._tasks)
+        for task in tasks:
             task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
         self.cloud.stop()
         await self.frigate.close()
         await self.notifier.close()
@@ -225,12 +229,11 @@ class Ops:
         # Raising a confirmation does not need a route to the robot or to know about the phone app (confirming does);
         # keep those checks visible but soft.
         # Only for a window that asks first: an auto-start window sends at once, and the send keeps them hard.
-        for c in checks:
-            if w.get("auto_start"):
-                break
-            if c["name"] in ("Route to the robot",) or (c["name"] == "Phone app not driving it" and c["ok"] is None):
-                c["hard"] = False
-                c["ok"] = c["ok"] or None
+        if not w.get("auto_start"):
+            for c in checks:
+                if c["name"] == "Route to the robot" or (c["name"] == "Phone app not driving it" and c["ok"] is None):
+                    c["hard"] = False
+                    c["ok"] = c["ok"] or None
         ok, reason = control.verdict(checks, override=False)
         return ok, checks, reason
 

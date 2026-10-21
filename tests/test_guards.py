@@ -69,10 +69,20 @@ def _uses(p: Path, attr: str) -> list[tuple[str, int]]:
     """(qualified place, line) of every `<anything>.<attr>` in a module: a call, a bound method handed on, however the
     object is named or aliased. The place is Class.method; a lambda is its own place ("...<lambda>"), so a lambda
     built inside an allowed method and handed out is not allowed."""
-    tree, out = ast.parse(read(p)), []
+    tree, out, skip = ast.parse(read(p)), [], set()
 
     def walk(node, place):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            outer = place.rsplit(".", 1)[0] if "." in place else "<module>"
+            heads = [*getattr(node, "decorator_list", []), *node.args.defaults, *[d for d in node.args.kw_defaults if d]]
+            for head in heads:                    # evaluated where the def stands, not inside it
+                for sub_node in ast.walk(head):
+                    skip.add(id(sub_node))
+                    if isinstance(sub_node, ast.Attribute) and sub_node.attr == attr:
+                        out.append((outer, sub_node.lineno))
         for child in ast.iter_child_nodes(node):
+            if id(child) in skip:
+                continue
             here = place
             if isinstance(child, ast.ClassDef):
                 here = child.name if place == "<module>" else f"{place}.{child.name}"
@@ -118,6 +128,14 @@ def test_the_guard_sees_handoffs_and_lambdas(tmp_path):
                    "    def tick(self):\n"
                    "        MapWriter(self.store, self.link.command)\n", encoding="utf-8")
     assert _uses(bad, "command") == [("Controller.send.<lambda>", 3), ("Ops.tick", 7)]
+
+
+def test_the_guard_places_defaults_and_decorators_outside_the_function(tmp_path):
+    bad = tmp_path / "bad.py"
+    bad.write_text("class Controller:\n"
+                   "    def send(self, cb=link.command):\n"
+                   "        return cb\n", encoding="utf-8")
+    assert _uses(bad, "command") == [("Controller", 2)]
 
 
 @pytest.mark.parametrize("cmd", ["cmd_vel", "set_sound_param", "light_ctrl", "get_controller", "shutdown"])

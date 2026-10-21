@@ -160,7 +160,7 @@ class RobotLink:
             raise NoRoute(f"{cmd} is not a map or settings write")
         route = route or self.write_route()
         if route == "local" and not LOCAL_WRITES_PROVED:
-            raise NoRoute(self._why_no_writes())
+            raise NoRoute("writes on your network aren't proved yet; they go through the Yarbo cloud")
         return self._send(cmd, payload, route, None)
 
     def _send(self, cmd: str, payload: dict, route: str | None, what: str | None) -> str:

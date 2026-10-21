@@ -294,7 +294,7 @@ def test_someone_elses_newer_command_stops_the_repeat(tmp_path, monkeypatch):
     state = {"planning": 1, "planning_paused": 0}
     c, rec, cl, store = _controller(tmp_path, monkeypatch, state)
     others = [0.0]
-    c.others_at = lambda: others[0]
+    c.others_at = lambda cmd: others[0]
 
     async def go():
         await c.send("pause", wait=False)
@@ -348,3 +348,19 @@ def test_an_auto_start_window_keeps_unknowns_hard(tmp_path):
     asks = asyncio.run(o._evaluate_window({"plan_id": 1}))
     auto = asyncio.run(o._evaluate_window({"plan_id": 1, "auto_start": True}))
     assert asks[0] is True and auto[0] is False and "Phone app" in auto[2]
+
+
+def test_a_late_echo_of_the_watched_command_does_not_stop_the_repeat(tmp_path, monkeypatch):
+    """In the weak patch the robot's echo of our own pause can arrive more than 5 s late and look like someone else's;
+    only another command stands the repeat down."""
+    c, rec, cl, store = _controller(tmp_path, monkeypatch, {"planning": 1, "planning_paused": 0})
+    seen = {}
+    c.others_at = lambda cmd: max((t for name, t in seen.items() if name != cmd), default=0.0)
+
+    async def go():
+        await c.send("pause", wait=False)
+        seen["pause"] = __import__("time").time() + 0.01     # our own pause echoed back late
+        await asyncio.sleep(0.2)
+
+    asyncio.run(go())
+    assert cl.sent == ["pause"]

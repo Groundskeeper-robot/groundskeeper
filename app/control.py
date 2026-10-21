@@ -194,7 +194,7 @@ class Controller:
         self.store = store
         self.link = link
         self._seq = 0                     # bumped by every command sent: a reroute waiting on an older one stands down
-        self.others_at = lambda: 0.0      # last command from someone else (the phone app, another client); set by Ops
+        self.others_at = lambda cmd: 0.0  # last command from someone else, other than `cmd`; set by Ops
         self._context, self._expect, self._state = context_fn, expect_reply_fn, state_fn
         self._lock = asyncio.Lock()
         self.poll_s = 0.5
@@ -359,15 +359,18 @@ class Controller:
         safe, start, rerouted = cmd in SAFE_TO_REPEAT, time.time(), False
         while time.time() - start < LATE_WATCH_S:
             await asyncio.sleep(self.poll_s)
-            if self._seq != seq or self.others_at() > start:
+            if self._seq != seq or self.others_at(cmd) > start:
                 return                                   # a newer command (ours or someone else's): stand down
             if test(self._state() or {}):
                 if not rerouted:
                     self.link.note_command(route, True)
                 return
-            if safe and not rerouted and time.time() - start >= REROUTE_AFTER_S:
+            elapsed = time.time() - start
+            if safe and not rerouted and elapsed > timeout:
+                rerouted = True                          # too late to repeat it now; keep watching for the outcome
+            if safe and not rerouted and elapsed >= REROUTE_AFTER_S:
                 async with self._lock:
-                    if self._seq != seq or self.others_at() > start or not self.enabled():
+                    if self._seq != seq or self.others_at(cmd) > start or not self.enabled():
                         return
                     if test(self._state() or {}):
                         self.link.note_command(route, True)
@@ -379,7 +382,7 @@ class Controller:
                     try:
                         self.link.command(cmd, payload, route=other)
                         result = {"sent": True, "cmd": cmd, "payload": payload, "route": other, "rerouted_from": route}
-                        note = f"{cmd}: not seen {REROUTE_AFTER_S} s after going {route}; sent again through {other}"
+                        note = f"{cmd}: not seen {time.time() - start:.0f} s after going {route}; sent again through {other}"
                     except Exception as exc:
                         result = {"sent": False, "cmd": cmd, "error": str(exc), "rerouted_from": route}
                         note = f"{cmd}: not seen after going {route}; {other} failed too ({exc})"

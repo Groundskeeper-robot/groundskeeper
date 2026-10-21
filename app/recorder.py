@@ -110,6 +110,7 @@ class Recorder:
         self.queue: asyncio.Queue = asyncio.Queue()
         self.transport: LocalTransport | None = None     # made by apply_robot() once there is an address
         self.link = None             # app.link.RobotLink, set by Ops: reads fall back to the cloud through it
+        self.foreign_cmds: dict[str, float] = {}   # PEOPLE_COMMANDS seen from other clients, by name
         self.app_stream_at = 0.0     # last unrequested DeviceMSG: the robot streams them only while the phone app is open
         self.robot_error = ""                            # why there is no local connection
         self.on_sn: Callable[[str], None] | None = None  # told when the serial is found or changed (Ops follows)
@@ -449,6 +450,7 @@ class Recorder:
             ours = ts - self._sent.get(name, 0) < 5
             if not ours and name in PEOPLE_COMMANDS:
                 self.foreign_cmd_at = ts
+                self.foreign_cmds[name] = ts     # by command: a late echo of the panel's own is told apart
             if not ours and name == "get_wifi_list":
                 self._wifi_foreign_at = ts
             safe = json.dumps(redact(data))                 # never keep another client's secrets
