@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<!-- Unraid Docker template. Install: Docker tab → Add Container → Template repositories, or copy this file to
+     /boot/config/plugins/dockerMan/templates-user/my-groundskeeper.xml and pick "groundskeeper" under Add Container.
+     A container made from it shows as an ordinary Unraid container (update check, autostart, Edit), not "3rd Party". -->
+<Container version="2">
+  <Name>groundskeeper</Name>
+  <Repository>ghcr.io/groundskeeper-robot/groundskeeper:latest</Repository>
+  <Registry>https://github.com/Groundskeeper-robot/groundskeeper/pkgs/container/groundskeeper</Registry>
+  <Network>host</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/Groundskeeper-robot/groundskeeper/issues</Support>
+  <Project>https://github.com/Groundskeeper-robot/groundskeeper</Project>
+  <ReadMe>https://github.com/Groundskeeper-robot/groundskeeper#readme</ReadMe>
+  <Overview>A self-hosted recorder, map and guarded control panel for Yarbo robots. It records every mow, shows the yard on aerial imagery, explains why the robot can't run, and starts, pauses or docks it only when every safety check passes. Talks to the robot on your network first, with the Yarbo cloud as an optional fallback.[br][br]After the first start, open the Web UI and set the admin password: the setup code it asks for is in the container's log. Host networking lets the panel hear a Tempest weather station's UDP broadcast and find the robot on your network.</Overview>
+  <Category>HomeAutomation: Tools:</Category>
+  <WebUI>http://[IP]:[PORT:8425]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/Groundskeeper-robot/groundskeeper/main/deploy/unraid/groundskeeper.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/Groundskeeper-robot/groundskeeper/main/brand/app-icons/icon-512.png</Icon>
+  <ExtraParams>--restart=unless-stopped</ExtraParams>
+  <PostArgs/>
+  <CPUset/>
+  <DonateText/>
+  <DonateLink/>
+  <Requirement>A Yarbo robot on your network.</Requirement>
+  <Config Name="Web UI port" Target="PORT" Default="8425" Mode="" Description="The port the panel listens on (host networking, so directly on the server). If you change it, change the Web UI link under Advanced too." Type="Variable" Display="always" Required="true" Mask="false">8425</Config>
+  <Config Name="Data" Target="/data" Default="/mnt/user/appdata/groundskeeper" Mode="rw" Description="Recordings, map, settings and the admin password. It includes your yard's location: back it up and keep it private." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/groundskeeper</Config>
+  <Config Name="Time zone" Target="TZ" Default="America/New_York" Mode="" Description="The scheduler's clock, for example America/Chicago." Type="Variable" Display="always" Required="false" Mask="false">America/New_York</Config>
+  <Config Name="PUID" Target="PUID" Default="99" Mode="" Description="The user the panel runs as (99 is Unraid's nobody)." Type="Variable" Display="advanced" Required="true" Mask="false">99</Config>
+  <Config Name="PGID" Target="PGID" Default="100" Mode="" Description="The group the panel runs as (100 is Unraid's users)." Type="Variable" Display="advanced" Required="true" Mask="false">100</Config>
+  <Config Name="DATA_DIR" Target="DATA_DIR" Default="/data" Mode="" Description="Where the data folder is inside the container. Leave it." Type="Variable" Display="advanced-hide" Required="true" Mask="false">/data</Config>
+</Container>
