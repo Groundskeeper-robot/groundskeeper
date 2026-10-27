@@ -2102,6 +2102,7 @@ function reloadIfOutdated(s) {
 function connectStream() {
   const es = new EventSource("/api/stream");
   let lastRender = 0, lastTrack = 0, lastRunGrow = 0, liveSel = null;
+  es.addEventListener("pose", (ev) => robot3dPoses(JSON.parse(ev.data)));
   es.addEventListener("status", (ev) => {
     const s = JSON.parse(ev.data);
     reloadIfOutdated(s);

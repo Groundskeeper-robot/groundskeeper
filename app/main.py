@@ -303,9 +303,19 @@ async def stream(request: Request):
     r = rec(request)
 
     async def events():
+        # The full status every 1.5 s; between them, each new position sample as a small pose event (~1 a second
+        # while the phone app is open), already in the robot's pose order, so the 3D robot and Follow use every one.
+        seq, next_status = r.pose_seq, 0.0
         while not await request.is_disconnected():
-            yield f"event: status\ndata: {json.dumps(full_status(request))}\n\n"
-            await asyncio.sleep(1.5)
+            now = time.monotonic()
+            if now >= next_status:
+                next_status = now + 1.5
+                yield f"event: status\ndata: {json.dumps(full_status(request))}\n\n"
+            poses = r.poses_since(seq)
+            if poses:
+                seq = poses[-1]["seq"]
+                yield f"event: pose\ndata: {json.dumps([{k: v for k, v in p.items() if k != 'seq'} for p in poses])}\n\n"
+            await asyncio.sleep(0.25)
 
     return StreamingResponse(events(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
