@@ -27,8 +27,8 @@ Map colours: mowing areas white, no-go zones red hatched, no-vision zones blue d
 pathways grey roads. The track: green RTK fixed, amber float, red-orange single point. Gaps and off-plan stretches
 are pink, edge passes violet.
 
-- **Map:** the robot (sky blue and pulsing while it works, amber when held mid-plan), its areas, no-go zones,
-  pathways and today's track. **Colour** switches the track between RTK fix quality and edge passes; the legend at
+- **Map:** the robot (sky blue and pulsing while it works, amber when held mid-plan, with an arrowhead pointing
+  where it is heading), its areas, no-go zones, pathways and today's track. **Colour** switches the track between RTK fix quality and edge passes; the legend at
   the foot of the map explains the colours.
 - **Map tools** (top right): layers (imagery, zones, labels, track, cameras), Problem areas, Signal, 3D and
   Fit yard. **Align**, next to the imagery credit at the foot of the map, lines the aerial photo up with the

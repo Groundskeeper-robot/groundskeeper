@@ -447,6 +447,8 @@ function addZoneLabels(fc) {
 // The robot is sky blue (amber while held mid-plan) so it never blends into the green areas and track; while it
 // works, a ring pulses out from it to draw the eye.
 // The ring is an HTML marker animated in CSS, so it costs nothing on the map canvas.
+// An arrowhead inside the dot points where the robot is heading (#19): CombinedOdom.phi, which matched the driven
+// direction on run 4 (telemetry.heading_deg). It turns with the map, so it stays true when the map is rotated.
 function addRobotLayers() {
   const map = state.map;
   map.addSource("robot", { type: "geojson", data: EMPTY });
@@ -456,6 +458,22 @@ function addRobotLayers() {
                  paint: { "circle-radius": 15, "circle-color": MAP.robot, "circle-opacity": 0.25 } });
   map.addLayer({ id: "robot", type: "circle", source: "robot",
                  paint: { "circle-radius": 7.5, "circle-color": MAP.robot, "circle-stroke-color": MAP.onmap, "circle-stroke-width": 2.5 } });
+  map.addLayer({ id: "robot-heading", type: "symbol", source: "robot", filter: ["has", "heading"],
+                 layout: { "icon-image": headingArrow(map), "icon-rotate": ["get", "heading"], "icon-rotation-alignment": "map",
+                           "icon-allow-overlap": true, "icon-ignore-placement": true } });
+}
+
+// The heading arrowhead, pointing up (north before icon-rotate), made once.
+function headingArrow(map) {
+  const id = "robot-heading";
+  if (map.hasImage(id)) return id;
+  const c = document.createElement("canvas");
+  c.width = c.height = 20;
+  const g = c.getContext("2d");
+  g.fillStyle = MAP.onmap;
+  g.beginPath(); g.moveTo(10, 3); g.lineTo(16, 15); g.lineTo(10, 12); g.lineTo(4, 15); g.closePath(); g.fill();
+  map.addImage(id, g.getImageData(0, 0, 20, 20), { pixelRatio: 2 });
+  return id;
 }
 
 function styleRobot(s) {
@@ -477,7 +495,8 @@ function stopPulse() {
 function setRobot(pos) {
   const src = state.map && state.map.getSource("robot");
   if (!src || !pos || pos.lon === null || pos.lon === undefined) return;
-  src.setData({ type: "FeatureCollection", features: [{ type: "Feature", properties: {},
+  const props = typeof pos.heading === "number" ? { heading: pos.heading } : {};
+  src.setData({ type: "FeatureCollection", features: [{ type: "Feature", properties: props,
     geometry: { type: "Point", coordinates: [pos.lon, pos.lat] } }] });
   const m = state.pulse.marker;
   if (m) { m.setLngLat([pos.lon, pos.lat]); if (!state.pulse.added) { m.addTo(state.map); state.pulse.added = true; } }

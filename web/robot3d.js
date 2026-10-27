@@ -103,6 +103,7 @@ function r3dLayer(THREE) {
 function r3dDots(hideLive, hideReplay) {
   paint("robot", "circle-opacity", hideLive ? 0 : 1);
   paint("robot", "circle-stroke-opacity", hideLive ? 0 : 1);
+  paint("robot-heading", "icon-opacity", hideLive ? 0 : 1);
   paint("robot-halo", "circle-opacity", hideLive ? 0 : 0.25);
   paint("replay", "circle-opacity", hideReplay ? 0 : 1);
   paint("replay", "circle-stroke-opacity", hideReplay ? 0 : 1);
