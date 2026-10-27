@@ -10,6 +10,7 @@ Polling policy (read requests only):
   it scans.
 """
 import asyncio
+from collections import deque
 from collections.abc import Callable
 import copy
 import json
@@ -65,6 +66,8 @@ STALL_ALERT_S = 180       # progressing but within STALL_RADIUS_M this long = pr
 FIX_HOLD_S = 10           # after waiting for an RTK fix, the fix must hold this long before the wait is over
 STALL_GAP_S = 60          # a longer gap in the data starts a fresh comparison (no stall measured across an outage)
 LOST_CONTACT_S = 120      # no data at all this long during a run = lost contact
+POSES_KEPT = 64           # position samples kept for /api/stream's pose events (~1 a second while it moves)
+POSE_RESET_S = 30         # nothing newer by the robot's clock this long: take the next sample anyway (its clock was set back)
 WIFI_POLL_S = 30          # Wi-Fi survey: one scan this often while a run is moving
 WIFI_MODES = ("off", "next", "on")    # off · next run only (then off by itself) · every run
 WIFI_SAVE_S = 60          # the open run's survey counters are kept in the database this often (a restart loses no more)
@@ -126,6 +129,10 @@ class Recorder:
         self.heartbeat: dict = {}
         self.heartbeat_at = 0.0
         self.t: dict = {}               # flat values from the latest snapshot
+        self.poses: deque = deque(maxlen=POSES_KEPT)   # position samples in the robot's pose order (see _note_pose)
+        self.pose_seq = 0
+        self._pose_rt: float | None = None      # the robot's time (odom_ts) of the newest sample kept
+        self._pose_at = 0.0                     # when that sample arrived
 
         self.gps_ref: tuple[float, float] | None = None
         self.map_raw: dict | None = None
@@ -470,6 +477,8 @@ class Recorder:
         elif t.get("rtk_lat") and t.get("rtk_lon"):
             t["lon"], t["lat"] = t["rtk_lon"], t["rtk_lat"]
         self.t = t
+        if isinstance(snap.get("CombinedOdom"), dict):
+            self._note_pose(t, ts, telemetry.extract({"CombinedOdom": snap["CombinedOdom"]}).get("odom_ts"))
         self._track_firmware(ts)
         self._track_run(ts, t)
 
@@ -484,6 +493,31 @@ class Recorder:
         if full and ts - self.last_raw_at >= self.cfg.raw_every_s:
             self.store.add_raw(ts, self.snapshot)
             self.last_raw_at = ts
+
+    def _note_pose(self, t: dict, ts: float, rt: float | None) -> None:
+        """Keep a position sample for the 3D robot and Follow (/api/stream's pose events). After a long dropout the
+        robot sends a backlog of old poses mixed with new ones, so a sample not newer by the robot's own clock
+        (rt: this message's own odom_ts, not the merged snapshot's) than the newest kept is dropped: drawn, it
+        would send the robot back on a detour. The same time again is the same pose. An older one is taken after
+        POSE_RESET_S without anything newer (the robot's clock was set back). Samples without a time are kept in
+        arrival order."""
+        if t.get("lon") is None or t.get("lat") is None:
+            return
+        last = self._pose_rt
+        if rt is not None and last is not None and (rt == last or rt < last and ts - self._pose_at < POSE_RESET_S):
+            return
+        if rt is not None:
+            self._pose_rt = rt
+        self._pose_at = ts
+        self.pose_seq += 1
+        sp = [v for v in (t.get("speed_l"), t.get("speed_r")) if isinstance(v, (int, float))]
+        self.poses.append({"seq": self.pose_seq, "t": rt, "lon": t["lon"], "lat": t["lat"],
+                           "heading": telemetry.heading_deg(t.get("phi")), "pitch": t.get("pitch"),
+                           "roll": t.get("roll"), "speed": round(sum(sp) / len(sp), 3) if sp else None})
+
+    def poses_since(self, seq: int) -> list[dict]:
+        """The kept position samples after `seq` (pose_seq when the caller last looked), oldest first."""
+        return [p for p in self.poses if p["seq"] > seq]
 
     # -- "record an app edit": learn a command by doing it once in the Yarbo app ----------------------------------
     def _session_record(self, channel: str, name: str, data, ts: float) -> None:
@@ -1343,7 +1377,7 @@ class Recorder:
                 "head": telemetry.head_label(t.get("head_type")),
                 "head_type": t.get("head_type"),
                 "position": {"lon": t.get("lon"), "lat": t.get("lat"), "x": t.get("x"), "y": t.get("y"),
-                             "heading": telemetry.heading_deg(t.get("phi"))},
+                             "heading": telemetry.heading_deg(t.get("phi")), "t": t.get("odom_ts")},
                 "rtk": {"status": t.get("rtk_status"), "label": telemetry.rtk_label(t.get("rtk_status")),
                         "sats": t.get("sats"), "heading_dop": t.get("heading_dop"), "rtcm_age": t.get("rtcm_age"),
                         "confidence": t.get("odom_conf"), "shared_sats": t.get("heading_multi")},

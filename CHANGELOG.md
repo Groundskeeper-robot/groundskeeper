@@ -9,6 +9,12 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 - **An Unraid Docker template** (`deploy/unraid/groundskeeper.xml`): a container made from it shows in Unraid's
   Docker tab like any other app, with the update check, autostart and Edit, instead of "3rd Party".
 
+### Changed
+- **The 3D robot and Follow use every position the robot sends** (about one a second while the phone app is open)
+  instead of only the status every 1.5 s, and take them in the robot's own time order: after a network dropout,
+  the late positions in the robot's backlog are skipped instead of sending the 3D robot back on a detour. The 2D
+  robot dot is unchanged.
+
 ## 0.19.0 — 2026-10-21
 
 ### Changed

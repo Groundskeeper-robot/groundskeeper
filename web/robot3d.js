@@ -3,9 +3,12 @@
    stands on the drawn ground, turns to the robot's compass heading and tilts by its pitch and roll: on run 4 the
    pitch read positive nose-down and the roll positive left side up. On a ground drawn taller than it is, the tilt is
    drawn taller to match (atan(height x tan(angle))). Zoomed out it keeps a minimum size on screen.
-   Live, it glides between the status updates (~1.5 s): it carries on at the reported speed and heading for up to
-   2.5 s, then catches up with the next real position, faster the further behind it is but never in a jump. In a
-   replay it follows the replay point. three.js is loaded the first time the 3D view is switched on.
+   Live, it takes every position sample the robot sends (the stream's pose events, #35: ~1 a second while the phone
+   app is open, else the panel's own reads),
+   in the robot's own time order: a late one from the backlog after a dropout is dropped instead of drawn as a detour.
+   Between samples it carries on at the reported speed and heading for up to 2.5 s, then catches up with the next
+   real position, faster the further behind it is but never in a jump. In a replay it follows the replay point.
+   three.js is loaded the first time the 3D view is switched on.
    Follow (2026-10-11): the camera stays with the model, behind it and R3D_FOLLOW_SIDE° to one side, and turns with
    its heading at most R3D_FOLLOW_TURN°/s, so the U-turn at the end of each stripe swings it round instead of
    spinning it. Right-drag (two fingers) moves the camera round the robot and it keeps that angle; zoom and tilt
@@ -13,7 +16,7 @@
 const R3D = {
   THREE: null, loading: null, layer: null,
   pose: null,         // what is drawn: {lon, lat, heading, pitch, roll}
-  fix: null,          // the last live position: {lon, lat, heading, pitch, roll, speed, at}
+  fix: null,          // the last live position: {lon, lat, heading, pitch, roll, speed, t (robot time), at}
   glide: null,        // a replay step: {from, to, t0, ms}
   mode: "live",       // live (the robot now) | replay (a selected run's replay point)
   colour: null,
@@ -26,6 +29,7 @@ const R3D_MIN_PX = 34;           // the model is never drawn shorter than this o
 const R3D_AHEAD_S = 2.5;         // keep moving on the last speed and heading for this long, then wait
 const R3D_EASE_S = 0.5;          // how quickly it closes on where it should be
 const R3D_JUMP_M = 25;           // further behind than this (a new run, a long gap): put it there at once
+const R3D_RESET_S = 30;          // nothing newer by the robot's clock this long: take the next sample anyway
 const R3D_FOLLOW_SIDE = 45;      // the camera sits behind the robot and this far round to one side
 const R3D_FOLLOW_TURN = 40;      // degrees a second it turns at most to stay behind the robot
 const R3D_FOLLOW_LEAD = 1.5;     // metres ahead of the robot the camera looks at
@@ -155,10 +159,27 @@ async function robot3dSync() {
 // A live status: where the robot is now. Called with status.robot.
 function robot3dLive(robot) {
   const p = robot && robot.position;
-  if (!p || p.lon === null || p.lon === undefined) return;
+  if (!p) return;
   const sp = (robot.speed || []).filter((v) => typeof v === "number");
-  R3D.fix = { lon: p.lon, lat: p.lat, heading: p.heading ?? (R3D.fix ? R3D.fix.heading : 0), pitch: robot.pitch || 0,
-              roll: robot.roll || 0, speed: sp.length ? sp.reduce((a, b) => a + b, 0) / sp.length : 0, at: performance.now() };
+  r3dTake({ ...p, pitch: robot.pitch, roll: robot.roll, speed: sp.length ? sp.reduce((a, b) => a + b, 0) / sp.length : 0 });
+}
+
+// The pose stream's samples (/api/stream "pose", ~1 a second while it moves), oldest first.
+function robot3dPoses(list) {
+  for (const s of list || []) r3dTake(s);
+}
+
+// One position sample: {lon, lat, heading, pitch, roll, speed, t} with t the robot's own time for it. The same time
+// again is the same sample (the status repeats the last one every 1.5 s, also through a dropout) and is dropped. An
+// older one is late (the backlog after a dropout) and dropped too, unless nothing newer has come for R3D_RESET_S
+// (the robot's clock was set back).
+function r3dTake(s) {
+  if (!s || s.lon === null || s.lon === undefined) return;
+  const now = performance.now(), f = R3D.fix;
+  if (f && f.t != null && s.t != null && (s.t === f.t || (s.t < f.t && now - f.at < R3D_RESET_S * 1000))) return;
+  if (f && s.t == null && s.lon === f.lon && s.lat === f.lat) return;     // no robot time: the same sample again
+  R3D.fix = { lon: s.lon, lat: s.lat, heading: s.heading ?? (f ? f.heading : 0), pitch: s.pitch || 0, roll: s.roll || 0,
+              speed: s.speed || 0, t: s.t ?? null, at: now };
   if (!state.map || !state.map.getLayer("robot3d") || R3D.mode !== "live") return;      // kept for when 3D comes on
   if (!R3D.pose) R3D.pose = { ...R3D.fix };
   r3dKick();
