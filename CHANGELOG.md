@@ -8,6 +8,8 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 ### Added
 - **An Unraid Docker template** (`deploy/unraid/groundskeeper.xml`): a container made from it shows in Unraid's
   Docker tab like any other app, with the update check, autostart and Edit, instead of "3rd Party".
+- **A heading arrow on the robot dot** (Live map): an arrowhead inside the dot points where the robot is heading,
+  and stays true when the map is rotated.
 
 ## 0.19.0 — 2026-10-21
 
