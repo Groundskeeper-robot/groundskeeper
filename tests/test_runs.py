@@ -199,7 +199,7 @@ def _controller(tmp_path, telemetry_now, reply=None):
     store.set_setting("control_enabled", True)
 
     async def context(args):
-        return {"snapshot_age_s": 1, "route_state": "connected"}
+        return {"snapshot_age_s": 1, "route_state": "connected", "writing": False}
 
     def expect(cmd):
         fut = asyncio.get_running_loop().create_future()
@@ -243,7 +243,7 @@ def test_a_refusal_in_a_reply_is_reported(tmp_path):
 def test_yard_clear_start_check_can_be_switched_off():
     ctx = {"snapshot_age_s": 1, "route_state": "connected", "plans": [{"id": 1}], "error_code": 0, "battery": 90,
            "running": False, "yard": {"ok": False, "detail": "person on back", "events": []},
-           "phone_app_active": False, "conditions": "Dry", "presence": True}
+           "phone_app_active": False, "conditions": "Dry", "presence": True, "writing": False}
     on = control.check("start_plan", {"plan_id": 1}, ctx, control.GATE_DEFAULTS, "user")
     assert not control.verdict(on, False)[0]
     off = control.check("start_plan", {"plan_id": 1}, ctx, {**control.GATE_DEFAULTS, "yard_clear_required": False},
@@ -382,7 +382,7 @@ def test_a_rain_pause_does_not_resume_without_the_full_checks(tmp_path, monkeypa
     """Review finding: a rain-held resume used to skip the yard. Now the guard-resume interlocks (in control.check)
     gate every resume; here the controller refuses and nothing goes out."""
     ctx = {"snapshot_age_s": 1, "route_state": "connected", "error_code": 0, "phone_app_active": False,
-           "yard": {"ok": None, "detail": "Frigate unreachable", "events": []}, "conditions": "Dry", "presence": None}
+           "yard": {"ok": None, "detail": "Frigate unreachable", "events": []}, "conditions": "Dry", "presence": None, "writing": False}
     checks = control.check("resume", {}, ctx, control.GATE_DEFAULTS, "guard")
     ok, reason = control.verdict(checks, override=True)
     assert not ok and "Yard clear" in reason and "Someone home" in reason
@@ -492,6 +492,39 @@ def test_a_human_resume_during_a_detection_snoozes_the_guard_for_that_detection(
     o.yard["person"] = True                             # a new detection: the guard applies again
     _tick(o, clock)
     assert o.controller.sent == ["pause", "pause"]
+
+
+def test_a_resume_snoozes_the_guard_even_when_its_pause_was_handed_back_to_people(tmp_path, monkeypatch):
+    """#53, seen on a real mow: the phone app was open, so the guard's confirmed pause was not "ours" and was handed
+    back to people in the same tick. That cleared what the guard had done, so a person's resume did not count as an
+    override and the guard paused the robot again within seconds, over and over."""
+    o, clock = _ops(tmp_path, monkeypatch, {})
+    o.yard["person"] = True                             # the owner, out at the robot
+    _tick(o, clock)                                     # the guard sends its pause
+    o.rec.app_stream_at = clock[0] + 1                  # the phone app is open: the pause is not the guard's to own
+    _tick(o, clock)                                     # confirmed, and handed back to people at once
+    assert o.controller.sent == ["pause"] and o.guards["person"]["owner"] is None
+    o.controller.human("resume")
+    _tick(o, clock, n=20)
+    assert o.controller.sent == ["pause"] and o.guards["person"]["snoozed"]
+
+
+def test_a_command_from_before_the_guard_acted_is_not_an_override(tmp_path, monkeypatch):
+    """Review of #53: once the guard has held the robot, only a person's command after that overrides it."""
+    o, clock = _ops(tmp_path, monkeypatch, {})
+    o.controller.deaf = True                            # the robot takes a moment to act on the pause
+    o.yard["person"] = True
+    _tick(o, clock)                                     # the guard's pause goes out
+    o.controller.last_human_cmd_at = clock[0] + 1       # someone sends something unrelated meanwhile
+    o.rec.app_stream_at = clock[0] + 1                  # with the phone app open: the pause won't be "ours"
+    clock[0] += 2
+    o.rec.set(PAUSED, "paused")                         # the pause lands
+    _tick(o, clock)                                     # confirmed, and handed back to people at once
+    assert o.guards["person"]["held"] and o.guards["person"]["acted"] is None
+    o.controller.deaf = False
+    o.rec.set(MOWING, "mowing")                         # it carries on mowing, with no new command from a person
+    _tick(o, clock, secs=25)
+    assert o.controller.sent == ["pause", "pause"] and not o.guards["person"]["snoozed"]
 
 
 def test_driving_by_hand_without_a_plan_is_not_paused(tmp_path, monkeypatch):

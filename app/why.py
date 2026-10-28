@@ -27,6 +27,8 @@ CHECKS = {
                         "Clear the error on the robot or in the Yarbo app", "#health"),
     "Battery": ("battery", "The battery is too low", "Let it charge on the dock", "#settings/rules"),
     "Not already running": ("running", "A run is already going", "Wait for it to finish, or stop it", "#live"),
+    "No write to the robot in progress": ("writing", "A change is being written to the robot",
+                                          "Wait a minute for the map, settings or Wi-Fi change to finish", "#events"),
     "Yard clear (Frigate)": ("yard", "Someone (or an animal) is in the yard, or the cameras cannot tell",
                              "Wait until the yard is clear; check Frigate if the cameras are down", "#settings/cameras"),
     "Phone app not driving it": ("phone_app", "The Yarbo app is driving it, or the panel cannot tell",

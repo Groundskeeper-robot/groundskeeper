@@ -55,6 +55,7 @@ function whyCard(w) {
 }
 
 /* --------------------------------------------------------------- chips */
+const GUARD_NAMES = { person: "Person guard", rain: "Rain guard", away: "Everyone-left guard", dark: "After-dark guard" };
 // The top bar's alerts from ops (a run waiting for a yes, guards); also where a command's result is announced.
 function opsAlerts(s) {
   const o = s.ops;
@@ -68,7 +69,9 @@ function opsAlerts(s) {
   return [
     o.pending ? alertChip("#live", AMBER, h("b", null, "Waiting for you"), ` · ${o.pending.plan}`) : null,
     ...(o.guards || []).filter((g) => g.active || g.acted).map((g) =>
-      alertChip("#settings/rules", AMBER, h("b", null, "Guard"), ` · ${g.acted === "pause" ? "paused for" : g.acted === "dock" ? "docked for" : "seeing"} ${g.why}`)),
+      titled(alertChip("#settings/rules", AMBER, h("b", null, GUARD_NAMES[g.key] || "Guard"),
+                       ` · ${g.acted === "pause" ? "paused for" : g.acted === "dock" ? "docked for" : "seeing"} ${g.why}`),
+             `${GUARD_NAMES[g.key] || "A guard"}: Settings → Run rules → During a run`)),
   ];
 }
 

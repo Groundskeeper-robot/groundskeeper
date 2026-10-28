@@ -96,6 +96,12 @@ def check(cmd: str, args: dict, ctx: dict, cfg: dict, actor: str) -> list[dict]:
     add("Robot online", ctx["snapshot_age_s"] is not None and ctx["snapshot_age_s"] < 120,
         f"last snapshot {ctx['snapshot_age_s']} s ago" if ctx["snapshot_age_s"] is not None else "no data")
     add("Route to the robot", ctx["route_state"] == "connected", ctx["route_state"])
+    if cmd in ("start_plan", "resume"):
+        # A map, settings or Wi-Fi write in progress must finish first (#57): a Wi-Fi join holds the writer for up to
+        # a minute while it checks. Unknown (no writer to ask) blocks too. Pause, stop and dock are never held back.
+        w = ctx.get("writing")
+        add("No write to the robot in progress", w is False,
+            "a write to the robot is in progress" if w else "no write in progress" if w is False else "unknown")
     if cmd == "resume" and actor in ("guard", "mcp"):
         # Nobody pressed this here (a guard, or an AI assistant): every check is hard and unknown counts as a fail
         # (blades start spinning).

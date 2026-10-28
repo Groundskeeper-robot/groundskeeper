@@ -5,6 +5,17 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ## Unreleased
 
+### Changed
+- **The two people rules read as two rules** (Settings → Run rules): *Yard must be clear to start* and the *Person
+  guard* (during a run), each saying what the other does, with a note when only one of them is on. A guard's alert
+  in the top bar and its notice name the rule that acted (#54).
+- **No start or resume while a write to the robot is in progress** (a map, settings or Wi-Fi change): a new hard
+  check, for every sender. Pause, stop and return to dock are never held back (#57).
+
+### Fixed
+- **Your resume now overrides the person guard** for that detection, also when the phone app was open: the guard
+  had been pausing the robot again within seconds after each resume (#53).
+
 ## 0.19.2 — 2026-10-28
 
 ### Added

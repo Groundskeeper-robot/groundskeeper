@@ -27,6 +27,8 @@ Each one is checked, in order:
    Yarbo cloud as a fallback.
 4. For a start, also: the plan exists, no active error, enough battery, not already running, the yard is clear on
    the cameras, the phone app is not driving it, the lawn is dry, and someone is home.
+5. For a start or a resume: no map, settings or Wi-Fi change is being written to the robot (a Wi-Fi join can take
+   a minute). Pause, stop and return to dock never wait.
 
 Hard checks can never be overridden. A wet lawn is a soft check you can override by hand; the scheduler cannot.
 Every attempt, sent or refused, is in [Events](#events) with the checks it passed or failed.
@@ -35,6 +37,13 @@ Every attempt, sent or refused, is in [Events](#events) with the checks it passe
 
 Every 5 seconds while it mows: a person or pet on a yard camera, rain starting, or everyone leaving home can pause
 it, dock it, or just notify ([Settings → Run rules](#settings/rules)). With control off they only notify.
+
+**Two people rules:** *Yard must be clear to start* (Before a run starts) only stops a start. The *person guard*
+(During a run) acts on a mow that is already running. Switching one off leaves the other as it is; Run rules says
+so when only one is on, and a guard's alert and notice name the rule that acted.
+
+**Your resume wins:** when you resume (from the panel or the app) while a guard is holding the robot for a person,
+that guard leaves it alone until the detection ends; it applies again the next time someone appears.
 
 **After dark:** a plan that stopped to charge heads back out by itself as soon as the battery is full, even at
 night. When that happens between sunset and sunrise at your yard (worked out from the robot's map), the panel sends

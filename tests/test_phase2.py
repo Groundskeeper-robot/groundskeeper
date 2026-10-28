@@ -21,7 +21,7 @@ class FakeCloud:
 def good_ctx(**over):
     ctx = {"snapshot_age_s": 5, "route_state": "connected", "plans": [{"id": 1, "name": "Mow All"}], "error_code": 0,
            "battery": 90, "running": False, "yard": {"ok": True, "detail": "clear", "events": []},
-           "phone_app_active": False, "conditions": "Dry", "presence": True}
+           "phone_app_active": False, "conditions": "Dry", "presence": True, "writing": False}
     ctx.update(over)
     return ctx
 
@@ -232,3 +232,19 @@ def test_ring_area_and_double_click_cleanup():
     cleaned = geo.clean_ring(flat)
     assert len(cleaned) == 2 and geo.ring_area_m2(cleaned) == 0
     assert geo.clean_ring(sq + [sq[0]]) == sq
+
+
+# -- #57: no start or resume while a write to the robot is in progress -------------------------------------------
+@pytest.mark.parametrize("cmd, args", [("start_plan", {"plan_id": 1}), ("resume", {})])
+@pytest.mark.parametrize("writing", [True, None])                    # busy, or unknown: both block
+def test_a_start_or_resume_waits_for_a_write_in_progress(cmd, args, writing):
+    for actor in ("user", "scheduler", "guard", "mcp"):
+        checks = control.check(cmd, args, good_ctx(writing=writing), control.GATE_DEFAULTS, actor)
+        ok, reason = control.verdict(checks, override=True)
+        assert not ok and "write to the robot" in reason
+
+
+@pytest.mark.parametrize("cmd", ["pause", "stop", "cmd_recharge"])
+def test_stopping_commands_are_never_held_back_by_a_write(cmd):
+    checks = control.check(cmd, {}, good_ctx(writing=True), control.GATE_DEFAULTS, "user")
+    assert control.verdict(checks, False)[0]
