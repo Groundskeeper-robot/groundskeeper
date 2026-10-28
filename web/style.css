@@ -109,6 +109,11 @@ a { color: var(--link); }
 .navver { margin-top: 8px; padding: 0 12px; color: var(--muted); text-decoration: none; }
 .navver:hover { color: var(--text); }
 .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: 1 1 160px; min-width: 0; }   /* shrinks and wraps, so the robot pill keeps its row */
+.sigbars { display: inline-flex; align-items: flex-end; gap: 1.5px; height: 11px; }
+.sigbars i { width: 3px; border-radius: 1px; background: var(--line3); }
+.sigbars i:nth-child(1) { height: 4px; } .sigbars i:nth-child(2) { height: 6px; }
+.sigbars i:nth-child(3) { height: 8.5px; } .sigbars i:nth-child(4) { height: 11px; }
+.sigbars i.on { background: currentColor; }
 .chip { display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px; border-radius: 999px; background: var(--card); border: 1px solid var(--chipline); font-size: 12.5px; color: var(--text3); white-space: nowrap; }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex: 0 0 8px; background: var(--muted); }
 
@@ -240,6 +245,10 @@ a { color: var(--link); }
 .healthgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); gap: 12px; padding: 0 12px 12px; align-items: start; }
 .healthgrid .card { margin: 12px 0 0; }
 .sharerow { display: grid; grid-template-columns: 110px 1fr 54px; align-items: center; gap: 8px; font-size: 13px; padding: 3px 0; }
+.sharerow.netrow { grid-template-columns: minmax(0, 1.3fr) minmax(36px, 1fr) 40px 132px; }
+.sharerow.netrow > span:last-child { justify-content: flex-end; }
+.field.netpw { flex: 1; min-width: 0; width: auto; }
+.sharerow.netrow > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bar { height: 8px; border-radius: 4px; background: var(--sel); overflow: hidden; }
 .fillbar { height: 100%; border-radius: 4px; }
 

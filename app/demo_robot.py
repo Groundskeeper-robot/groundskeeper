@@ -646,6 +646,8 @@ class DemoTransport:
             return 0, "", backup_map(b["id"], b["name"], b["timestamp"], b["is_auto_backup"])
         if cmd == "get_wifi_list":
             return 0, "", r.wifi()
+        if cmd == "get_connect_wifi_name":
+            return 0, "", "DemoNet"
         if cmd == "preview_snowbot_area_path":
             p = r.preview(payload)
             return p["state"], p["msg"], p["data"]

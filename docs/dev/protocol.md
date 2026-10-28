@@ -119,6 +119,35 @@ weak link the answer can take 30–60 s, and a request sent after a timeout can 
 (two answers about 0.1 s apart), so a client should use long timeouts, drop repeats and not place late answers on a
 map.
 
+The shape of the `get_connect_wifi_name` answer has not been recorded; the panel accepts a plain name or a dict with
+`wifi_name`, and reads no answer as "no network".
+
+### Wi-Fi writes
+
+Both seen from the phone app on the robot's `app/` topics (`forget_wifi` 2026-10-05, `change_to_wifi` 2026-10-10,
+the latter mid-plan); their `data_feedback` replies were not recorded.
+
+| Command | Payload | Notes |
+|---|---|---|
+| `change_to_wifi` | `{"wifi_name": "<SSID>", "password": "<password>"}` | Join a network. The robot kept mowing when the app sent it mid-plan |
+| `forget_wifi` | `{"wifi_name": "<SSID>"}` | Forget a saved network |
+
+Because the replies are unknown, the panel (`app/network.py`) confirms a join by `get_connect_wifi_name` naming the
+network and a forget by a fresh `get_wifi_list` no longer marking it `saved`. It sends both as captured writes
+(through the map writer and the cloud route), only while the robot is docked with no plan. The password is a secret:
+`codec.redact` masks it in stored captures and events, and the control log stores neither it nor the network's name.
+
+**Capture needed:** what the app sends to rejoin a *saved* network (an empty password could replace the working
+one) and to join an *open* one (and what `security` an open network reports). Until then the panel always sends a
+password and does not join open networks.
+
+### Link strengths in the device message
+
+`halow_status.strength` is the HaLow link in dBm (the robot falls back to 4G at −82 dBm and returns at −77,
+`robot-states.md`). `net_module_status` carries `lte_status`, `lte_signal`, `lte_rssi`, `lte_rsrp`, `lte_rsrq`,
+`lte_csq` and `lte_netera`: all 0 on a robot that was on HaLow and Wi-Fi; their units are not confirmed, so the panel
+shows them as reported. Wi-Fi strength is not in the device message; only a scan gives it.
+
 ## Commands the phone app sends that are not writes
 
 | Command | Payload | Notes |

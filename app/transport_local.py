@@ -32,7 +32,8 @@ READ_ONLY_COMMANDS = frozenset({
     "get_map_buckup_from_id",    # one backup's map, by id (sic: the robot's spelling)
     "read_mower_pathway_params", # one pathway's mowing settings, by id
     "read_deadend_params",       # one dead end's settings, by id (id 0 in the reply = the robot's defaults)
-    "get_wifi_list",             # the Wi-Fi networks the robot hears (a ~4 s scan); only for the Wi-Fi survey
+    "get_wifi_list",             # the Wi-Fi networks the robot hears (a ~4 s scan): the survey and Health → Network
+    "get_connect_wifi_name",     # the Wi-Fi network it is on (no answer when none): Health → Network
 }) | {
     "preview_snowbot_area_path", # COMPUTE_ONLY: the planned mowing route for an area outline (the app's preview)
 }
