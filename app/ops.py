@@ -35,6 +35,8 @@ STUCK_CLEAR_M = 3.0       # a stuck alert clears once the robot is this far from
 NOT_PAUSABLE = {"paused", "charging_break", "returning", "docking", "docked", "idle"}
 NOT_DOCKABLE = {"charging_break", "returning", "docking", "docked"}
 BUSY = {"mowing", "transit", "planning", "moving"}
+# How each guard is named in Settings → Run rules → During a run, for its notices (#54).
+GUARD_RULES = {"person": "person guard", "rain": "rain guard", "away": "everyone-left guard", "dark": "after-dark guard"}
 AFTER_CHARGE_S = 120      # the robot counts as leaving its charger if it was charging mid-plan this recently (it can
                           # pass through idle for a moment on its way out)
 
@@ -220,6 +222,7 @@ class Ops:
             "phone_app_active": self.phone_app_active(quiet),
             "conditions": (r.conditions or {}).get("state"),
             "presence": await self.presence(),
+            "writing": self.map_writer.lock.locked() if getattr(self, "map_writer", None) else None,
         }
 
     # -- scheduler ---------------------------------------------------------------------------------------------
@@ -391,7 +394,7 @@ class Ops:
     def _new_guard() -> dict:
         return {"active": False, "seen_at": 0.0, "since": None, "clear_since": None, "why": "", "notified": False,
                 "warned": False, "pending": None, "tried_at": 0.0, "tries": 0, "acted": None, "acted_at": 0.0,
-                "owner": None, "snoozed": False}
+                "owner": None, "snoozed": False, "held": False}
 
     def _people_cmd_at(self) -> float:
         """Last time a person told the robot something: this panel (not the guard), the phone app, another client."""
@@ -428,7 +431,7 @@ class Ops:
             on = bool(active) or (st["active"] and (active is None or now - st["seen_at"] < GUARD_HYST_S))
             if on and not st["active"]:
                 st.update(active=True, since=now, clear_since=None, notified=self._guard_carried(key, now),
-                          warned=False, snoozed=False, tries=0)
+                          warned=False, snoozed=False, tries=0, held=False)
             elif not on and st["active"]:
                 st.update(active=False, clear_since=now)
             if st["active"]:
@@ -473,7 +476,9 @@ class Ops:
             return
         if st["pending"] or st["snoozed"]:
             return
-        if (st["acted"] or st["tries"]) and self._people_cmd_at() > (st["since"] or 0) and act in BUSY:
+        # held, not acted: a confirmed pause that was handed back to people (not "ours") clears acted, yet the guard
+        # did hold the robot during this detection, so a person's resume after it is still their override (#53).
+        if (st["acted"] or st["tries"] or st["held"]) and self._people_cmd_at() > (st["since"] or 0) and act in BUSY:
             # A person resumed or started it while the guard was holding: their call, for this detection only.
             st["snoozed"] = True
             await self.notifier.send("guard", f"Guard: {st['why']}", "overridden by a person for this detection; "
@@ -497,7 +502,8 @@ class Ops:
             st["pending"] = {"cmd": cmd, "action": action, "at": now}
             if not st["notified"]:
                 st["notified"] = True
-                await self.notifier.send("guard", f"Guard: {st['why']}", f"{action}: sent")
+                await self.notifier.send("guard", f"Guard: {st['why']}", f"{action}: sent (the {GUARD_RULES[key]}, "
+                                         "Settings → Run rules → During a run)")
         elif not st["warned"]:
             st["warned"] = True
             await self.notifier.send("guard", f"Guard: {st['why']}",
@@ -516,7 +522,7 @@ class Ops:
                 ours = (r.activity_at >= p["at"] - 1 and self._people_cmd_at() < p["at"]
                         and self.phone_app_seen_at() < p["at"] and r.plan is not None and r.plan.active
                         and r.plan.session is not None)
-                st.update(pending=None, acted=p["action"], acted_at=now, warned=False, tries=0,
+                st.update(pending=None, acted=p["action"], acted_at=now, warned=False, tries=0, held=True,
                           owner={"activity_at": r.activity_at, "session": r.plan.session} if ours else None)
                 await self.notifier.send("guard", f"Guard: {st['why']}", f"{p['action']}: done, {meaning}" + (
                     ". On a real mow, Return to dock ended the plan: the next schedule window starts it again"

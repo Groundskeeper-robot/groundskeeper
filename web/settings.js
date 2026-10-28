@@ -434,8 +434,8 @@ function setupSafety(d) {
            "Type ENABLE to let the panel send commands to the robot.", "Control switched off.", "Control switched on."),
     master("map_write_enabled", mw, "Map writing", "Lets Map Studio send map edits to the robot. Each write is read back and undone on a mismatch.",
            "Type ENABLE to let the panel change the robot's map.", "Map writing is off.", "Map writing is on."),
-    srow("Yard must be clear", ["No start while a yard camera sees a person or pet. Needs ", slink("#settings/cameras", "yard cameras"), "; without them the check says unknown."],
-      rec(g.yard_clear_required, "on"), switchCtl("Yard must be clear", g.yard_clear_required, (v) => gate("yard_clear_required", v), "yard_clear_required")),
+    srow("Yard must be clear to start", ["No start while a yard camera sees a person or pet. Needs ", slink("#settings/cameras", "yard cameras"), "; without them the check says unknown."],
+      rec(g.yard_clear_required, "on"), switchCtl("Yard must be clear to start", g.yard_clear_required, (v) => gate("yard_clear_required", v), "yard_clear_required")),
     srow("Resume after a guard pause", "When on, a run a guard paused (someone walked in) resumes by itself once the yard is clear again. Resuming spins the blades.",
       rec(!g.guard_resume, "off"), switchCtl("Resume after a guard pause", g.guard_resume, (v) => gate("guard_resume", v), "guard_resume")),
     srow("All at once", safe ? "Everything is at the recommended value." : "Sets all four to the safe values. Nothing is sent to the robot.",
@@ -661,6 +661,16 @@ function secSafety(d) {
 }
 
 /* ------------------------------------------------------------- run rules */
+// The two people rules act at different times and are easy to mix up (#54): say so when only one of them is on.
+function peopleNote(g, where) {
+  const startOn = !!g.yard_clear_required, guardActs = ["pause", "dock"].includes(g.guard_person);
+  if (startOn === guardActs) return null;
+  const text = where === "start"
+    ? (startOn ? null : `Off for starts, but the person guard still ${g.guard_person === "dock" ? "sends a running mow home" : "pauses a running mow"} when it sees someone.`)
+    : (guardActs ? null : "The guard won't stop a running mow for people; they only block a start.");
+  return text ? ssub(srow("", text, null)) : null;
+}
+
 function secRules(d) {
   const g = d.st.gates;
   const gate = (k, v) => saveSetting("gates", { [k]: v });
@@ -677,8 +687,10 @@ function secRules(d) {
         switchCtl("Damp is fine too", g.allow_damp, (v) => gate("allow_damp", v), "allow_damp"))) : null,
       srow("Someone must be home", ["By the presence entity in ", slink("#settings/ha", "Home Assistant"), ". Unknown counts as nobody home."],
         switchCtl("Someone must be home", g.presence_required, (v) => gate("presence_required", v), "presence_required")),
-      srow("Yard must be clear", ["No person or pet on a ", slink("#settings/cameras", "yard camera"), ". Off skips the check."],
-        switchCtl("Yard must be clear", g.yard_clear_required, (v) => gate("yard_clear_required", v), "yard_clear_required")),
+      srow("Yard must be clear to start", ["No person or pet on a ", slink("#settings/cameras", "yard camera"),
+        ". Only before a start: a mow already running is the person guard's (During a run, below)."],
+        switchCtl("Yard must be clear to start", g.yard_clear_required, (v) => gate("yard_clear_required", v), "yard_clear_required")),
+      peopleNote(g, "start"),
       g.yard_clear_required ? ssub(srow("Clear for", null,
         numCtl({ key: "yard_clear_minutes", value: g.yard_clear_minutes, min: 0, max: 120, unit: "min", onsave: (v) => gate("yard_clear_minutes", v) }))) : null,
       sstack("Who counts", "Frigate labels that make the yard busy, separated by commas.",
@@ -691,8 +703,9 @@ function secRules(d) {
         numCtl({ key: "phone_app_quiet_s", value: g.phone_app_quiet_s, min: 0, max: 3600, unit: "s", onsave: (v) => gate("phone_app_quiet_s", v) }))),
     scard("During a run",
       snote("Checked every 5 seconds while the robot works. With control off, each of these can only notify."),
-      srow("Person or pet in the yard", "Seen by a yard camera inside its drawn coverage.",
+      srow("Person guard", "A person or pet appears on a yard camera (inside its drawn coverage) while a mow runs. Separate from the start check above.",
         selCtl({ key: "guard_person", value: g.guard_person, options: ACTIONS, onsave: (v) => gate("guard_person", v) })),
+      peopleNote(g, "guard"),
       srow("Rain starts", "From the weather station.",
         selCtl({ key: "guard_rain", value: g.guard_rain, options: ACTIONS, onsave: (v) => gate("guard_rain", v) })),
       srow("Everyone leaves", "The presence entity says nobody is home.",

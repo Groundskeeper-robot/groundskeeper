@@ -115,7 +115,7 @@ def _controller(tmp_path, monkeypatch, state):
     async def context(args):
         return {"snapshot_age_s": 1, "route_state": "connected", "plans": [{"id": 1}], "error_code": 0, "battery": 90,
                 "running": False, "yard": {"ok": True, "detail": "clear"}, "phone_app_active": False,
-                "conditions": "Dry", "presence": True}
+                "conditions": "Dry", "presence": True, "writing": False}
 
     def expect(cmd):
         return asyncio.get_running_loop().create_future()
@@ -342,7 +342,7 @@ def test_an_auto_start_window_keeps_unknowns_hard(tmp_path):
     async def context(args):
         return {"snapshot_age_s": 1, "route_state": "connected", "plans": [{"id": 1}], "error_code": 0, "battery": 90,
                 "running": False, "yard": {"ok": True, "detail": "clear"}, "phone_app_active": None,
-                "conditions": "Dry", "presence": True}
+                "conditions": "Dry", "presence": True, "writing": False}
 
     o.context = context
     asks = asyncio.run(o._evaluate_window({"plan_id": 1}))
