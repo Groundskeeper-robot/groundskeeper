@@ -618,6 +618,8 @@ class DemoTransport:
             return 0, "", {"data": [dict(p) for p in PLANS]}
         if cmd == "read_low_cfd_config":
             return 0, "", low_cfd_config()
+        if cmd == "read_schedules":
+            return 0, "", []
         if cmd == "get_plan_feedback":
             fb = r.plan_feedback(now)
             return fb["state"], fb["msg"], fb["data"]

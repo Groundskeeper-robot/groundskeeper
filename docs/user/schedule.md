@@ -1,7 +1,10 @@
 # Schedule
 <!-- order: 40 -->
 
-The robot keeps no schedules of its own; the panel does.
+The panel does the scheduling. The robot keeps schedules of its own only if you save one in the Yarbo app, and
+those start mows **without** any of the run rules (dry lawn, yard clear, someone home, daylight). The panel never
+makes them; when the robot has one, this page shows it under **On the robot itself** and Events notes it. Remove it
+in the app to let the panel decide.
 
 - A **window** is days, a start and end time, a plan, and a head (mower, snow, or any).
 - Inside a window the checks run every minute. When they all pass the panel raises **one** confirmation (valid

@@ -620,6 +620,7 @@ async function renderSchedule() {
       h("p", { class: "muted small", style: "margin:0" }, "The panel owns scheduling. Inside a window it checks the gates every minute and asks you to confirm once they all pass."),
       h("button", { type: "button", class: "btn pri", onclick: () => { ops.editing = { days: [1, 4], start: "09:00", end: "14:00", head: "mower", plan_id: d.plans[0]?.id ?? null, enabled: true, auto_start: false, name: "" }; renderSchedule(); } }, "Add window")),
     d.pending ? h("div", { class: "pad0" }, pendingCard(d.pending, state.status?.ops?.control_enabled)) : null,
+    robotSchedulesCard(d.robot_schedules, planName),
     ops.editing ? windowEditor(ops.editing, d, save) : null,
     h("div", { class: "healthgrid" },
       h("div", { class: "card" },
@@ -631,6 +632,18 @@ async function renderSchedule() {
         kv(`${when(l.ts)} · ${l.outcome}`, `${planName((d.windows.find((w) => w.id === l.window_id) || {}).plan_id)}${(l.detail.why || []).length ? "" : ` ${l.detail.reason || l.detail.result || ""}`}`),
         (l.detail.why || []).length ? whyList(l.detail.why) : null))
                    : h("p", { class: "muted small" }, "Nothing yet.")));
+}
+
+// Schedules saved in the Yarbo app live on the robot and start mows without any of the panel's run rules (#64). The
+// panel never writes them; it says they are there.
+function robotSchedulesCard(list, planName) {
+  if (!list || !list.length) return null;
+  return h("div", { class: "card", style: "margin:12px" },
+    h("p", { class: "label" }, h("span", { style: `color:${AMBER}` }, "On the robot itself")),
+    h("p", { class: "small", style: "margin:0 0 6px" },
+      `${list.length === 1 ? "A schedule was" : `${list.length} schedules were`} saved in the Yarbo app. They start mows without the run rules (dry lawn, yard clear, someone home, daylight). Remove them in the app to let the panel decide.`),
+    list.map((s) => kv(s.name || `Schedule ${s.id}`,
+      `${s.enabled ? "on" : "off"} · ${planName(s.plan_id)} · ${s.days.join(", ") || "no days"} · ${s.start_utc || "?"}–${s.end_utc || "?"} UTC`)));
 }
 
 function windowEditor(w, d, save) {

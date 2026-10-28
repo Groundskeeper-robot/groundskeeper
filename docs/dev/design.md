@@ -270,7 +270,8 @@ The trade-off is explicit: **if the panel is down, nothing runs.** Mitigations: 
 Assistant with an alert when it goes stale, an external uptime monitor, and the phone app as the manual fallback.
 
 Robot-side schedules can be written (`save_schedule`, see `map-writes.md`), but a robot-side schedule starts without
-the panel's gates, so the panel runs its windows itself.
+the panel's gates, so the panel runs its windows itself and **never writes them**. It reads them (`read_schedules`, at
+each map refresh) and shows any it finds on the Schedule page, with an event the first time one appears.
 
 ### 8.2 Plans
 Plans live on the robot (`read_all_plan`). The panel can create, rename, change the areas of and delete a plan

@@ -20,7 +20,7 @@ import statistics
 import time
 from pathlib import Path
 
-from . import coverage, demo_robot, geo, planned as planned_mod, problems, telemetry
+from . import coverage, demo_robot, geo, planned as planned_mod, problems, scheduler, telemetry
 from .edges import EdgeIndex
 from .codec import decode_map, decode_any, locate_map, redact
 from .conditions import ConditionsConfig, evaluate
@@ -140,6 +140,7 @@ class Recorder:
         self.map_fetched = 0.0
         self.plans: list = []
         self.cfd: dict | None = None
+        self.robot_schedules: list | None = None   # the robot's own (app-made) schedules; None = not read yet
         self.yard: dict | None = imagery.yard_meta
 
         self.detector = RunDetector(cfg.run_idle_end_s)
@@ -1088,6 +1089,16 @@ class Recorder:
                 self.store.save_version("cfd", cfd["data"])
         except asyncio.TimeoutError:
             log.info("read_low_cfd_config: no reply")
+        try:
+            found = scheduler.robot_schedules(await self.request("read_schedules"))
+            if found is not None:
+                before = self.robot_schedules
+                self.robot_schedules = found
+                if found and not before:
+                    self.store.event("robot_schedule_seen", f"the robot has {len(found)} schedule(s) of its own (made "
+                                     "in the Yarbo app); they start mows without the panel's run rules")
+        except asyncio.TimeoutError:
+            log.info("read_schedules: no reply")
         bbox = geo.bounds(self.map_geojson)
         if bbox:
             self.yard = await self.imagery.ensure_yard(geo.pad(bbox, 60))
