@@ -10,7 +10,9 @@ What the panel cannot do today, and what would unlock it. A line goes when the f
 | Change sidewalks or fences (add, reshape, rename, delete) | A capture of the app doing each one; until then those changes stay in the draft |
 | Some area settings: mowing height, obstacle avoidance mode, boundary obstacle avoidance, perimeter direction, turning mode, module gap, route pattern, target height | Changing one at a time in the app with "Record an app edit" running, to match the robot's numbers |
 | Pathway blade height and blade speed | Changing one pathway's blade height or speed in the app with the panel running |
+| Show the driving between areas in a plan's route preview | Asking the robot for its whole-plan preview (`preview_plan_path`) once and reading the reply; each area's own route already shows |
+| Change how far the robot drives without an RTK fix (50 m in an area, 10 m on pathways) | A capture of the app changing it; the panel already shows the values per area |
+| Restart or shut down the robot | A capture of the app doing it, with the robot docked |
 | Show the robot's cameras | The robot serves them only on an internal network; needs access to the robot itself |
-| Show the robot's heading | The robot's three heading readings disagree; needs a study on a moving run |
 | Map writes, backups and the safety switches from an AI assistant | Not planned: those stay in the panel, with you |
 | Drive the robot by hand | Never: manual driving is blocked on purpose |
