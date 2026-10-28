@@ -5,6 +5,8 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ## Unreleased
 
+## 0.19.2 — 2026-10-28
+
 ### Added
 - **A Network card** (Robot → Health): HaLow strength with the robot's own weak and 4G-fallback levels, the 4G
   module's values as the robot reports them, and the Wi-Fi it is on with its signal. **Scan** lists nearby networks
