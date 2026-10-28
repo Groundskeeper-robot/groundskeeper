@@ -13,6 +13,8 @@ coming back across mows. Trends need two mows or more.
 Open a run for its stats (duration, distance, RTK share, coverage, gaps, battery and energy per 100 m²), replay
 with a scrubber, coverage by area, and:
 
+- **Duration** is working time: a pause or a charging stop mid-plan is not counted, so a mow paused overnight and
+  finished in the morning shows its real length (and pace). A break of half an hour or more shows underneath.
 - **Gaps:** only RTK-fixed track counts. Where the position was not fixed the ground is "unknown", never a gap.
   Gaps under 1 m² are ignored; each gap is labelled missed, boundary margin or next to RTK loss. A run that picks a
   plan up again after an earlier run (one that was not joined onto it) counts what that run mowed as done.

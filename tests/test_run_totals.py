@@ -133,3 +133,34 @@ def test_recompute_does_not_flush_caches(tmp_path):
     gen = st.write_gen
     st.recompute_run(rid)
     assert st.write_gen == gen
+
+
+def test_a_run_paused_overnight_counts_only_its_working_time(tmp_path):
+    """#62: a plan paused in the evening and resumed in the morning is one run; its pace must not count the night."""
+    from app import insights
+    st = Store(str(tmp_path))
+    rid = st.start_run(1000, 5, None)
+    t = 1000
+    for _ in range(30):                                   # 29 s mowing
+        st.add_telemetry({"ts": t, "run_id": rid, "planning": 1, "speed_l": 0.3, "speed_r": 0.3}); t += 1
+    for _ in range(90):                                   # paused for 15 h, a row every 10 min
+        st.add_telemetry({"ts": t, "run_id": rid, "planning": 1, "planning_paused": 1}); t += 600
+    for _ in range(30):                                   # the morning: 29 s more
+        st.add_telemetry({"ts": t, "run_id": rid, "planning": 1, "speed_l": 0.3, "speed_r": 0.3}); t += 1
+    st.end_run(rid, t, "plan finished", RunStats())
+    run = st.run(rid)
+    assert run["working_s"] == 59                          # 29 + 1 (into the pause) + 29; the night is not in it
+    row = insights.mow_row(run, None, None)
+    assert row["duration_h"] == round(59 / 3600, 2) and run["ended"] - run["started"] > 15 * 3600
+
+
+def test_a_gap_in_the_rows_counts_for_a_few_minutes_at_most():
+    from app.runs import WORK_GAP_S, working_seconds
+    rows = [{"ts": 0, "planning": 1, "speed_l": 0.3}, {"ts": 3600, "planning": 1, "speed_l": 0.3}]
+    assert working_seconds(rows) == WORK_GAP_S
+
+
+def test_a_run_without_working_time_falls_back_to_start_to_end():
+    from app import insights
+    run = {"id": 1, "started": 0, "ended": 7200, "working_s": None}
+    assert insights.mow_row(run, None, None)["duration_h"] == 2.0

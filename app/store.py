@@ -26,7 +26,7 @@ log = logging.getLogger(__name__)
 RECOMPUTE_COLS = ("ts", "x", "y", "odom_ts", "rtk_status", "battery", "error_code", "speed_l", "speed_r", "planning",
                   "planning_paused", "recharging", "charging", "working_state", "car_controller")
 # Columns added to runs after the first release (name -> SQL type).
-RUN_EXTRA_COLS = {"plan_session": "TEXT", "plan_progress_pct": "REAL"}
+RUN_EXTRA_COLS = {"plan_session": "TEXT", "plan_progress_pct": "REAL", "working_s": "REAL"}
 
 WEATHER_COLS = [
     "ts", "temp_c", "rh", "dew_c", "rain_mm", "precip_type", "solar", "uv", "wind_avg", "wind_gust", "pressure",
@@ -273,30 +273,32 @@ class Store:
         """Work a run's totals out again from its stored telemetry. The live counters (RunStats) are in memory and
         start again after a restart, so totals kept only from them lose everything since the last join (run 4:
         7.4 km recorded against ~8.5 km driven). Returns the RunStats, or None for a run without rows."""
-        from .runs import RunStats
+        from .runs import RunStats, working_seconds
         try:
             rows = [dict(r) for r in self.db.execute(f"SELECT {', '.join(RECOMPUTE_COLS)} FROM telemetry "
                                                      "WHERE run_id = ? ORDER BY ts", (run_id,))]
             if not rows:
                 return None
+            working = working_seconds(rows)
             s = RunStats.from_rows(rows)
         except Exception:                   # best effort: a run's end, a join or the start must never fail on it
             log.exception("working out run %s's totals again failed", run_id)
             return None
         self.db.execute("UPDATE runs SET distance_m=?, points=?, rtk_fixed_pct=COALESCE(?, rtk_fixed_pct), "
                         "battery_start=COALESCE(?, battery_start), battery_end=COALESCE(?, battery_end), "
-                        "max_error=MAX(?, COALESCE(max_error, 0)) WHERE id=?",
+                        "max_error=MAX(?, COALESCE(max_error, 0)), working_s=? WHERE id=?",
                         (round(s.distance_m, 1), s.points, s.fixed_pct, s.battery_start, s.battery_end, s.max_error,
-                         run_id))
+                         round(working), run_id))
         return s                            # the rows did not change, so caches keyed on write_gen stay valid
 
     def recompute_all_runs_once(self) -> int:
-        """One time (2026-10-11): every stored run's totals from its rows, so runs cut by restarts are right."""
-        if self.setting("runs_recomputed_v1"):
+        """One time per version: every stored run's totals from its rows (v1 2026-10-11: runs cut by restarts; v2
+        2026-10-28: working time, #62)."""
+        if self.setting("runs_recomputed_v2"):
             return 0
         n = sum(1 for (rid,) in self.db.execute("SELECT id FROM runs WHERE ended IS NOT NULL").fetchall()
                 if self.recompute_run(rid))
-        self.set_setting("runs_recomputed_v1", True)
+        self.set_setting("runs_recomputed_v2", True)
         return n
 
     def set_run_plan(self, run_id: int, session: str | None, progress_pct: float | None) -> None:
