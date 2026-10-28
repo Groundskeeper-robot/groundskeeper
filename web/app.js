@@ -1124,13 +1124,45 @@ function renderChips(s, streamOk = true) {
       cloudChip(s),
       titled(chipLink("#settings/robot", local.connected ? GREEN : CORAL, connLabel("Broker", local.connected ? "" : " down")),
              local.connected ? "Local broker: connected" : "Local broker: not connected"),
-      titled(chipLink("#health", s.activity === "docked" ? MUTED : rtkColor(r.rtk.status),   // no fix on the dock is normal
-                      connLabel("RTK", ` ${r.rtk.label.replace(/^RTK /, "").toLowerCase()}`)),
-             `Positioning: ${r.rtk.label}`),
+      halowChip(r.halow_dbm),
+      wifiChip(s.wifi),
+      titled(chipLink("#health", null, sigBars(gpsBars(r.rtk), s.activity === "docked" ? MUTED : rtkColor(r.rtk.status)),
+                      connLabel("RTK", ` ${r.rtk.label.replace(/^RTK /, "").toLowerCase()}`)),   // no fix on the dock is normal
+             `Positioning: ${r.rtk.label} · ${num(r.rtk.sats)} satellites · heading DOP ${num(r.rtk.heading_dop, 2)}`),
       streamOk ? null : chip(AMBER, "Reconnecting…")));
   fill($("#battery"), chipGroup("robot", "Robot",
     titled(chipLink("#live", stateColor(s), st), `Robot: ${st}`),
     batteryChip(r.battery)));
+}
+
+/* Signal bars for the links (Robot → Health → Network has the numbers). HaLow levels follow the robot's own: weak
+   below -77 dBm, 4G fallback at -82 (app/network.py). Wi-Fi is the scan's 0-100 %. */
+function sigBars(count, color) {
+  return h("span", { class: "sigbars", style: `color:${color}`, "aria-hidden": "true" },
+    [1, 2, 3, 4].map((i) => h("i", { class: i <= count ? "on" : "" })));
+}
+// GPS: the fix type decides (fixed 4, float 2, single/DGPS 1, none 0); a fix with heading DOP at the warn level
+// (1.5, docs/dev/robot-states.md) shows 3.
+function gpsBars(rtk) {
+  const st = rtk && rtk.status;
+  if (st === 4) return typeof rtk.heading_dop === "number" && rtk.heading_dop >= 1.5 ? 3 : 4;
+  return st === 5 ? 2 : st === 1 || st === 2 ? 1 : 0;
+}
+function halowChip(dbm) {
+  if (typeof dbm !== "number" || !dbm) return null;
+  const n = dbm >= -60 ? 4 : dbm >= -70 ? 3 : dbm > -77 ? 2 : dbm > -82 ? 1 : 0;
+  const color = dbm <= -82 ? CORAL : dbm < -77 ? AMBER : GREEN;
+  return titled(chipLink("#health", null, sigBars(n, color), connLabel("HaLow", ` ${num(dbm)} dBm`)),
+                `HaLow: ${num(dbm)} dBm${dbm <= -82 ? " (the robot switches to 4G here)" : dbm < -77 ? " (weak)" : ""}`);
+}
+function wifiChip(w) {
+  if (!w || !w.connected) return null;                 // not on Wi-Fi, or not asked yet: nothing to show
+  const v = w.signal;
+  const known = typeof v === "number";
+  const n = !known ? 0 : v >= 75 ? 4 : v >= 50 ? 3 : v >= 25 ? 2 : v > 0 ? 1 : 0;
+  return titled(chipLink("#health", null, sigBars(n, known ? (v >= 50 ? GREEN : v >= 25 ? AMBER : CORAL) : MUTED),
+                         connLabel("Wi-Fi", known ? ` ${num(v)}%` : "")),
+                known ? `Wi-Fi: ${num(v)}% (from the latest scan)` : "Wi-Fi: connected; scan in Robot → Health for its signal");
 }
 
 /* The battery, always at the far right of the top bar (it stays in view on a phone, where the chips scroll). The icon
@@ -1905,6 +1937,7 @@ async function renderHealth() {
         s ? kv("Local broker", s.transport.local.host ? `${s.transport.local.host} · ${s.transport.local.connected ? "connected" : "down"}` : "not set up") : null,
         s ? kv("Messages · read requests", `${s.transport.local.received} · ${s.transport.local.read_requests_sent}`) : null,
         hv ? kv("Home Assistant", hv.ha.enabled ? (hv.ha.error ? colored(CORAL, hv.ha.error) : "publishing") : "not configured") : null),
+      networkCard(),
       card("Power",
         r ? kv("Charge · health", `${num(r.battery)}% · ${num(r.battery_health)}%`) : null,
         r ? kv("Voltage · current", `${num(r.voltage_v, 1)} V · ${num(r.current_a, 2)} A`) : null,
@@ -1924,6 +1957,87 @@ async function renderHealth() {
                      : h("p", { class: "muted small" }, "No error codes recorded."),
         h("details", null, h("summary", { class: "muted small" }, "Plan and recharge status dictionary"),
           hv ? Object.entries(hv.status_dictionary).map(([k, v]) => kv(k, `${v.meaning}: ${v.action}`)) : null))));
+}
+
+/* ------------------------------------------------------- health: network */
+// Link strengths and the robot's Wi-Fi (app/network.py). The card draws itself into its own box, so a scan (up to a
+// minute on a weak link) or a join does not reload the whole Health view.
+const net = { box: null, d: null, busy: null, joining: null };
+const HALOW_COLOR = { good: GREEN, weak: AMBER, fallback: CORAL };
+const netAgo = (s) => (s === null || s === undefined ? "" : s < 90 ? ` · ${s} s ago` : ` · ${Math.round(s / 60)} min ago`);
+
+function networkCard() {
+  net.box = h("div", { class: "card" }, h("p", { class: "label" }, "Network"), h("p", { class: "muted small" }, "Loading…"));
+  getJSON("/api/network").then((d) => { net.d = d; drawNetwork(); })
+    .catch((e) => fill(net.box, h("p", { class: "label" }, "Network"), h("p", { class: "muted small" }, e.message)));
+  return net.box;
+}
+
+async function netAct(what, url, body) {
+  net.busy = what;
+  drawNetwork();
+  try {
+    const d = await postJSON(url, body);
+    net.d = d;
+    if (d.ok === false) toast(d.error || "not confirmed");
+    else if (what !== "scan") toast(what === "join" ? `The robot joined ${body.name}.` : `${body.name} forgotten.`);
+    net.joining = null;
+  } catch (e) {
+    toast(e.message);
+    if (net.joining) net.joining.pw = "";      // never resend a password the field no longer shows
+  }
+  net.busy = null;
+  drawNetwork();
+}
+
+function drawNetwork() {
+  const d = net.d;
+  if (!d || !net.box) return;
+  const hl = d.halow, lte = d.lte, w = d.wifi, block = d.write_block;
+  const lteText = lte.reported ? Object.entries(lte.fields).filter(([, v]) => v).map(([k, v]) => `${k.replace("lte_", "")} ${v}`).join(" · ")
+                               : "not reported";
+  const rows = (w.networks || []).map((n) => {
+    const here = n.name === w.connected;
+    const joining = net.joining && net.joining.name === n.name;
+    const open = !n.security;                  // an open network's join was never captured
+    return h("div", null,
+      h("div", { class: "sharerow netrow" },
+        h("span", { title: `${n.name} · ${n.security || "open"}${n.saved ? " · saved on the robot" : ""}` },
+          here ? h("b", null, n.name) : n.name, n.saved && !here ? h("span", { class: "muted" }, " · saved") : null),
+        h("div", { class: "bar" }, h("div", { class: "fillbar", style: `width:${n.signal ?? 0}%;background:${here ? GREEN : SKY}` })),
+        mono(n.signal === null ? "—" : `${num(n.signal)}%`),
+        h("span", { class: "row gap" },
+          here ? h("span", { class: "muted small" }, "connected") : h("button", { type: "button", class: "btn slim",
+            disabled: block || open || net.busy || null,
+            title: block || (open ? "Open networks can't be joined from here yet" : "Join this network"),
+            onclick: () => { net.joining = { name: n.name, pw: "" }; drawNetwork(); } }, "Join"),
+          n.saved || here ? h("button", { type: "button", class: "btn slim", disabled: block || net.busy || null,
+            title: block || (here ? "Forget it: the robot leaves this network now" : "Forget it on the robot"),
+            onclick: () => { if (confirm(`Forget ${n.name} on the robot?${here ? " It leaves this network now." : ""} Joining again needs the password.`))
+              netAct("forget", "/api/network/wifi/forget", { name: n.name }); } }, "Forget") : null)),
+      joining ? h("div", { class: "row gap", style: "margin:4px 0 8px" },
+        h("input", { class: "field slim netpw", type: "password", autocomplete: "off", placeholder: "Password",
+          value: net.joining.pw, "aria-label": `Password for ${n.name}`, oninput: (e) => { net.joining.pw = e.target.value; } }),
+        h("button", { type: "button", class: "btn slim pri", disabled: block || net.busy || null,
+          onclick: () => netAct("join", "/api/network/wifi/join", { name: n.name, password: net.joining.pw }) },
+          net.busy === "join" ? "Joining…" : "Join"),
+        h("button", { type: "button", class: "btn slim", onclick: () => { net.joining = null; drawNetwork(); } }, "Cancel")) : null);
+  });
+  fill(net.box,
+    h("p", { class: "label" }, "Network"),
+    kv("HaLow", hl.dbm === null ? "no data" : colored(HALOW_COLOR[hl.level] || MUTED, `${num(hl.dbm)} dBm`),
+       h("span", { class: "muted", title: `Below ${hl.weak_dbm} dBm is weak; at ${hl.fallback_dbm} dBm the robot switches to 4G` },
+         hl.level === "fallback" ? " · 4G level" : hl.level === "weak" ? " · weak" : "")),
+    kv("4G", h("span", { title: "As the robot reports it; units not confirmed" }, lteText)),
+    kv("Wi-Fi", w.connected ? `${w.connected}${w.signal === null || w.signal === undefined ? "" : ` · ${num(w.signal)}%`}` : "not connected or not asked yet",
+       h("span", { class: "muted" }, netAgo(w.connected_age_s))),
+    h("div", { class: "row gap", style: "justify-content:space-between;margin:8px 0 4px" },
+      h("span", { class: "muted small" }, w.networks ? `Nearby${netAgo(w.scan_age_s)}` : "No scan yet"),
+      h("button", { type: "button", class: "btn slim", disabled: net.busy || null,
+        title: "A fresh scan on the robot (about 4 s; up to a minute on a weak link)",
+        onclick: () => netAct("scan", "/api/network/scan") }, net.busy === "scan" ? "Scanning…" : "Scan")),
+    rows,
+    block && (w.networks || []).length ? h("p", { class: "muted tiny", style: "margin:6px 0 0" }, `Join and Forget: ${block}`) : null);
 }
 
 /* -------------------------------------------------------------- events */

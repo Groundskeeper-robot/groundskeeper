@@ -12,6 +12,7 @@ from .link import RobotLink
 from .control import Controller
 from .backups import Backups
 from .mapwrite import MapWriter
+from .network import Network
 from .frigate import Frigate
 from .ha import presence_from
 from .notify import Notifier
@@ -72,6 +73,7 @@ class Ops:
                                lambda cmd, payload: (rec.request_area_params(payload["id"]) if cmd == "read_mower_area_params"
                                                      else rec.request(cmd, payload=payload)),
                                rec.reload_map, rec.read_area_records)
+        self.network = Network(self.store, rec, self.map_writer)
         self.phone_app_at = 0.0
         self._follow, self._follow_next = None, (None, 0.0)  # follow-cam: shown, and a new pick and since when
         self.presence_cache = (0.0, None)

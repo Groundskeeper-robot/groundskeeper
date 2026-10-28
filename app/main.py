@@ -289,6 +289,7 @@ def ops(request: Request) -> Ops:
 def full_status(request: Request) -> dict:
     s = rec(request).status()
     s["ops"] = ops(request).status()
+    s["wifi"] = ops(request).network.bars()       # the top bar's Wi-Fi bars: no network name
     s["ui"] = UI_VERSION
     return s
 
@@ -1948,6 +1949,73 @@ async def studio_backup_fetch(request: Request, bid: int):
         raise HTTPException(502, str(exc))
     counts = {k: len(raw.get(k) or []) for k in mapstudio.POLYGONS + mapstudio.LINES if raw.get(k)}
     return {"ok": True, "ref": f"backup:{bid}", "counts": counts}
+
+
+# -- network: link strengths and the robot's Wi-Fi (app/network.py) ------------------------------------------------
+def _network_write_block(request: Request, held: bool = False) -> str | None:
+    """Joining or forgetting a Wi-Fi network can cut a link, so only with the robot on its charger and no plan.
+    held: asked again by the write itself, which holds the writer's lock by then."""
+    r, t = rec(request), rec(request).t
+    if not r.store.setting("map_write_enabled", False):
+        return "robot writes are switched off (Settings → Safety → Map writing)"
+    if ops(request).cloud.state != "connected":
+        return f"the Yarbo cloud is {ops(request).cloud.state}"
+    age = time.time() - r.snapshot_at if r.snapshot_at else None
+    if age is None or age > 120:
+        return "no recent data from the robot"
+    if not (t.get("charging") or 0) > 0:
+        return "the robot must be on its charger"
+    if r.run_id or r.plan_active() is not False:
+        return "a plan may be running (the robot's plan state is not idle)"
+    if not held and ops(request).map_writer.lock.locked():
+        return "another write to the robot is in progress"
+    return None
+
+
+@app.get("/api/network")
+async def network_status(request: Request):
+    """Link strengths and the latest Wi-Fi scan, as already known (asks the robot nothing)."""
+    return {**ops(request).network.status(), "write_block": _network_write_block(request)}
+
+
+@app.post("/api/network/scan")
+async def network_scan(request: Request):
+    """A fresh Wi-Fi scan on the robot (get_wifi_list, a read) and the connected network's name; not during a plan."""
+    if not rec(request).can_read():
+        raise HTTPException(409, "no route to the robot")
+    try:
+        result = await ops(request).network.scan()
+    except mapwrite.WriteRefused as exc:
+        raise HTTPException(409, str(exc))
+    return {**result, "write_block": _network_write_block(request)}
+
+
+async def _network_write(request: Request, coro_fn):
+    why = _network_write_block(request)
+    if why:
+        raise HTTPException(409, why)
+    try:
+        result = await coro_fn()
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    except mapwrite.WriteRefused as exc:
+        raise HTTPException(409, str(exc))
+    return {**result, **ops(request).network.status(), "write_block": _network_write_block(request)}
+
+
+@app.post("/api/network/wifi/join")
+async def network_wifi_join(request: Request, body: dict = Body(...)):
+    """Join a network from the latest scan (change_to_wifi, the phone app's command). Confirmed by the robot naming it
+    as its connected network. The password goes to the robot only; it is never stored or logged."""
+    gate = lambda: _network_write_block(request, held=True)        # noqa: E731
+    return await _network_write(request, lambda: ops(request).network.join(body.get("name"), body.get("password"), gate))
+
+
+@app.post("/api/network/wifi/forget")
+async def network_wifi_forget(request: Request, body: dict = Body(...)):
+    """Forget a saved network (forget_wifi). Confirmed by a fresh scan no longer marking it saved."""
+    gate = lambda: _network_write_block(request, held=True)        # noqa: E731
+    return await _network_write(request, lambda: ops(request).network.forget(body.get("name"), gate))
 
 
 @app.get("/api/studio/draft")

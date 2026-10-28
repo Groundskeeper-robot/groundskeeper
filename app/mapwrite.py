@@ -65,7 +65,8 @@ WRITE_COMMANDS = frozenset({*SAVE.values(), *DELETE.values(), "save_mower_pathwa
                             DEADEND_PARAMS_SAVE,
                             NOVIS_SAVE, NOVIS_DELETE, PLAN_SAVE, PLAN_DELETE,
                             AREA_SAVE, BACKUP_CMD, "get_all_map_backup",
-                            "del_map_backup", "map_recovery", "save_mower_area_params", "rename_map_backup"})   # backups.py
+                            "del_map_backup", "map_recovery", "save_mower_area_params", "rename_map_backup",   # backups.py
+                            "change_to_wifi", "forget_wifi"})                                                  # network.py
 # What the Yarbo app sent for a new pathway's mowing settings (capture C2).
 PATHWAY_DEFAULTS = {"blade_speed": 80, "blade_height": 0, "turn_type": 0, "land_push_pod_place": 50, "route_angle": 0,
                     "route_dis": 0.0, "offset_enable": False, "en_blade": False, "plan_speed": 0.5,
@@ -578,6 +579,8 @@ def _audit_args(cmd: str, payload: dict) -> str:
                            "enable": payload.get("enable"), "by_pass_level": payload.get("by_pass_level")})
     if cmd == "upload_cloud_map_backup":
         return "{}"
+    if cmd in ("change_to_wifi", "forget_wifi"):  # neither the password nor the network's name reaches the log
+        return json.dumps({"wifi_name": "…", **({"password": "***"} if cmd == "change_to_wifi" else {})})
     return json.dumps(payload)
 
 

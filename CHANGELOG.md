@@ -5,6 +5,15 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ## Unreleased
 
+### Added
+- **A Network card** (Robot → Health): HaLow strength with the robot's own weak and 4G-fallback levels, the 4G
+  module's values as the robot reports them, and the Wi-Fi it is on with its signal. **Scan** lists nearby networks
+  with their signal; **Join** and **Forget** use the phone app's own commands and are confirmed by asking the robot
+  afterwards. Join and Forget need map writing on and the robot on its charger with no plan; the password goes to
+  the robot only and is never kept or logged. Open networks can't be joined yet (not captured).
+- **Signal bars on the top bar:** HaLow, Wi-Fi (when the robot is on it) and GPS (from the fix type) in the
+  connections pill.
+
 ## 0.19.1 — 2026-10-26
 
 ### Added
