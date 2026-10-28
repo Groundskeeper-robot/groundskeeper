@@ -470,7 +470,7 @@ textarea.field { min-height: 80px; padding: 8px 10px; font: 12px/1.4 var(--mono)
   .legend span { flex: none; white-space: nowrap; }
   .legend .signalbox { flex-basis: auto; padding-bottom: 0; border-bottom: 0; }
   .imgcredit { display: none; }
-  .studiobar { left: 10px; max-width: none; }
+  .studiobar { left: 52px; max-width: none; }    /* clear of the zoom buttons at the top left */
   .settings { grid-template-columns: 1fr; gap: 8px; padding: 8px 12px 24px; }
   .snav { position: static; flex-direction: row; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
   .sitem { flex: 0 0 auto; grid-template-columns: 8px auto; }
@@ -788,15 +788,44 @@ button.subtab { border: 0; background: none; font: inherit; font-size: 13px; cur
   .camstage .camtl { max-width: calc(100% - 20px); }
   .camstage .camtr { top: auto; bottom: 56px; right: 10px; }
 }
-/* A phone's top bar is two rows: the title, the Live layout switch and the theme button, then the chips (scrolling)
-   with the robot's state and the battery at the right end, always in view. The chips' 40% basis is what pushes
-   them onto the second row; they grow into whatever the state and battery leave. */
+/* A phone's top bar is three rows: the title, the Live layout switch and the theme button; then the chips (scrolling)
+   with the robot's state and the battery at the right end, always in view; then the connections (#conn, filled by
+   renderChips on a phone only), spread across their own row so none scrolls out of sight. The ::after is a line
+   break after the first row, so the chips never share it on a page without the layout switch; its negative margin
+   takes back the row gap it would add. The chips grow into whatever the state and battery leave. */
 @media (max-width: 700px) {
   .top { flex-wrap: wrap; row-gap: 8px; }
+  .top::after { content: ""; order: 3; flex-basis: 100%; height: 0; margin-bottom: -8px; }
+  .top:has(#subtabs:not([hidden]))::after { display: none; }     /* the Robot tabs already fill the second row */
   .liveview { order: 0; flex: none; }
   .themebtn { margin-left: auto; }
   .chips { order: 5; flex: 1 1 40%; }
   .battslot { order: 6; margin-left: 0; }
+  .connslot { order: 7; flex: 1 0 100%; display: flex; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .connslot::-webkit-scrollbar { display: none; }
+  .connslot .chipgroup.conn { flex: 1 0 auto; margin-left: 0; }
+  .connslot .chipgroup.conn > .chip { flex: 1 0 auto; justify-content: center; }
+}
+.connslot:empty { display: none; }    /* wider screens: the connections stay with the other chips */
+/* Phone tap targets of at least 32 px: the top bar's chips and tabs grow; the ? and the ⓘ keep their look and get
+   a bigger invisible hit area. On a touch screen a tap on an ⓘ shows its text (app.js), since tooltips never do. */
+@media (max-width: 700px) {
+  .top .chip { min-height: 32px; }
+  .subtab { display: inline-flex; align-items: center; min-height: 32px; }
+  .helplink { position: relative; }
+  .helplink::after { content: ""; position: absolute; inset: -6px; }
+  .toast { width: max-content; }      /* left: 50% would squeeze a long one into half the screen */
+  .sitem, .shapebtn { min-height: 32px; }
+  .rowedit { width: 32px; height: 32px; }
+  .maplibregl-ctrl-group button { width: 36px; height: 36px; }   /* the zoom buttons; the tool bars start at 52 px */
+  /* iOS zooms the page into any field under 16 px when it is focused, and leaves it zoomed */
+  input:not([type=checkbox]):not([type=radio]):not([type=range]), select, textarea { font-size: 16px; }
+  /* 100vh is the height without the browser's bars on a phone; a dialog's buttons could sit under them */
+  .imgdialogbox { max-height: calc(100dvh - 32px); }
+}
+@media (hover: none) {
+  .tip { position: relative; }
+  .tip::after { content: ""; position: absolute; inset: -9px; }
 }
 
 /* ------------------------------------------------------- settings: set up (wizard) */
