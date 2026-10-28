@@ -1351,7 +1351,7 @@ async function renderRunPanel() {
   try { runs = (await getJSON("/api/runs")).runs; } catch { /* keep empty */ }
   if (state.view !== "runs" || !state.runsSub) return;
   const items = runs.map((r) => {
-    const length = r.ended ? dur(r.ended - r.started) : "running";
+    const length = r.ended ? dur(r.working_s ?? (r.ended - r.started)) : "running";
     const fixed = r.rtk_fixed_pct === null ? "" : ` · RTK ${num(r.rtk_fixed_pct)}%`;
     return runButton(r.id, [h("b", null, when(r.started)), ` · ${headName(r.head_type)}`],
                      `${r.end_reason || "in progress"} · ${num(r.distance_m)} m${fixed}`, length);
@@ -1396,7 +1396,8 @@ function drawRunsOverview(panel, runs, d) {
                      tabindex: "0", onclick: () => openRun(r.id), onkeydown: (e) => { if (e.key === "Enter") openRun(r.id); } },
       h("td", null, `${day(r.started)} ${clock(r.started)}`),
       h("td", { class: "opt" }, headName(r.head_type)),
-      h("td", { class: "num" }, r.ended ? dur(r.ended - r.started) : "running"),
+      h("td", { class: "num", title: pausedFor(r) ? `${dur(r.ended - r.started)} start to end, ${pausedFor(r)} of it paused or charging` : null },
+        r.ended ? dur(r.working_s ?? (r.ended - r.started)) : "running"),
       h("td", { class: "num" }, kmOrM(r.distance_m)),
       h("td", { class: "num" }, m ? cell(m.coverage_pct, "%") : "—"),
       h("td", { class: "num opt" }, m && m.gaps_m2 !== null ? `${num(m.gaps_m2, 1)} m² (${m.gap_count})` : "—"),
@@ -1457,6 +1458,19 @@ function drawRunsOverview(panel, runs, d) {
           : h("p", { class: "muted small" }, few ? "Needs at least two mows to tell a one-off from a pattern." : "Nothing has come back so far."))));
 }
 
+// A run's length is its working time; a long break (a mow paused overnight, a charging stop) shows underneath (#62).
+function pausedFor(r) {
+  if (!r.ended || r.working_s === null || r.working_s === undefined) return null;
+  const gap = r.ended - r.started - r.working_s;
+  return gap >= 1800 ? dur(gap) : null;
+}
+function runDuration(info) {
+  if (!info.ended) return stat("Duration", "running");
+  const p = pausedFor(info);
+  return stat("Duration", dur(info.working_s ?? (info.ended - info.started)),
+              p ? `working · ${dur(info.ended - info.started)} start to end, ${p} paused or charging` : null);
+}
+
 function stat(label, value, sub) {
   if (value === "—") return null;              // nothing to say yet (a short run, coverage still being worked out)
   return h("div", { class: "stat" }, h("span", { class: "muted small" }, label), h("b", { class: "mono" }, value),
@@ -1508,7 +1522,7 @@ function runDetail() {
     state.run.endWhy ? whyList([state.run.endWhy]) : null,
     joinBar(),
     h("div", { class: "stats" },
-      stat("Duration", info.ended ? dur(info.ended - info.started) : "running"),
+      runDuration(info),
       stat("Distance", `${num(info.distance_m)} m`),
       stat("RTK fixed", `${num(info.rtk_fixed_pct)}%`),
       stat("Coverage", known ? `${num((100 * covered) / known)}%` : "—", "of the known area"),

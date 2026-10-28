@@ -15,6 +15,9 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 ### Fixed
 - **Your resume now overrides the person guard** for that detection, also when the phone app was open: the guard
   had been pausing the robot again within seconds after each resume (#53).
+- **A mow paused overnight no longer counts the night:** a run's length and the Runs overview's pace use its
+  working time (not paused or charging mid-plan); a run page shows the start-to-end time and the break underneath
+  (#62). Stored runs are worked out again once after the update.
 
 ## 0.19.2 — 2026-10-28
 

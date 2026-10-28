@@ -9,7 +9,10 @@ MIN_RUN_M = 50          # shorter runs are tests or nudges, not mows
 
 
 def mow_row(run: dict, analysis: dict | None, problems: dict | None) -> dict:
-    duration_h = max(0.0, (run["ended"] - run["started"]) / 3600) if run.get("ended") else None
+    # Working time where it is known (a run can span a night's pause, #62), else start to end.
+    span = (run["ended"] - run["started"]) if run.get("ended") else None
+    working = run.get("working_s")
+    duration_h = max(0.0, (working if working is not None else span) / 3600) if span is not None else None
     used = (run["battery_start"] - run["battery_end"]
             if run.get("battery_start") is not None and run.get("battery_end") is not None else None)
     covered = known = gaps = None

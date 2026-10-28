@@ -268,6 +268,21 @@ class RunStats:
                    battery_end=run.get("battery_end"), max_error=int(run.get("max_error") or 0))
 
 
+WORK_GAP_S = 300    # a gap in a run's rows counts as working for at most this long (the robot may be out of touch)
+
+
+def working_seconds(rows: list[dict]) -> float:
+    """How long a run was working, from its rows in arrival order: the time to each next row, unless the robot was
+    parked mid-plan (paused, or charging on the dock) and still. A mow paused in the evening and resumed the next
+    morning is one run (a plan session joins up to PLAN_JOIN_MAX_S), so ended - started would count the night (#62)."""
+    total = 0.0
+    for a, b in zip(rows, rows[1:]):
+        if activity(a) in HELD and not is_moving(a):
+            continue
+        total += min(max(0.0, (b.get("ts") or 0) - (a.get("ts") or 0)), WORK_GAP_S)
+    return total
+
+
 def pose_order(rows: list[dict]) -> list[dict]:
     """Rows with a position, in the robot's pose order, one per pose (the same odom_ts again is the same pose).
     Rows without odom_ts (recorded before it was stored) keep their arrival order."""
