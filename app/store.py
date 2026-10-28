@@ -108,6 +108,15 @@ class Store:
         step = max(1, len(rows) // max_points)
         return [[r[0], r[1]] for r in rows[::step]]
 
+    def correction_rows(self, since: float) -> list[tuple]:
+        """(ts, rtcm_age, rtk_status, halow, sats) since `since`, oldest first (app/corrections.py): only the late
+        rows and the one after each, which is all the gap finder needs (30 days are a few hundred thousand rows)."""
+        from .problems import RTCM_LATE_S
+        q = ("SELECT ts, rtcm_age, rtk_status, halow, sats FROM (SELECT ts, rtcm_age, rtk_status, halow, sats, "
+             "LAG(rtcm_age) OVER (ORDER BY ts) AS prev FROM telemetry WHERE ts >= ? AND rtcm_age IS NOT NULL) "
+             "WHERE rtcm_age > ? OR prev > ? ORDER BY ts")
+        return [tuple(r) for r in self.db.execute(q, (since, RTCM_LATE_S, RTCM_LATE_S))]
+
     def track(self, run_id: int | None = None, since: float | None = None) -> list[dict]:
         if run_id is not None:
             q, args = "SELECT ts, lon, lat, rtk_status FROM telemetry WHERE run_id = ? ORDER BY ts", (run_id,)

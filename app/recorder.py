@@ -20,7 +20,7 @@ import statistics
 import time
 from pathlib import Path
 
-from . import coverage, demo_robot, geo, planned as planned_mod, problems, scheduler, telemetry
+from . import corrections, coverage, demo_robot, geo, planned as planned_mod, problems, scheduler, telemetry
 from .edges import EdgeIndex
 from .codec import decode_map, decode_any, locate_map, redact
 from .conditions import ConditionsConfig, evaluate
@@ -168,6 +168,7 @@ class Recorder:
         self.last_poll_at = 0.0
         self.firmware: dict = store.firmware_last()
         self._fw_pending: dict[str, tuple[str, float]] = {}   # component -> (new version, first seen) not yet settled
+        self._corrections = corrections.GapTracker()          # RTK correction gaps, an event when each one ends
         self.replies: dict[str, dict] = {}     # latest data_feedback per topic, from anyone's request
         self._pending: dict[str, list[asyncio.Future]] = {}
         self._backup_lock = asyncio.Lock()
@@ -482,6 +483,10 @@ class Recorder:
             self._note_pose(t, ts, telemetry.extract({"CombinedOdom": snap["CombinedOdom"]}).get("odom_ts"))
         self._track_firmware(ts)
         self._track_run(ts, t)
+        # Only an update that carries the age: a partial one keeps the last age while the clock moves on.
+        gap = self._corrections.feed(ts, t) if "rtcm_age" in snap else None
+        if gap:
+            self.store.event("rtk_corrections_gap", corrections.describe(gap))
 
         # ~1 s rows while it moves; parked mid-plan (paused, charging break) one row every 10 s is plenty.
         every = (10 if self.activity in HELD and not is_moving(t) else 0.9) if self.run_id else self.cfg.poll_idle_s

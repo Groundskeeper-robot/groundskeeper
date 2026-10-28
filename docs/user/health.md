@@ -5,6 +5,13 @@ Under **Robot → Health**: the robot now and over the last 24 hours, 7 days or 
 to read the value at that time.
 
 - **Positioning:** fix now, share of time fixed, satellites, DOP, correction age.
+  - **Correction gaps:** times the RTK corrections from the base station stopped arriving for 20 s or more, with
+    what the fix fell to and the HaLow signal then. Without corrections the fix drops to DGPS or single point however
+    many satellites the robot sees. With HaLow strong, look at the base station (its power, its view of the sky);
+    with HaLow weak, the link is the likely cause. Each gap is also an event (*rtk_corrections_gap*) when it ends
+    (one that ends while the panel is restarting is listed here but has no event).
+  - The **RTK** pill in the top bar reads *no corrections* in amber while they are more than 10 s old, docked too.
+    None at all (-1) is normal on the dock and doesn't count.
 - **Link:** the local connection and HaLow over time.
 - **Network:** each link's strength now, and the robot's Wi-Fi.
   - **HaLow** in dBm: amber below −77, red at −82 (where the robot switches to 4G).
