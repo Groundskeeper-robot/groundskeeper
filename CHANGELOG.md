@@ -5,6 +5,10 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ## Unreleased
 
+### Added
+- **Schedules saved in the Yarbo app are shown** on the Schedule page (and noted in Events): they live on the robot
+  and start mows without the panel's run rules, so the page says so (#64). The panel still never writes them.
+
 ### Changed
 - **The two people rules read as two rules** (Settings → Run rules): *Yard must be clear to start* and the *Person
   guard* (during a run), each saying what the other does, with a note when only one of them is on. A guard's alert

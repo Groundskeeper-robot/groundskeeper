@@ -1533,7 +1533,7 @@ async def schedule(request: Request):
     o = ops(request)
     return {"windows": o.scheduler.windows(), "upcoming": o.scheduler.upcoming(datetime.now()),
             "pending": o.scheduler.pending(), "log": rec(request).store.schedule_log(50),
-            "plans": rec(request).plans}
+            "plans": rec(request).plans, "robot_schedules": rec(request).robot_schedules}
 
 
 @app.put("/api/schedule/windows")

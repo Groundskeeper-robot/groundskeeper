@@ -1,4 +1,5 @@
-"""The scheduler (spec §8). The app owns scheduling; the robot has no on-board schedules (read_schedules = []).
+"""The scheduler (spec §8). The panel owns scheduling; the robot keeps schedules only if the Yarbo app saves one, and
+then they start without the run rules, so the panel reads them (robot_schedules) and warns, but never writes them.
 
 A window is "plan P may run on these days between HH:MM and HH:MM". Inside a window the gates are evaluated every
 minute; when they all pass the scheduler raises a pending start (notify-to-confirm by default). A window that ends
@@ -11,6 +12,28 @@ from datetime import datetime, timedelta
 from . import why
 
 PENDING_TTL_S = 30 * 60
+DAY_BITS = ("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")    # read_schedules' week_day: bit 0 = Sunday (map-writes.md)
+
+
+def robot_schedules(reply) -> list[dict] | None:
+    """The robot's own schedules from a read_schedules reply (None = no usable answer). The panel never writes them
+    (design §8.1): one saved in the Yarbo app starts mows without the run rules, so the Schedule page warns about it.
+    Times are the robot's UTC "HH:MM:SS", shown as they are."""
+    if not isinstance(reply, dict) or reply.get("state") not in (None, 0):
+        return None
+    data = reply.get("data")
+    items = data.get("data") if isinstance(data, dict) else data
+    if not isinstance(items, list):
+        return None
+    out = []
+    for it in items:
+        if not isinstance(it, dict):
+            continue
+        mask = it.get("week_day") if isinstance(it.get("week_day"), int) else 0
+        out.append({"id": it.get("id"), "name": str(it.get("name") or ""), "enabled": bool(it.get("enable")),
+                    "plan_id": it.get("plan_id"), "days": [d for i, d in enumerate(DAY_BITS) if mask >> i & 1],
+                    "start_utc": it.get("start_time"), "end_utc": it.get("end_time")})
+    return out
 HEADS = {"mower": {3, 5}, "snow": {1}, "any": None}
 
 

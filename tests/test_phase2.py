@@ -248,3 +248,23 @@ def test_a_start_or_resume_waits_for_a_write_in_progress(cmd, args, writing):
 def test_stopping_commands_are_never_held_back_by_a_write(cmd):
     checks = control.check(cmd, {}, good_ctx(writing=True), control.GATE_DEFAULTS, "user")
     assert control.verdict(checks, False)[0]
+
+
+# -- #64: the robot's own schedules are read and shown, never written ----------------------------------------------
+def test_the_robots_own_schedules_are_read_from_either_reply_shape():
+    rec = {"id": 1, "name": "Schedule 1", "enable": True, "plan_id": 2, "week_day": 42,
+           "start_time": "13:49:00", "end_time": "16:00:00"}
+    for reply in ({"state": 0, "data": [rec]}, {"state": 0, "data": {"data": [rec]}}):
+        out = scheduler.robot_schedules(reply)
+        assert out == [{"id": 1, "name": "Schedule 1", "enabled": True, "plan_id": 2, "days": ["Mon", "Wed", "Fri"],
+                        "start_utc": "13:49:00", "end_utc": "16:00:00"}]
+    assert scheduler.robot_schedules({"state": 0, "data": []}) == []
+    assert scheduler.robot_schedules({"state": -1, "msg": "failed"}) is None
+    assert scheduler.robot_schedules({"state": 0, "data": "nope"}) is None
+
+
+def test_the_panel_never_writes_robot_schedules():
+    from app import mapwrite
+    from app.transport_local import READ_ONLY_COMMANDS
+    assert "read_schedules" in READ_ONLY_COMMANDS
+    assert not {"save_schedule", "enable_schedule", "del_schedule"} & (set(mapwrite.WRITE_COMMANDS) | set(control.CATALOGUE))
