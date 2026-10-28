@@ -394,7 +394,7 @@ class Ops:
     def _new_guard() -> dict:
         return {"active": False, "seen_at": 0.0, "since": None, "clear_since": None, "why": "", "notified": False,
                 "warned": False, "pending": None, "tried_at": 0.0, "tries": 0, "acted": None, "acted_at": 0.0,
-                "owner": None, "snoozed": False, "held": False}
+                "owner": None, "snoozed": False, "held": False, "held_at": None}
 
     def _people_cmd_at(self) -> float:
         """Last time a person told the robot something: this panel (not the guard), the phone app, another client."""
@@ -431,7 +431,7 @@ class Ops:
             on = bool(active) or (st["active"] and (active is None or now - st["seen_at"] < GUARD_HYST_S))
             if on and not st["active"]:
                 st.update(active=True, since=now, clear_since=None, notified=self._guard_carried(key, now),
-                          warned=False, snoozed=False, tries=0, held=False)
+                          warned=False, snoozed=False, tries=0, held=False, held_at=None)
             elif not on and st["active"]:
                 st.update(active=False, clear_since=now)
             if st["active"]:
@@ -478,7 +478,10 @@ class Ops:
             return
         # held, not acted: a confirmed pause that was handed back to people (not "ours") clears acted, yet the guard
         # did hold the robot during this detection, so a person's resume after it is still their override (#53).
-        if (st["acted"] or st["tries"] or st["held"]) and self._people_cmd_at() > (st["since"] or 0) and act in BUSY:
+        # Once it has held the robot, counted from that: a command from before it overrides nothing. Not
+        # carried over a restart on purpose (the safe side: one more pause, then the person's next resume wins).
+        since = st["held_at"] or st["since"] or 0
+        if (st["acted"] or st["tries"] or st["held"]) and self._people_cmd_at() > since and act in BUSY:
             # A person resumed or started it while the guard was holding: their call, for this detection only.
             st["snoozed"] = True
             await self.notifier.send("guard", f"Guard: {st['why']}", "overridden by a person for this detection; "
@@ -523,6 +526,7 @@ class Ops:
                         and self.phone_app_seen_at() < p["at"] and r.plan is not None and r.plan.active
                         and r.plan.session is not None)
                 st.update(pending=None, acted=p["action"], acted_at=now, warned=False, tries=0, held=True,
+                          held_at=st["held_at"] or now,
                           owner={"activity_at": r.activity_at, "session": r.plan.session} if ours else None)
                 await self.notifier.send("guard", f"Guard: {st['why']}", f"{p['action']}: done, {meaning}" + (
                     ". On a real mow, Return to dock ended the plan: the next schedule window starts it again"

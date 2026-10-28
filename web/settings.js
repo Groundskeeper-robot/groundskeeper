@@ -662,12 +662,13 @@ function secSafety(d) {
 
 /* ------------------------------------------------------------- run rules */
 // The two people rules act at different times and are easy to mix up (#54): say so when only one of them is on.
-function peopleNote(g, where) {
-  const startOn = !!g.yard_clear_required, guardActs = ["pause", "dock"].includes(g.guard_person);
+function peopleNote(g, where, controlOn) {
+  const startOn = !!g.yard_clear_required, guardActs = !!controlOn && ["pause", "dock"].includes(g.guard_person);
   if (startOn === guardActs) return null;
   const text = where === "start"
     ? (startOn ? null : `Off for starts, but the person guard still ${g.guard_person === "dock" ? "sends a running mow home" : "pauses a running mow"} when it sees someone.`)
-    : (guardActs ? null : "The guard won't stop a running mow for people; they only block a start.");
+    : (guardActs ? null : controlOn ? "The guard won't stop a running mow for people; they only block a start."
+                                    : "With control off the guard only notifies; people only block a start.");
   return text ? ssub(srow("", text, null)) : null;
 }
 
@@ -690,7 +691,7 @@ function secRules(d) {
       srow("Yard must be clear to start", ["No person or pet on a ", slink("#settings/cameras", "yard camera"),
         ". Only before a start: a mow already running is the person guard's (During a run, below)."],
         switchCtl("Yard must be clear to start", g.yard_clear_required, (v) => gate("yard_clear_required", v), "yard_clear_required")),
-      peopleNote(g, "start"),
+      peopleNote(g, "start", d.st.control_enabled),
       g.yard_clear_required ? ssub(srow("Clear for", null,
         numCtl({ key: "yard_clear_minutes", value: g.yard_clear_minutes, min: 0, max: 120, unit: "min", onsave: (v) => gate("yard_clear_minutes", v) }))) : null,
       sstack("Who counts", "Frigate labels that make the yard busy, separated by commas.",
@@ -705,7 +706,7 @@ function secRules(d) {
       snote("Checked every 5 seconds while the robot works. With control off, each of these can only notify."),
       srow("Person guard", "A person or pet appears on a yard camera (inside its drawn coverage) while a mow runs. Separate from the start check above.",
         selCtl({ key: "guard_person", value: g.guard_person, options: ACTIONS, onsave: (v) => gate("guard_person", v) })),
-      peopleNote(g, "guard"),
+      peopleNote(g, "guard", d.st.control_enabled),
       srow("Rain starts", "From the weather station.",
         selCtl({ key: "guard_rain", value: g.guard_rain, options: ACTIONS, onsave: (v) => gate("guard_rain", v) })),
       srow("Everyone leaves", "The presence entity says nobody is home.",

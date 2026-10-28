@@ -509,6 +509,24 @@ def test_a_resume_snoozes_the_guard_even_when_its_pause_was_handed_back_to_peopl
     assert o.controller.sent == ["pause"] and o.guards["person"]["snoozed"]
 
 
+def test_a_command_from_before_the_guard_acted_is_not_an_override(tmp_path, monkeypatch):
+    """Review of #53: once the guard has held the robot, only a person's command after that overrides it."""
+    o, clock = _ops(tmp_path, monkeypatch, {})
+    o.controller.deaf = True                            # the robot takes a moment to act on the pause
+    o.yard["person"] = True
+    _tick(o, clock)                                     # the guard's pause goes out
+    o.controller.last_human_cmd_at = clock[0] + 1       # someone sends something unrelated meanwhile
+    o.rec.app_stream_at = clock[0] + 1                  # with the phone app open: the pause won't be "ours"
+    clock[0] += 2
+    o.rec.set(PAUSED, "paused")                         # the pause lands
+    _tick(o, clock)                                     # confirmed, and handed back to people at once
+    assert o.guards["person"]["held"] and o.guards["person"]["acted"] is None
+    o.controller.deaf = False
+    o.rec.set(MOWING, "mowing")                         # it carries on mowing, with no new command from a person
+    _tick(o, clock, secs=25)
+    assert o.controller.sent == ["pause", "pause"] and not o.guards["person"]["snoozed"]
+
+
 def test_driving_by_hand_without_a_plan_is_not_paused(tmp_path, monkeypatch):
     o, clock = _ops(tmp_path, monkeypatch, {})
     o.rec.in_plan = False
