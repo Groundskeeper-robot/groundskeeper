@@ -121,7 +121,7 @@ class Network:
     def connected(self) -> tuple[str | None, float | None]:
         """The robot's Wi-Fi network and when that was learnt: its last answer, unless a later ask went unanswered."""
         reply, at = self._reply("get_connect_wifi_name")
-        if self._no_name_at and (at is None or self._no_name_at > at):
+        if self._no_name_at and (at is None or self._no_name_at >= at):   # a tie: the unanswered ask came later
             return None, self._no_name_at
         return (parse_connected(reply) if reply else None), at
 
