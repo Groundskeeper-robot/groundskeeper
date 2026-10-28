@@ -295,7 +295,8 @@ def _request(**over):
                         plan_active=lambda: over.get("plan", False))
     r.store.settings["map_write_enabled"] = over.get("writes", True)
     o = SimpleNamespace(cloud=SimpleNamespace(state=over.get("cloud", "connected")),
-                        map_writer=SimpleNamespace(lock=Lock()))
+                        map_writer=SimpleNamespace(lock=Lock()),
+                        controller=SimpleNamespace(start_settling=lambda: over.get("starting")))
     return SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(rec=r, ops=o)))
 
 
@@ -313,3 +314,4 @@ def test_wifi_writes_need_the_robot_docked_idle_and_writes_on():
     stale = _request()
     stale.app.state.rec.snapshot_at = time.time() - 300
     assert "recent data" in main._network_write_block(stale)
+    assert "a moment" in main._network_write_block(_request(starting="Start plan was sent 2 s ago; try again in a moment"))

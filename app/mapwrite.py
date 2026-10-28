@@ -67,6 +67,9 @@ WRITE_COMMANDS = frozenset({*SAVE.values(), *DELETE.values(), "save_mower_pathwa
                             AREA_SAVE, BACKUP_CMD, "get_all_map_backup",
                             "del_map_backup", "map_recovery", "save_mower_area_params", "rename_map_backup",   # backups.py
                             "change_to_wifi", "forget_wifi"})                                                  # network.py
+# Backup bookkeeping: allowed during a plan (nothing the robot drives by changes); every other write needs it idle.
+BOOKKEEPING = frozenset({BACKUP_CMD, "get_all_map_backup", "del_map_backup", "rename_map_backup",
+                         "upload_cloud_map_backup"})
 # What the Yarbo app sent for a new pathway's mowing settings (capture C2).
 PATHWAY_DEFAULTS = {"blade_speed": 80, "blade_height": 0, "turn_type": 0, "land_push_pod_place": 50, "route_angle": 0,
                     "route_dis": 0.0, "offset_enable": False, "en_blade": False, "plan_speed": 0.5,
@@ -593,11 +596,11 @@ class _WriteLock:
 
     async def __aenter__(self):
         await self._lock.acquire()
-        self._writer.route = None
+        self._writer.route, self._writer.cleared = None, False
         return self
 
     async def __aexit__(self, *exc):
-        self._writer.route = None
+        self._writer.route, self._writer.cleared = None, False
         self._lock.release()
 
     def locked(self) -> bool:
@@ -617,6 +620,8 @@ class MapWriter:
         self.read_areas = read_areas            # async () -> {id: live area record} (read_all_clean_area)
         self.read_deadend = read_deadend        # async (id) -> a dead end's settings (read_deadend_params)
         self.lock = _WriteLock(self)
+        self.start_block = lambda cmd: None     # (cmd) -> why no write may go out now (#69); set by Ops
+        self.cleared = False                    # this lock hold passed start_block at its first send
         self.route: str | None = None           # the route this write goes by (set at its first send)
         self._routed = "route" in inspect.signature(publish).parameters
 
@@ -625,6 +630,15 @@ class MapWriter:
         (the write itself never switches route)."""
         if cmd not in WRITE_COMMANDS:
             raise WriteRefused(f"{cmd} is not a map-write command")
+        if not (rollback or self.cleared or cmd == "get_all_map_backup"):
+            # Every write goes out here (#69). Asked once per hold of the lock, at its first send, so a write is never
+            # stopped half-way: with the lock held no start can go out (control asks right before it sends). The
+            # gates before the lock can be many seconds old by now (reads of the map, of each area), so this asks
+            # again: no start settling and, for anything but backup bookkeeping, no plan running.
+            why = self.start_block(cmd)
+            if why:
+                raise WriteRefused(why)
+            self.cleared = True
         fut = self.expect(cmd)
         started = time.time()
         try:

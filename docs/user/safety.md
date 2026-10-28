@@ -56,3 +56,10 @@ Resuming after a guard is off unless you switch it on, because resuming spins th
 ## Map writes
 
 The robot must be docked and idle. Every write is read back and compared; on any mismatch everything sent is undone.
+
+A start and a write from this panel never overlap. A start or resume waits for a write in progress to finish. In the
+other direction, after a start or resume goes out, writes wait until the robot shows the plan running (it can take a
+few seconds), or for 3 minutes if it never does. Just before a write sends its first command, the panel also asks
+again that no plan is running, since reading the map first can take a while. A write refused this way says so and
+sends nothing. Once a write has started it is never cut short, and putting things back after a failed write is never
+held back. Starts from the Yarbo app aren't covered: the panel only knows about them once the robot reports the plan.

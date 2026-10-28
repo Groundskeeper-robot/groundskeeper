@@ -15,6 +15,10 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   in the top bar and its notice name the rule that acted (#54).
 - **No start or resume while a write to the robot is in progress** (a map, settings or Wi-Fi change): a new hard
   check, for every sender. Pause, stop and return to dock are never held back (#57).
+- **No write to the robot right after a start or resume from the panel**, until the robot shows the plan running
+  (up to 3 min if it never does). Every write also asks again, just before its first command, that no plan is
+  running: Map Studio apply and a backup restore read for many seconds after their checks. A write is refused before
+  anything is sent, never half-way. Map Studio, the settings editors and the Network card show the reason (#69).
 
 ### Fixed
 - **Your resume now overrides the person guard** for that detection, also when the phone app was open: the guard
