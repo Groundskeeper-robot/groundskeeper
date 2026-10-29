@@ -268,3 +268,181 @@ def test_the_panel_never_writes_robot_schedules():
     from app.transport_local import READ_ONLY_COMMANDS
     assert "read_schedules" in READ_ONLY_COMMANDS
     assert not {"save_schedule", "enable_schedule", "del_schedule"} & (set(mapwrite.WRITE_COMMANDS) | set(control.CATALOGUE))
+
+
+# -- #69: no write to the robot in the moments after a start --------------------------------------------------------
+def started_controller(tmp_path, cmd, args, state):
+    store, cloud, c = make_controller(tmp_path, enabled=True)
+    c._state = lambda: state
+    r = run(c.send(cmd, args, wait=False))
+    assert r["sent"]
+    return c
+
+
+@pytest.mark.parametrize("cmd, args", [("start_plan", {"plan_id": 1}), ("resume", {})])
+def test_a_start_holds_writes_back_until_the_robot_shows_the_plan(tmp_path, cmd, args):
+    state = {"planning": 0, "planning_paused": 0}                 # the robot has not reported the plan yet
+    c = started_controller(tmp_path, cmd, args, state)
+    why = c.start_settling()
+    assert why and "try again in a moment" in why
+    state.update(planning=1)                                      # it shows the plan: the plan checks take over
+    assert c.start_settling() is None
+    state.update(planning_paused=1)                               # paused again: the hold stays ended (latched)
+    assert c.start_settling() is None and c.start_out is None
+
+
+def test_a_start_the_robot_never_acts_on_holds_for_the_late_watch(tmp_path, monkeypatch):
+    c = started_controller(tmp_path, "start_plan", {"plan_id": 1}, {"planning": 0})
+    sent = c.start_out["at"]
+    monkeypatch.setattr(control.time, "time", lambda: sent + control.LATE_WATCH_S - 1)
+    assert c.start_settling()
+    monkeypatch.setattr(control.time, "time", lambda: sent + control.LATE_WATCH_S)
+    assert c.start_settling() is None
+
+
+@pytest.mark.parametrize("cmd", ["pause", "stop", "cmd_recharge"])
+def test_stopping_commands_do_not_hold_writes_back(tmp_path, cmd):
+    c = started_controller(tmp_path, cmd, {}, {"planning": 0})
+    assert c.start_settling() is None
+
+
+def test_a_send_that_fails_half_way_still_holds_writes(tmp_path):
+    store, cloud, c = make_controller(tmp_path, enabled=True)
+    c._state = lambda: {"planning": 0}
+
+    def broken(cmd, payload):
+        raise ConnectionError("dropped mid-publish")
+    c.link.command = broken
+    r = run(c.send("start_plan", {"plan_id": 1}, wait=False))
+    assert not r["sent"] and c.start_settling()
+
+
+def test_a_start_is_refused_if_a_write_takes_the_lock_while_its_checks_run(tmp_path):
+    from app import mapwrite
+    store = Store(str(tmp_path))
+    store.set_setting("control_enabled", True)
+    cloud = FakeCloud()
+    w = mapwrite.MapWriter(store, lambda cmd, payload: None, None, None, None, lambda: "")
+    held = asyncio.Event()
+
+    async def context(args):                    # a write takes the lock while the start's checks are running
+        held.set()
+        await asyncio.sleep(0.05)
+        return good_ctx(writing=False)          # read before the write took it
+
+    def expect(cmd):
+        return asyncio.get_running_loop().create_future()
+
+    c = control.Controller(store, FakeLink(cloud), context, expect)
+    c.writing = w.lock.locked
+
+    async def go():
+        async def writer():
+            await held.wait()
+            async with w.lock:
+                await asyncio.sleep(0.2)
+        task = asyncio.create_task(writer())
+        r = await c.send("start_plan", {"plan_id": 1}, wait=False)
+        await task
+        return r
+    r = run(go())
+    assert not r["sent"] and "write to the robot" in r["refused"]
+    assert cloud.sent == [] and c.start_out is None
+
+
+class _Robot:
+    def __init__(self):
+        self.sent = []
+
+    def publish(self, cmd, payload):
+        self.sent.append(cmd)
+
+    def expect(self, cmd):
+        fut = asyncio.get_running_loop().create_future()
+        fut.set_result({"state": 0, "msg": "ok"})
+        return fut
+
+
+def test_the_writer_refuses_every_write_at_its_first_send(tmp_path):
+    from app import mapwrite
+    bot = _Robot()
+    w = mapwrite.MapWriter(Store(str(tmp_path)), bot.publish, bot.expect, None, None, lambda: "")
+    w.start_block = lambda cmd: "Start plan was sent 2 s ago"
+
+    async def go():
+        for cmd in sorted(mapwrite.WRITE_COMMANDS - {"get_all_map_backup"}):
+            async with w.lock:
+                with pytest.raises(mapwrite.WriteRefused, match="sent 2 s ago"):
+                    await w._send(cmd, {})
+        async with w.lock:
+            assert (await w._send("get_all_map_backup", {}))["ok"]                     # a read still goes
+            assert (await w._send("save_mower_pathway_params", {}, rollback=True))["ok"]   # so does putting back
+    run(go())
+    assert bot.sent == ["get_all_map_backup", "save_mower_pathway_params"]
+
+
+def test_a_write_is_never_stopped_half_way(tmp_path):
+    """Asked once per hold of the lock: a hold that comes back after the first send does not cut a write short."""
+    from app import mapwrite
+    bot = _Robot()
+    w = mapwrite.MapWriter(Store(str(tmp_path)), bot.publish, bot.expect, None, None, lambda: "")
+    answers = [None, "Resume was sent 1 s ago"]
+    w.start_block = lambda cmd: answers.pop(0) if answers else "held"
+
+    async def go():
+        async with w.lock:
+            await w._send("save_nogozone", {})
+            await w._send("save_pathway", {})
+            await w._send("upload_cloud_map_backup", {})
+        async with w.lock:                                          # the next write asks again
+            with pytest.raises(mapwrite.WriteRefused):
+                await w._send("save_nogozone", {})
+    run(go())
+    assert bot.sent == ["save_nogozone", "save_pathway", "upload_cloud_map_backup"]
+
+
+def _ops(tmp_path, monkeypatch):
+    from app import config
+    from app.imagery import Imagery
+    from app.main import Runtime
+    from app.ops import Ops
+    from app.recorder import Recorder
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    env = config.load()
+    store = Store(env.data_dir)
+    cfg = Runtime(env, store)
+    return Ops(cfg, Recorder(cfg, store, Imagery(env.data_dir), None))
+
+
+def test_ops_wires_the_start_and_the_writer_to_each_other(tmp_path, monkeypatch):
+    import time
+    o = _ops(tmp_path, monkeypatch)
+    o.rec.plan_active = lambda ts=None: False
+    assert o.map_writer.start_block("save_nogozone") is None
+    o.controller.start_out = {"cmd": "start_plan", "at": time.time()}
+    assert "Start plan was sent" in o.map_writer.start_block("save_nogozone")
+    from app import mapwrite
+    assert "Start plan was sent" in o.map_writer.start_block(mapwrite.BACKUP_CMD)   # even bookkeeping waits on a start
+
+    async def held():
+        async with o.map_writer.lock:
+            return o.controller.writing()
+    assert run(held()) is True and o.controller.writing() is False
+
+
+def test_the_writer_asks_the_plan_state_again_before_it_sends(tmp_path, monkeypatch):
+    """Map Studio apply and backup restore read for many seconds after their gates: a plan shown by then stops them."""
+    from app import mapwrite
+    o = _ops(tmp_path, monkeypatch)
+    for active, word in ((True, "running"), (None, "unknown")):
+        o.rec.plan_active = lambda ts=None, a=active: a
+        assert word in o.write_hold("map_recovery") and word in o.write_hold("change_to_wifi")
+        assert o.write_hold(mapwrite.BACKUP_CMD) is None                             # bookkeeping during a mow is fine
+    o.rec.plan_active = lambda ts=None: False
+    o.rec.t = {"planning": 1, "planning_paused": 0}           # the flags say planning though a reply says idle
+    assert "running" in o.write_hold("save_nogozone")
+    o.rec.t = {"planning": 0, "planning_paused": 0}
+    assert o.write_hold("save_nogozone") is None
+    o.rec.run_id = 7
+    assert "running" in o.write_hold("save_nogozone")

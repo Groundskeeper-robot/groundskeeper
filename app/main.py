@@ -660,7 +660,7 @@ def _pathway_write_block(request: Request) -> str | None:
         return "the robot's plan state is unknown"
     if o.cloud.state != "connected":
         return f"the Yarbo cloud is {o.cloud.state}"
-    return None
+    return o.controller.start_settling()
 
 
 def _robot_area(r, aid: int) -> dict:
@@ -1726,12 +1726,14 @@ def _write_checks(request: Request, d: dict, issues: list, plan: dict) -> list[d
     errors = [i for i in issues if i["level"] == "error"]
     on = bool(r.store.setting("map_write_enabled", False))
     cloud = ops(request).cloud.state
+    starting = ops(request).controller.start_settling()
     checks = [
         ("Map writing switched on", on, "on" if on else "off (switch it on below)"),
         ("Yarbo cloud connected", cloud == "connected", cloud),
         ("Robot online", snap_age is not None and snap_age < 120, f"last snapshot {snap_age} s ago" if snap_age else "no data"),
         ("Docked", (t.get("charging") or 0) > 0, "on the charger" if (t.get("charging") or 0) > 0 else "not on the charger"),
         ("Idle", not (r.run_id or t.get("planning")), "a plan is running" if (r.run_id or t.get("planning")) else "idle"),
+        ("No start just sent", not starting, starting or "none"),
         ("Draft is valid", not errors, f"{len(errors)} error(s)" if errors else "no errors"),
         ("Draft starts from the robot's current map", not _draft_meta(request, d)["stale"],
          "the robot's map changed after this draft was started" if _draft_meta(request, d)["stale"] else "yes"),
@@ -1862,6 +1864,7 @@ def _backup_block(request: Request, restore: bool) -> str | None:
             return "the robot must be on its charger"
         if r.run_id or r.plan_active() is not False:
             return "a plan may be running (the robot's plan state is not idle)"
+        return ops(request).controller.start_settling()
     return None
 
 
@@ -1969,7 +1972,7 @@ def _network_write_block(request: Request, held: bool = False) -> str | None:
         return "a plan may be running (the robot's plan state is not idle)"
     if not held and ops(request).map_writer.lock.locked():
         return "another write to the robot is in progress"
-    return None
+    return ops(request).controller.start_settling()
 
 
 @app.get("/api/network")

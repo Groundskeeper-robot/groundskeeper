@@ -206,6 +206,8 @@ class Controller:
         self.poll_s = 0.5
         self.last_human_cmd_at = 0.0      # last command sent from this panel by a person or the scheduler
         self.last: dict | None = None     # the last background-confirmed command, for the status stream
+        self.start_out: dict | None = None  # the last start or resume this panel sent: {"cmd", "at"} (#69)
+        self.writing = lambda: False      # a write to the robot holds the writer's lock; set by Ops
         self._tasks: set = set()
 
     async def _watch(self, cmd: str, fut: asyncio.Future, last: dict, rowid: int, logged: dict) -> None:
@@ -283,6 +285,22 @@ class Controller:
                 "checks": checks,
                 "why": why.from_checks(checks, self.enabled(), ctx.get("plans") if cmd == "start_plan" else None)}
 
+    def start_settling(self) -> str | None:
+        """Why a write to the robot must wait: a start or resume this panel sent has not shown in the robot's state
+        yet (#69). The robot can take a minute to act, so this holds for LATE_WATCH_S from the send. Once the robot
+        shows the plan the hold ends for good (a later pause does not bring it back) and the plan checks take over,
+        the writer's own included. None = no start in the way."""
+        s = self.start_out
+        if not s:
+            return None
+        age = time.time() - s["at"]
+        test = CONFIRM[s["cmd"]][1]
+        if age >= LATE_WATCH_S or (self._state is not None and test(self._state() or {})):
+            self.start_out = None
+            return None
+        return (f"{CATALOGUE[s['cmd']]['label']} was sent {age:.0f} s ago and the robot does not show the plan running "
+                f"yet; try again in a moment (writes wait up to {LATE_WATCH_S // 60} min after a start)")
+
     async def send(self, cmd: str, args: dict | None = None, actor: str = "user", override: bool = False,
                    wait: bool | str = True) -> dict:
         """wait=True waits for the robot's state to confirm it. wait=False returns as soon as it is out (the caller
@@ -306,8 +324,14 @@ class Controller:
                 ok, reason = verdict(checks, override=override and actor == "user")
                 if not ok:
                     raise Refused(reason, checks)
+                if cmd in ("start_plan", "resume") and self.writing():
+                    # Asked again now, with no await before the send: the context above was read before a write
+                    # could have taken the writer's lock (#69).
+                    raise Refused("a write to the robot is in progress")
                 payload = payload_for(cmd, args)
                 fut = self._expect(cmd)
+                if cmd in ("start_plan", "resume"):
+                    self.start_out = {"cmd": cmd, "at": time.time()}   # before the send: a send that fails half-way holds too
                 route = self.link.command(cmd, payload)
                 self._seq += 1
                 self._spawn(self._follow_up(cmd, payload, args, route, self._seq, actor))

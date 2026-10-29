@@ -178,7 +178,8 @@ def _gate(**over):
     rec = SimpleNamespace(store=SimpleNamespace(setting=lambda k, d=None: store_settings.get(k, d)),
                           snapshot_at=time.time() - over.get("age", 2), run_id=over.get("run_id"),
                           plan_active=lambda: over.get("active", False))
-    ops = SimpleNamespace(cloud=SimpleNamespace(state=over.get("cloud", "connected")))
+    ops = SimpleNamespace(cloud=SimpleNamespace(state=over.get("cloud", "connected")),
+                          controller=SimpleNamespace(start_settling=lambda: over.get("starting")))
     req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(rec=rec, ops=ops)))
     return main._pathway_write_block(req)
 
@@ -190,6 +191,7 @@ def test_the_write_gate():
     assert "plan is running" in _gate(active=True)
     assert "unknown" in _gate(active=None)
     assert "cloud" in _gate(cloud="signed out")
+    assert "a moment" in _gate(starting="Resume was sent 3 s ago; try again in a moment")     # #69
 
 
 def test_a_map_write_that_cannot_read_a_replaced_pathways_settings_is_refused(tmp_path):

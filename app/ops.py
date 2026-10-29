@@ -11,7 +11,7 @@ from .cloud import CloudTransport
 from .link import RobotLink
 from .control import Controller
 from .backups import Backups
-from .mapwrite import MapWriter
+from .mapwrite import BOOKKEEPING, MapWriter
 from .network import Network
 from .frigate import Frigate
 from .ha import presence_from
@@ -76,6 +76,9 @@ class Ops:
                                                      else rec.request(cmd, payload=payload)),
                                rec.reload_map, rec.read_area_records)
         self.network = Network(self.store, rec, self.map_writer)
+        # A start and a write never overlap (#57, #69): each side asks the other right before it sends.
+        self.controller.writing = self.map_writer.lock.locked
+        self.map_writer.start_block = self.write_hold
         self.phone_app_at = 0.0
         self._follow, self._follow_next = None, (None, 0.0)  # follow-cam: shown, and a new pick and since when
         self.presence_cache = (0.0, None)
@@ -204,6 +207,21 @@ class Ops:
             return {"ok": True, "detail": f"nothing in the last {minutes:g} min", "events": []}
         names = ", ".join(sorted({f"{e['label']} on {e['camera']}" for e in ev}))
         return {"ok": False, "detail": names, "events": ev}
+
+    def write_hold(self, cmd: str) -> str | None:
+        """The writer asks this at a write's first send (#69): a start still settling holds every write back, and
+        anything but backup bookkeeping needs the plan state known to be idle. Fails closed."""
+        why = self.controller.start_settling()
+        if why or cmd in BOOKKEEPING:
+            return why
+        active = self.rec.plan_active()
+        # The robot's planning flag too: at a plan's start a "no plan working" reply can still be newer than it.
+        # (Not planning_paused: it can outlive a plan; Map Studio's Idle row reads the same flag.)
+        if self.rec.run_id or active or (self.rec.t.get("planning") or 0) > 0:
+            return "a plan is running; nothing was sent"
+        if active is None:
+            return "the robot's plan state is unknown; nothing was sent"
+        return None
 
     async def context(self, args: dict) -> dict:
         r = self.rec
