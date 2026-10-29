@@ -562,6 +562,21 @@ function fitTo(coords) {
   state.map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: 60 });
 }
 
+// The phone's More menu (style.css shows it only at 700 px or less). The tools in it are the same buttons as on a
+// wide screen, so they keep their handlers and on state. Toggles leave it open; Fit yard, which moves the map, and
+// a tap outside or Escape close it.
+function bindToolMore() {
+  const row = $(".maptools"), btn = $("#toolmorebtn");
+  const show = (open) => { row.classList.toggle("open", open); btn.setAttribute("aria-expanded", String(open)); };
+  btn.addEventListener("click", () => show(!row.classList.contains("open")));
+  $("#recenter").addEventListener("click", () => show(false));
+  document.addEventListener("pointerdown", (e) => { if (!row.contains(e.target)) show(false); });
+  window.addEventListener("hashchange", () => show(false));   // a link or Back changes the view without a tap here
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && row.classList.contains("open")) { show(false); btn.focus(); }
+  });
+}
+
 function bindMapTools() {
   for (const b of $$(".tool[data-layer]")) {
     b.addEventListener("click", () => {
@@ -580,6 +595,7 @@ function bindMapTools() {
       applyLayerVisibility();
     });
   }
+  bindToolMore();
   $("#recenter").addEventListener("click", () => { robot3dFollow(false); fitYard(400); });
   $("#follow3d").addEventListener("click", () => robot3dFollow(!R3D.follow.on));
   $("#ground3d").addEventListener("click", () => { state.ground3d = !state.ground3d; writePref("ground3d", state.ground3d); sync3d(); });
