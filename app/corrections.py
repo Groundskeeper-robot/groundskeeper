@@ -2,8 +2,8 @@
 
 The robot reports `rtcm_age`: seconds since its last RTK correction from the base station (-1 = none received, which
 is normal on the dock). Without corrections the fix falls to DGPS or single point however many satellites it sees,
-so a gap says where to look: at the base station's side when the robot's own HaLow link is strong (2026-10-28: three
-gaps of 1.5-3.5 min with HaLow at -49 dBm and 20 satellites, the fix at DGPS).
+so a gap says where to look: at the base station's side when the robot's own HaLow link is strong (the fix at DGPS
+with plenty of satellites).
 
 A gap opens when the age passes problems.RTCM_LATE_S and closes at the first fresh age. It starts at the robot's
 last correction (the sample's time minus its age), not at the sample that first showed it late.
