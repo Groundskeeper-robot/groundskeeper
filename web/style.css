@@ -401,7 +401,9 @@ textarea.field { min-height: 80px; padding: 8px 10px; font: 12px/1.4 var(--mono)
 
 /* ---- settings ---- */
 .settings { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 0 20px; padding: 10px 16px 28px; align-items: start; }
-.snav { position: sticky; top: 10px; display: flex; flex-direction: column; gap: 2px; }
+.sfold { position: sticky; top: 10px; }
+.sfold > summary { display: none; }              /* a phone's fold row only (below) */
+.snav { display: flex; flex-direction: column; gap: 2px; }
 .sitem { display: grid; grid-template-columns: 10px minmax(0, 1fr); column-gap: 10px; align-items: center; padding: 8px 12px; border-radius: 9px; color: var(--text2); text-decoration: none; }
 .sitem .dot { grid-row: 1 / 3; }
 .sitem:hover { background: var(--hover); color: var(--text); }
@@ -489,7 +491,8 @@ textarea.field { min-height: 80px; padding: 8px 10px; font: 12px/1.4 var(--mono)
   .imgcredit { display: none; }
   .studiobar { left: 52px; max-width: none; }    /* clear of the zoom buttons at the top left */
   .settings { grid-template-columns: 1fr; gap: 8px; padding: 8px 12px 24px; }
-  .snav { position: static; flex-direction: row; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+  .sfold { position: static; }
+  .snav { flex-direction: row; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
   .sitem { flex: 0 0 auto; grid-template-columns: 8px auto; }
   .sitem .dot { grid-row: 1; }
   .scap { display: none; }
@@ -744,7 +747,16 @@ button.subtab { border: 0; background: none; font: inherit; font-size: 13px; cur
   .top { position: sticky; top: 0; z-index: 15; }
   /* switches: the toggle says on or off */
   .switchchip .swstate { display: none; }
-  /* settings: every section in sight (wrapped), and each row's control under its name */
+  /* settings: the sections fold under one row (open, every section in sight, wrapped), and each row's control
+     under its name */
+  .sfold > summary { display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px;
+                     border-radius: 9px; border: 1px solid var(--line); background: var(--card); font-weight: 600;
+                     font-size: 13.5px; cursor: pointer; list-style: none; }
+  .sfold > summary::-webkit-details-marker { display: none; }
+  .sfold > summary::after { content: "▾"; margin-left: auto; color: var(--label); }
+  .sfold[open] > summary { margin-bottom: 8px; }
+  .sfold[open] > summary::after { content: "▴"; }
+  .sfoldcur { font-weight: 500; color: var(--text2); }
   .snav { flex-wrap: wrap; overflow: visible; }
   .sitem { padding: 6px 10px; }
   .srow { flex-direction: column; align-items: stretch; gap: 8px; }
