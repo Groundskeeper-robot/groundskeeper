@@ -5,7 +5,7 @@ image: scripts/deploy.sh passes it as PANEL_BUILD."""
 import os
 import re
 
-__version__ = "0.19.2"
+__version__ = "0.19.3"
 _build = (os.environ.get("PANEL_BUILD") or "").strip().lower()
 BUILD = (_build[:7] if re.fullmatch(r"[0-9a-f]{8,40}", _build) else _build[:20]) or None   # a full commit id is cut to 7
 

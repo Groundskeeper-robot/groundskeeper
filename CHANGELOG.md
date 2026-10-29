@@ -5,6 +5,8 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ## Unreleased
 
+## 0.19.3 — 2026-10-29
+
 ### Added
 - **RTK correction gaps are named.** The RTK pill reads *no corrections* while the base station's corrections are
   more than 10 s old, and Robot → Health → Positioning lists each gap of 20 s or more with the fix it fell to and the
