@@ -22,7 +22,9 @@ for you). Then the switches, **Control** (and **Map writing** in Map Studio): cl
 on asks you to type ENABLE. Then the lawn. At the right, the connections in one pill (Cloud, Broker, RTK; on a
 narrower screen just the word and its dot, with the detail when you hover) and, at the far right, the robot: its
 state and battery. Each part opens where you can act on it (battery and RTK → Health, lawn → Lawn conditions, cloud
-and broker → Settings → Robot).
+and broker → Settings → Robot). On a phone the connections have a row of their own; while every one is fine they
+shrink to a single **Links ok** chip beside the theme button (it opens Settings → Robot), and as soon as one is not,
+they are all spelled out again. A grey RTK on the dock counts as fine: no fix there is normal.
 
 In the **Camera** layout the small map always shows the whole yard: it refits whenever its card changes size and
 cannot be panned or zoomed. **Map layout** gives the full map.

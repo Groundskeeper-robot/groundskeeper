@@ -27,6 +27,9 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   anything is sent, never half-way. Map Studio, the settings editors and the Network card show the reason (#69).
 - **On a phone the top bar shows the connections on a row of their own** (Cloud, Broker, HaLow, RTK), instead of
   scrolling out of sight behind the robot pill, and keeps the same layout on every page (#52).
+- **On a phone the connections fold into one *Links ok* chip while all of them are fine**, beside the theme button,
+  so the top bar is two rows instead of three (about 101 px instead of 143). Any connection that is not fine brings
+  them all back, spelled out on their own row.
 - **Bigger tap targets on a phone:** the top bar's chips and tabs, the **?** help link, Settings' section list, Map
   Studio's shape rows and the map's zoom buttons; a tap on an ⓘ shows its explanation (#52).
 - **On a phone, Live's Control card says why a button is off** in a line under the buttons ("Start: a run is

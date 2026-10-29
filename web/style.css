@@ -834,6 +834,9 @@ button.subtab { border: 0; background: none; font: inherit; font-size: 13px; cur
   .connslot::-webkit-scrollbar { display: none; }
   .connslot .chipgroup.conn { flex: 1 0 auto; margin-left: 0; }
   .connslot .chipgroup.conn > .chip { flex: 1 0 auto; justify-content: center; }
+  /* While all is well the connections are one short chip (renderChips): it ends the title row, after the theme
+     button, and the bar is two rows again. Last in the row, it is what wraps when a narrow screen has no room. */
+  .connslot:has(.linksok) { order: 1; flex: none; }
 }
 .connslot:empty { display: none; }    /* wider screens: the connections stay with the other chips */
 /* Phone tap targets of at least 32 px: the top bar's chips and tabs grow; the ? and the ⓘ keep their look and get
