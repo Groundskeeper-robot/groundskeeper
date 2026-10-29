@@ -29,6 +29,8 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   scrolling out of sight behind the robot pill, and keeps the same layout on every page (#52).
 - **Bigger tap targets on a phone:** the top bar's chips and tabs, the **?** help link, Settings' section list, Map
   Studio's shape rows and the map's zoom buttons; a tap on an ⓘ shows its explanation (#52).
+- **On a phone, Live's Control card says why a button is off** in a line under the buttons ("Start: a run is
+  already going."), since a touch screen shows no tooltips.
 
 ### Fixed
 - **Your resume now overrides the person guard** for that detection, also when the phone app was open: the guard
