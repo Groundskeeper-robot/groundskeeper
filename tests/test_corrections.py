@@ -16,7 +16,7 @@ def feed(samples, start=1000.0, step=10.0):
 
 
 def test_a_gap_runs_from_the_last_correction_to_the_first_fresh_one():
-    # fresh, then late for ~100 s with the fix at DGPS, then fresh again (like 2026-10-28 15:53)
+    # fresh, then late for ~100 s with the fix at DGPS, then fresh again
     samples = [sample(1), sample(1), sample(13), sample(25, rtk=2), sample(37, rtk=2), sample(98, rtk=2),
                sample(1, rtk=5), sample(1)]
     tr, out = feed(samples)
