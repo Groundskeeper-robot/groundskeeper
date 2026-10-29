@@ -10,6 +10,8 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   more than 10 s old, and Robot → Health → Positioning lists each gap of 20 s or more with the fix it fell to and the
   HaLow signal, so a DGPS fix with plenty of satellites points at the base station rather than the sky. Each gap is
   an event when it ends.
+- **On a phone, Live's map layout starts with Pause, Stop and Return to dock while a run is going**: the emergency
+  buttons the camera layout already leads with. Before, stopping a mow there took a scroll of more than a screen.
 - **Schedules saved in the Yarbo app are shown** on the Schedule page (and noted in Events): they live on the robot
   and start mows without the panel's run rules, so the page says so (#64). The panel still never writes them.
 

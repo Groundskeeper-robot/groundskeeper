@@ -112,7 +112,11 @@ function switchChip(key, label, on, what) {
 // Live, top to bottom: what the robot is doing, a run waiting for a yes, Control, the follow-cam. In the camera
 // layout the follow-cam takes the map's slot, the emergency buttons lead the panel and the small map comes next.
 // When no camera's coverage holds the robot (and none is pinned), the camera layout puts the map back in the big
-// slot until one does; the emergency buttons stay at the top of the panel.
+// slot until one does; the emergency buttons stay at the top of the panel. On a phone the map layout's panel sits under
+// the map, so during a run the emergency buttons lead it there too (Control's own buttons are a screen further down).
+const PHONE_LIVE = window.matchMedia("(max-width: 700px)");
+PHONE_LIVE.addEventListener("change", () => { if (state.view === "live") refreshLive(); });
+const runGoing = (s) => !!s.run || (!!s.activity && !["docked", "idle"].includes(s.activity));
 async function liveExtras(s) {
   const o = s.ops || {};
   // Live can render before the map's plan list arrives; an empty picker would send plan_id 0.
@@ -126,7 +130,7 @@ async function liveExtras(s) {
     drawCamStage(fc, s);
     return [emergencyCard(s), miniMapCard(), statusCard(s), ...rest];
   }
-  return [statusCard(s), ...rest, followCamCard(fc)];
+  return [PHONE_LIVE.matches && runGoing(s) ? emergencyCard(s) : null, statusCard(s), ...rest, followCamCard(fc)];
 }
 
 /* ---------------------------------------------------------- live layout

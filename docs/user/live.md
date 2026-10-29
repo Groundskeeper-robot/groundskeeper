@@ -13,6 +13,10 @@ they last. When no camera's coverage holds the robot (it has driven out of every
 the big slot shows the map again and the camera comes back when the robot drives into view; both changes wait 10 s so
 one stray position does not flip the picture. Pinning a camera with its chip keeps the camera up regardless.
 
+On a phone the **Map** layout's panel sits under the map, so while a run is going it starts with the same emergency
+buttons; the Control card's own buttons are a screen further down. Docked or idle, the panel starts with the status
+as before.
+
 The bar at the top of every page: problems first, tinted in their colour (a robot error, a guard, a run waiting
 for you). Then the switches, **Control** (and **Map writing** in Map Studio): click to switch one off; switching it
 on asks you to type ENABLE. Then the lawn. At the right, the connections in one pill (Cloud, Broker, RTK; on a
