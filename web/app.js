@@ -1106,6 +1106,9 @@ function rtkColor(status) {
   return CORAL;
 }
 
+// The phone layout in style.css (max-width: 700px); crossing it moves the connections between their two places.
+const PHONE = window.matchMedia("(max-width: 700px)");
+PHONE.addEventListener("change", () => { if (state.status) renderChips(state.status); });
 function renderChips(s, streamOk = true) {
   const r = s.robot, local = s.transport.local;
   /* Left to right: what needs you (tinted), the switches; then, pushed right, the connections as one pill
@@ -1128,6 +1131,8 @@ function renderChips(s, streamOk = true) {
       wifiChip(s.wifi),
       gpsChip(r.rtk, s.activity),
       streamOk ? null : chip(AMBER, "Reconnecting…")));
+  // On a phone the connections get a row of their own instead of scrolling out of sight behind the robot pill.
+  fill($("#conn"), PHONE.matches ? $("#chips > .chipgroup.conn") : null);
   fill($("#battery"), chipGroup("robot", "Robot",
     titled(chipLink("#live", stateColor(s), st), `Robot: ${st}`),
     batteryChip(r.battery)));
@@ -1593,8 +1598,10 @@ async function selectRun(id) {
   renderColourControl();
   drawRunTrack();
   robot3dSync();
-  state.map.resize();                    // the map was hidden behind the overview a moment ago
-  fitTo(pts.rows.map((r) => [r[1], r[2]]));
+  if (state.map) {                       // a run link opened cold: the map comes up after this and draws the run itself
+    state.map.resize();                    // the map was hidden behind the overview a moment ago
+    fitTo(pts.rows.map((r) => [r[1], r[2]]));
+  }
   renderRuns();
   const run = state.run;
   getJSON(`/api/runs/${encodeURIComponent(id)}/planned`)              // a comparison made before, if any
@@ -2322,9 +2329,15 @@ function edgeFade(el) {
   update();
 }
 
+// Touch screens never show a title tooltip, and an ⓘ holds nothing else: a tap on one shows its text in the toast.
+document.addEventListener("click", (e) => {
+  const tip = e.target instanceof Element && e.target.closest(".tip[title]");
+  if (tip && window.matchMedia("(hover: none)").matches) toast(tip.title);
+});
+
 // ops.js loads after this file; start once every script has run.
 window.addEventListener("DOMContentLoaded", () => {
-  for (const el of [$(".side"), $("#chips"), $(".maptools")]) edgeFade(el);
+  for (const el of [$(".side"), $("#chips"), $("#conn"), $(".maptools")]) edgeFade(el);
   bindViews();
   bindMapTools();
   initMap();

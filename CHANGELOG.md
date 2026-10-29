@@ -23,6 +23,10 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   (up to 3 min if it never does). Every write also asks again, just before its first command, that no plan is
   running: Map Studio apply and a backup restore read for many seconds after their checks. A write is refused before
   anything is sent, never half-way. Map Studio, the settings editors and the Network card show the reason (#69).
+- **On a phone the top bar shows the connections on a row of their own** (Cloud, Broker, HaLow, RTK), instead of
+  scrolling out of sight behind the robot pill, and keeps the same layout on every page (#52).
+- **Bigger tap targets on a phone:** the top bar's chips and tabs, the **?** help link, Settings' section list, Map
+  Studio's shape rows and the map's zoom buttons; a tap on an ⓘ shows its explanation (#52).
 
 ### Fixed
 - **Your resume now overrides the person guard** for that detection, also when the phone app was open: the guard
@@ -30,6 +34,9 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 - **A mow paused overnight no longer counts the night:** a run's length and the Runs overview's pace use its
   working time (not paused or charging mid-plan); a run page shows the start-to-end time and the break underneath
   (#62). Stored runs are worked out again once after the update.
+- **A run link opened as the first page shows the run** instead of an empty Runs page (#52).
+- **On a phone:** fields no longer zoom the page in when tapped on an iPhone, Map Studio's tool bar no longer
+  covers the zoom-out button, and long messages and dialogs fit the screen (#52).
 
 ## 0.19.2 — 2026-10-28
 
