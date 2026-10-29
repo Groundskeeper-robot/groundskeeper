@@ -162,8 +162,14 @@ async function renderSettings(section, auto = false) {
   setUI.at = Date.now();
   if (section && SECTIONS.some(([id]) => id === section)) setUI.section = section;
   if (!$(".settings", panel)) {
-    fill(panel, h("div", { class: "settings" }, h("nav", { class: "snav", "aria-label": "Settings sections" }), h("section", { class: "ssec" })));
+    fill(panel, h("div", { class: "settings" },
+      h("details", { class: "sfold", open: true }, h("summary", null, "Sections", h("span", { class: "sfoldcur" })),
+        h("nav", { class: "snav", "aria-label": "Settings sections" })),
+      h("section", { class: "ssec" })));
   }
+  // On a phone the list is a fold: open on #settings, shut once a section is chosen. Only a navigation (showView
+  // passes the sub-page or null) sets it; a save or a refresh leaves it as the user left it.
+  if (section !== undefined) $(".sfold", panel).open = !section || !phoneNav();
   if (setUI.data) drawSettings(setUI.data, false);               // at once, from the last fetch; refreshed below
   else { drawSettingsNav(null); fill($(".ssec", panel), h("p", { class: "muted pad" }, "Loading…")); }
   const ticket = ++setUI.ticket;
@@ -232,11 +238,20 @@ function drawSettings(d, fresh) {
   el.focus({ preventScroll: true });
 }
 
+// At 700 px or less the section list folds away under one row (style.css); wider, the fold is always open.
+const phoneNav = () => window.matchMedia("(max-width: 700px)").matches;
+window.matchMedia("(max-width: 700px)").addEventListener("change", (e) => {
+  const fold = $("#p-settings .sfold");
+  if (fold && !e.matches) fold.open = true;          // wider, the summary is hidden: a shut fold would hide the list
+});
+
 function drawSettingsNav(d) {
+  $("#p-settings .sfoldcur").textContent = `· ${SECTIONS.find(([x]) => x === setUI.section)[1]}`;
   fill($("#p-settings .snav"), SECTIONS.map(([id, name]) => {
     const [color, caption] = d ? sectionStatus(id, d) : [MUTED, ""];
     const on = id === setUI.section;
-    return h("a", { class: `sitem${on ? " on" : ""}`, href: `#settings/${id}`, "aria-current": on ? "page" : null },
+    return h("a", { class: `sitem${on ? " on" : ""}`, href: `#settings/${id}`, "aria-current": on ? "page" : null,
+                    onclick: () => { if (phoneNav()) $("#p-settings .sfold").open = false; } },  // also the open one
       dot(color), h("span", { class: "stitle" }, name), h("span", { class: "scap" }, caption));
   }));
 }

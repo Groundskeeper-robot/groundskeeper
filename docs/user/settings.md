@@ -4,6 +4,9 @@
 One section at a time. The dot next to each section says whether it is set up. Changes apply at once and need no
 restart; a field left blank goes back to the environment's value, shown as the placeholder.
 
+On a phone the list of sections folds into one row, **Sections**, naming the one you are in: tap it to pick another.
+It is open when you go to Settings and closes once you choose a section.
+
 | Section | What it holds |
 |---|---|
 | [Set up](#settings/setup) | The first-run guide: every step below in order, with what each is for ([more](#help/setup)) |

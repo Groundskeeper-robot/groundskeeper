@@ -34,6 +34,9 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 - **The map tools fit on a phone:** Imagery, Zones and Track stay in the row over the map and the other tools
   (Labels, Cameras, Problem areas, Signal, 3D, Colour, Fit yard) are under **More**, instead of a row that scrolled
   sideways with half the tools off the edge. Wider screens are unchanged.
+- **Settings on a phone starts with the section, not the list:** the 13 section links fold into one *Sections*
+  row naming the open section; it is open on Settings itself and closes once you pick one. Wider screens keep the
+  list on the left.
 
 ### Fixed
 - **Your resume now overrides the person guard** for that detection, also when the phone app was open: the guard
