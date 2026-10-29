@@ -31,6 +31,9 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   Studio's shape rows and the map's zoom buttons; a tap on an ⓘ shows its explanation (#52).
 - **On a phone, Live's Control card says why a button is off** in a line under the buttons ("Start: a run is
   already going."), since a touch screen shows no tooltips.
+- **The map tools fit on a phone:** Imagery, Zones and Track stay in the row over the map and the other tools
+  (Labels, Cameras, Problem areas, Signal, 3D, Colour, Fit yard) are under **More**, instead of a row that scrolled
+  sideways with half the tools off the edge. Wider screens are unchanged.
 
 ### Fixed
 - **Your resume now overrides the person guard** for that detection, also when the phone app was open: the guard

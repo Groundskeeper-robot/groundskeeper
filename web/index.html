@@ -54,8 +54,10 @@
         <div class="maptools" role="group" aria-label="Map layers">
           <button type="button" class="tool on" data-layer="imagery" aria-pressed="true">Imagery</button>
           <button type="button" class="tool on" data-layer="zones" aria-pressed="true">Zones</button>
-          <button type="button" class="tool on" data-layer="labels" aria-pressed="true">Labels</button>
           <button type="button" class="tool on" data-layer="track" aria-pressed="true" data-studio-hide>Track</button>
+          <button type="button" class="tool moretool" id="toolmorebtn" aria-expanded="false" aria-controls="toolmore" title="More map tools">More</button>
+          <div class="toolmore" id="toolmore">
+          <button type="button" class="tool on" data-layer="labels" aria-pressed="true">Labels</button>
           <button type="button" class="tool on" data-layer="cameras" aria-pressed="true">Cameras</button>
           <button type="button" class="tool" data-layer="trouble" aria-pressed="false" data-studio-hide title="Where the robot gets stuck, errors, steep ground and weak positioning, from recorded runs">Problem areas</button>
           <button type="button" class="tool" data-layer="signal" aria-pressed="false" data-studio-hide title="Signal across the yard, from every recorded run">Signal</button>
@@ -64,6 +66,7 @@
           <button type="button" class="tool" id="follow3d" aria-pressed="false" data-studio-hide hidden title="Follow the robot from behind and to one side. Right-drag (two fingers on a phone) moves the camera round it; a drag or Fit yard lets go.">Follow</button>
           <label class="tool toolsel" data-studio-hide title="What the track's colour shows">Colour <select id="trackmetric" aria-label="Colour the track by"></select></label>
           <button type="button" class="tool" id="recenter">Fit yard</button>
+          </div>
         </div>
         <div class="legend" aria-label="Legend">
           <div class="signalbox" id="problembox" hidden><span class="muted">Problems</span><span id="problemscale" class="signalscale"></span></div>

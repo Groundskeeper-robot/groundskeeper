@@ -125,6 +125,23 @@ a { color: var(--link); }
 .tool.on { background: var(--sel); color: var(--text); }
 .tool:hover { color: var(--text); }
 .tool[hidden] { display: none; }
+/* On a phone the less used tools fold behind More; wider, the menu's contents sit in the row as before */
+.moretool { display: none; }
+.toolmore { display: contents; }
+@media (min-width: 701px) {
+  #toolmore > :not([data-layer="labels"]), .maptools > [data-layer="track"] { order: 1; }   /* Labels before Track */
+}
+@media (max-width: 700px) {
+  .maptools { overflow: visible; }                     /* the row fits now, and the menu hangs below it */
+  .moretool { display: block; }
+  .moretool[aria-expanded="true"] { background: var(--sel); color: var(--text); }
+  .toolmore { display: none; position: absolute; top: calc(100% + 6px); right: 0; z-index: 5; flex-direction: column;
+    align-items: stretch; gap: 2px; min-width: 160px; padding: 4px; border-radius: 10px; background: var(--card);
+    border: 1px solid var(--line2); box-shadow: 0 6px 24px rgba(0, 0, 0, .35); }
+  .maptools.open .toolmore { display: flex; }
+  .toolmore .tool { min-height: 32px; text-align: left; }   /* 32 px rows keep the open menu near the map's height */
+  .toolmore .toolsel { justify-content: space-between; padding-left: 12px; }
+}
 .legend { position: absolute; left: 10px; bottom: 28px; display: flex; flex-wrap: wrap; gap: 12px; max-width: calc(100% - 20px); padding: 8px 12px; border-radius: 10px; background: color-mix(in srgb, var(--bg) 88%, transparent); border: 1px solid var(--line); font-size: 12px; color: var(--text3); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .sw { display: inline-block; width: 14px; height: 10px; border-radius: 2px; }
