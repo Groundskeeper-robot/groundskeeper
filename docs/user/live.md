@@ -49,7 +49,8 @@ are pink, edge passes violet.
 - **Problem areas:** a weak-positioning spot also says when HaLow was weak there (−77 dBm or lower) or corrections
   came late. A good link there points at the sky view instead: trees, walls, the house.
 - **Control card:** pick a plan and see its areas. Only the buttons that make sense in the robot's state are on.
-  Needs control switched on ([Safety](#help/safety)).
+  Needs control switched on ([Safety](#help/safety)). Hover a button that is off to see why; on a phone or a narrow
+  window a line under the buttons says it instead.
 - **Ready to start:** runs every check a start would face and sends nothing. When a start would be refused it says
   why and what fixes it ("Can't start: the lawn is not dry"), with every check one click further.
 - **Why it stopped:** when the robot paused itself (bumper, emergency stop, rain, a fault) or the last run ended

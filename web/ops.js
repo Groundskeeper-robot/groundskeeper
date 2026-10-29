@@ -501,6 +501,17 @@ function controlCard(s) {
     stop: no(running, `Nothing to stop: the robot is ${s.state}.`),
     cmd_recharge: no(!NOT_DOCKABLE.has(act), act === "docked" ? "Already on the dock." : `Already on its way: ${s.state}.`),
   };
+  // A touch screen never shows a disabled button's title, so the same reasons go in one line under the grid
+  // (.whyline). The button's name replaces "Nothing to pause:", so buttons off for the same state share one entry
+  // ("Pause, Stop: the robot is docked."). Control off and no plans already say so above the buttons.
+  const labels = { start_plan: "Start", pause: "Pause", resume: "Resume", stop: "Stop",
+    cmd_recharge: "Return to dock" };
+  const offWhy = new Map();
+  for (const [cmd, text] of Object.entries(idle)) {
+    const t = text?.replace(/^Nothing to \w+: /, "");
+    if (t) offWhy.set(t, [...(offWhy.get(t) || []), labels[cmd]]);
+  }
+  const whyLine = [...offWhy].map(([t, names]) => `${names.join(", ")}: ${t[0].toLowerCase()}${t.slice(1)}`).join(" ");
   const btn = (cmd, label, args) => h("button", { type: "button", class: "btn", disabled: disabled || !!idle[cmd] || null,
     title: idle[cmd] || null, onclick: () => openConfirm(cmd, label, args) }, label);
   return h("div", { class: "card" },
@@ -517,7 +528,8 @@ function controlCard(s) {
     h("div", { class: "ctlgrid" },
       h("button", { type: "button", class: "btn pri wide", disabled: disabled || !plan || !!idle.start_plan || null, title: idle.start_plan || null,
         onclick: () => openConfirm("start_plan", startLabel, startArgs()) }, plan ? `Start ${plan.name}…` : "Start plan…"),
-      btn("pause", "Pause"), btn("resume", "Resume"), btn("stop", "Stop"), btn("cmd_recharge", "Return to dock")));
+      btn("pause", "Pause"), btn("resume", "Resume"), btn("stop", "Stop"), btn("cmd_recharge", "Return to dock")),
+    whyLine ? h("p", { class: "whyline muted tiny", style: "margin-top:6px" }, whyLine) : null);
 }
 
 /* A command's confirmation is a modal over the page (it used to open under the buttons, below the fold on a phone or
