@@ -1125,8 +1125,24 @@ function rtkColor(status) {
 // The phone layout in style.css (max-width: 700px); crossing it moves the connections between their two places.
 const PHONE = window.matchMedia("(max-width: 700px)");
 PHONE.addEventListener("change", () => { if (state.status) renderChips(state.status); });
+// A link is fine while its dot or bars are green: the colour each chip already picks (compared as the browser spells it).
+const GREEN_CSS = dot(GREEN).style.backgroundColor;
+const isGreen = (el) => { const m = el.querySelector(".dot, .sigbars"); return !!m && (m.style.backgroundColor || m.style.color) === GREEN_CSS; };
 function renderChips(s, streamOk = true) {
   const r = s.robot, local = s.transport.local;
+  const docked = s.activity === "docked", rtk = gpsChip(r.rtk, s.activity);
+  const links = [
+    cloudChip(s),
+    titled(chipLink("#settings/robot", local.connected ? GREEN : CORAL, connLabel("Broker", local.connected ? "" : " down")),
+           local.connected ? "Local broker: connected" : "Local broker: not connected"),
+    halowChip(r.halow_dbm),
+    wifiChip(s.wifi),
+    rtk,
+    streamOk ? null : chip(AMBER, "Reconnecting…")].filter(Boolean);
+  // A phone's bar has no room to spare: while every link is fine one chip says so (its tooltip lists them); the
+  // moment one is not, they are all spelled out again. The RTK chip is grey on the dock, where that is normal, but
+  // corrections that stopped are amber there too and keep it spelled out.
+  const linksOk = PHONE.matches && links.every((c) => isGreen(c) || (c === rtk && docked && !correctionsLate(r.rtk)));
   /* Left to right: what needs you (tinted), the switches; then, pushed right, the connections as one pill
      (cloud, local broker, RTK: short words while all is well, the problem spelled out when not), and at the far right
      the robot itself, its state and battery, in the slot that stays in view on a phone. */
@@ -1139,14 +1155,8 @@ function renderChips(s, streamOk = true) {
     s.lost_contact ? alertChip("#health", CORAL, h("b", null, "No data"), ` for ${dur(s.data_age_s)}`) : null,
     opsAlerts(s),
     chipGroup("switches", "Switches", opsSwitches(s)),
-    chipGroup("conn", "Connections",
-      cloudChip(s),
-      titled(chipLink("#settings/robot", local.connected ? GREEN : CORAL, connLabel("Broker", local.connected ? "" : " down")),
-             local.connected ? "Local broker: connected" : "Local broker: not connected"),
-      halowChip(r.halow_dbm),
-      wifiChip(s.wifi),
-      gpsChip(r.rtk, s.activity),
-      streamOk ? null : chip(AMBER, "Reconnecting…")));
+    linksOk ? chipGroup("conn linksok", "Connections", titled(chipLink("#settings/robot", GREEN, "Links ok"), links.map((c) => c.title).join("\n")))
+            : chipGroup("conn", "Connections", links));
   // On a phone the connections get a row of their own instead of scrolling out of sight behind the robot pill.
   fill($("#conn"), PHONE.matches ? $("#chips > .chipgroup.conn") : null);
   fill($("#battery"), chipGroup("robot", "Robot",
