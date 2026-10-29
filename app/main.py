@@ -25,6 +25,7 @@ from fastapi.staticfiles import StaticFiles
 from . import areasettings
 from . import auth as auth_mod
 from . import backups as backups_mod
+from . import corrections
 from . import robotscan
 from . import config, control, coverage, geo, insights, mapstudio, mapwrite, telemetry
 from . import ha as ha_mod
@@ -1104,6 +1105,11 @@ async def weather_series(request: Request, metric: str, hours: float = 24):
         raise HTTPException(400, f"unknown metric {metric!r}")
 
 
+def _correction_gaps(store, since: float) -> dict:
+    found = corrections.gaps(store.correction_rows(since), time.time())
+    return {"correction_gaps": found[::-1][:20], "correction_gap_count": len(found)}   # newest first
+
+
 @app.get("/api/health")
 async def health_view(request: Request, hours: float = 24):
     r = rec(request)
@@ -1117,6 +1123,7 @@ async def health_view(request: Request, hours: float = 24):
     return {
         "hours": hours,
         "rtk_share_pct": {k: round(100 * v / total, 1) for k, v in sorted(share.items(), key=lambda kv: -kv[1])},
+        **_correction_gaps(r.store, since),
         "error_codes_seen": r.store.error_codes_seen(),
         "status_dictionary": {k: {"meaning": v[0], "action": v[1]} for k, v in telemetry.STATUS_DICTIONARY.items()},
         "firmware_history": r.store.firmware_history(),

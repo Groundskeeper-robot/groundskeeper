@@ -1126,9 +1126,7 @@ function renderChips(s, streamOk = true) {
              local.connected ? "Local broker: connected" : "Local broker: not connected"),
       halowChip(r.halow_dbm),
       wifiChip(s.wifi),
-      titled(chipLink("#health", null, sigBars(gpsBars(r.rtk), s.activity === "docked" ? MUTED : rtkColor(r.rtk.status)),
-                      connLabel("RTK", ` ${r.rtk.label.replace(/^RTK /, "").toLowerCase()}`)),   // no fix on the dock is normal
-             `Positioning: ${r.rtk.label} · ${num(r.rtk.sats)} satellites · heading DOP ${num(r.rtk.heading_dop, 2)}`),
+      gpsChip(r.rtk, s.activity),
       streamOk ? null : chip(AMBER, "Reconnecting…")));
   fill($("#battery"), chipGroup("robot", "Robot",
     titled(chipLink("#live", stateColor(s), st), `Robot: ${st}`),
@@ -1147,6 +1145,18 @@ function gpsBars(rtk) {
   const st = rtk && rtk.status;
   if (st === 4) return typeof rtk.heading_dop === "number" && rtk.heading_dop >= 1.5 ? 3 : 4;
   return st === 5 ? 2 : st === 1 || st === 2 ? 1 : 0;
+}
+/* Corrections late (rtcm_age above 10 s, app/problems.py RTCM_LATE_S): the base station's corrections are not
+   arriving, so the fix falls to DGPS whatever the sky. Says so, in amber even on the dock: corrections that were
+   flowing and stopped are worth knowing about (none at all, -1, is normal there). */
+const correctionsLate = (rtk) => !!rtk && typeof rtk.rtcm_age === "number" && rtk.rtcm_age > 10;
+function gpsChip(rtk, activity) {
+  const late = correctionsLate(rtk);
+  const color = late ? AMBER : activity === "docked" ? MUTED : rtkColor(rtk.status);   // no fix on the dock is normal
+  const text = late ? " no corrections" : ` ${rtk.label.replace(/^RTK /, "").toLowerCase()}`;
+  return titled(chipLink("#health", null, sigBars(gpsBars(rtk), color), connLabel("RTK", text)),
+                `Positioning: ${rtk.label} · ${num(rtk.sats)} satellites · heading DOP ${num(rtk.heading_dop, 2)}` +
+                (late ? ` · no RTK corrections for ${dur(rtk.rtcm_age)}: they are not arriving from the base station` : ""));
 }
 function halowChip(dbm) {
   if (typeof dbm !== "number" || !dbm) return null;
@@ -1940,7 +1950,15 @@ async function renderHealth() {
       card("Positioning",
         s ? kv("Now", colored(s.activity === "docked" ? MUTED : rtkColor(r.rtk.status), r.rtk.label)) : null,
         r ? kv("Satellites · heading DOP", `${num(r.rtk.sats)} · ${num(r.rtk.heading_dop, 2)}`) : null,
-        r ? kv("Correction age", rtcm) : null,
+        r ? kv("Correction age", correctionsLate(r.rtk) ? colored(AMBER, `${rtcm}: not arriving`) : rtcm) : null,
+        hv && hv.correction_gaps && hv.correction_gaps.length ? [
+          h("p", { class: "muted small" }, `Correction gaps: ${hv.correction_gap_count}` +
+            (hv.correction_gap_count > 6 ? ", the latest 6" : "")),
+          hv.correction_gaps.slice(0, 6).map((g) => kv(when(g.start),
+            `${g.end === null ? "still going, " : ""}${dur(g.seconds)}` +
+            (g.fixes.filter((f) => f !== "RTK fixed").length ? ` · ${g.fixes.filter((f) => f !== "RTK fixed").join(", ")}` : "") +
+            (typeof g.halow === "number" ? ` · HaLow ${num(g.halow)} dBm` : ""))),
+        ] : null,
         h("p", { class: "muted small" }, "Share of samples by fix type"),
         shareRows.length ? shareRows : h("p", { class: "muted small" }, "collecting…"),
         chart("Satellites", [{ points: sats, color: SERIES[0] }], "", 0),

@@ -6,6 +6,10 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 ## Unreleased
 
 ### Added
+- **RTK correction gaps are named.** The RTK pill reads *no corrections* while the base station's corrections are
+  more than 10 s old, and Robot → Health → Positioning lists each gap of 20 s or more with the fix it fell to and the
+  HaLow signal, so a DGPS fix with plenty of satellites points at the base station rather than the sky. Each gap is
+  an event when it ends.
 - **Schedules saved in the Yarbo app are shown** on the Schedule page (and noted in Events): they live on the robot
   and start mows without the panel's run rules, so the page says so (#64). The panel still never writes them.
 
