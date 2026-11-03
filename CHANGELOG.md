@@ -15,6 +15,9 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   beside it still scrolls the page. On a tablet or a phone on its side the connections stay in view: one *Links ok*
   chip while all is well, a row of their own when one isn't.
 
+- **The panel uses the whole screen on a phone with a notch**, with the top bar, nav and page kept clear of the notch
+  and the home bar.
+
 ### Fixed
 - **On a phone the map's credit stays folded** when the imagery loads late, instead of covering the legend.
 
