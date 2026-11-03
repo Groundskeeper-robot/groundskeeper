@@ -5,16 +5,16 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ## Unreleased
 
+## 0.19.4 — 2026-11-03
+
 ### Changed
 - **On a phone a connection that isn't fine says why** in the top bar (*Cloud: signed out*, *RTK no corrections*),
   since a tooltip never shows on touch. The row wraps if that's long.
 - **Easier to tap on a phone:** the small folds (*Every check*, *History*, *Advanced*), *check again*, the track colour
   select, the replay slider and Map Studio's tolerance chip are all at least 32 px tall.
-
 - **A phone on its side gets the stacked layout**, however wide it is, with the map at 70 % of the height so a swipe
   beside it still scrolls the page. On a tablet or a phone on its side the connections stay in view: one *Links ok*
   chip while all is well, a row of their own when one isn't.
-
 - **The panel uses the whole screen on a phone with a notch**, with the top bar, nav and page kept clear of the notch
   and the home bar.
 
