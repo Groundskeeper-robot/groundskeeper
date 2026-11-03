@@ -11,6 +11,10 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 - **Easier to tap on a phone:** the small folds (*Every check*, *History*, *Advanced*), *check again*, the track colour
   select, the replay slider and Map Studio's tolerance chip are all at least 32 px tall.
 
+- **A phone on its side gets the stacked layout**, however wide it is, with the map at 70 % of the height so a swipe
+  beside it still scrolls the page. On a tablet or a phone on its side the connections stay in view: one *Links ok*
+  chip while all is well, a row of their own when one isn't.
+
 ### Fixed
 - **On a phone the map's credit stays folded** when the imagery loads late, instead of covering the legend.
 

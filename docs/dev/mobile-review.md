@@ -85,14 +85,17 @@ Fixed after the review: the small `summary` folds (*Every check*, *History (5)*,
 Below 900 px the drawing bar started at 10 px from the left, over the bottom of the − button, so a tap there hit
 the bar. It now starts at 52 px, like the map tools row above it.
 
-### 8. Landscape (844 × 390) and the 701–900 px band
+### 8. Landscape (844 × 390) and the 701–900 px band — fixed
 
 This band uses the tablet layout: nav row at the top (not sticky), a one-row top bar where the connections pill
 still scrolls out of sight (627 px of chips in 383 px), and a map with a 360 px minimum height on a 390 px screen,
 so the map fills the view and a drag on it pans the map instead of scrolling the page.
 
-Fix (one PR, medium): in `(orientation: landscape) and (max-height: 500px)`, cap the map at about 70 % of the
-height, and give the connections the same own-row treatment as 1 (or fold them, see 10).
+Fixed: a phone on its side (`(orientation: landscape) and (max-height: 500px) and (pointer: coarse)`) gets the
+stacked layout at any width, so the largest phones (932 px) no longer get the desktop sidebar, and its map is 70 % of
+the height. In that case and the 701–900 px band the connections show as *Links ok* in the one-row bar while all is
+well, and take a row of their own when one is not. Live's emergency card leads the panel there too, under the map;
+the map-tools fold and the Settings fold stay portrait-only.
 
 ### 9. Settings: the section list pushes the section down — fixed in #76
 

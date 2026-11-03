@@ -465,7 +465,8 @@ textarea.field { min-height: 80px; padding: 8px 10px; font: 12px/1.4 var(--mono)
 .login .formgrid { margin-top: 6px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
 .sctl .btn.slim { font-weight: 500; }
 
-@media (max-width: 900px) {
+/* The stacked layout: narrow screens, and a phone on its side however wide it is. */
+@media (max-width: 900px), (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
   .shell { grid-template-columns: 1fr; height: auto; }
   .side { flex-direction: row; align-items: center; gap: 4px; padding: 8px; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); }
   .brand { padding: 0 6px 0 4px; }
@@ -812,17 +813,21 @@ button.subtab { border: 0; background: none; font: inherit; font-size: 13px; cur
 .ehalf .btn { min-height: 52px; gap: 8px; }
 .liveview button { border: 0; background: transparent; font: inherit; font-size: 13px; cursor: pointer; }
 .liveview button[aria-current] { background: var(--sel); color: var(--text); }
-@media (max-width: 900px) {
+@media (max-width: 900px), (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
   .layout.cam .mapwrap { height: 56vh; }
   .camstage .camtl { max-width: calc(100% - 20px); }
   .camstage .camtr { top: auto; bottom: 56px; right: 10px; }
+}
+/* A phone on its side: the map stops short of the whole screen, so a swipe beside it still scrolls the page. */
+@media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+  .mapwrap, .layout.cam .mapwrap, .shell[data-view="studio"] .mapwrap { height: 70vh; min-height: 0; }
 }
 /* A phone's top bar is three rows: the title, the Live layout switch and the theme button; then the chips (scrolling)
    with the robot's state and the battery at the right end, always in view; then the connections (#conn, filled by
    renderChips on a phone only), spread across their own row so none scrolls out of sight. The ::after is a line
    break after the first row, so the chips never share it on a page without the layout switch; its negative margin
    takes back the row gap it would add. The chips grow into whatever the state and battery leave. */
-@media (max-width: 700px) {
+@media (max-width: 900px), (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
   .top { flex-wrap: wrap; row-gap: 8px; }
   .top::after { content: ""; order: 3; flex-basis: 100%; height: 0; margin-bottom: -8px; }
   .top:has(#subtabs:not([hidden]))::after { display: none; }     /* the Robot tabs already fill the second row */
@@ -841,10 +846,22 @@ button.subtab { border: 0; background: none; font: inherit; font-size: 13px; cur
      button, and the bar is two rows again. Last in the row, it is what wraps when a narrow screen has no room. */
   .connslot:has(.linksok) { order: 1; flex: none; }
 }
+/* Wider than a phone in portrait (a tablet, a phone on its side): title, chips and robot share one row, and the
+   connections take a second only while one of them is not fine. */
+@media (min-width: 701px) and (max-width: 900px), (min-width: 701px) and (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+  .top::after { display: none; }
+  .chips { flex: 1 1 200px; }
+  .themebtn { order: 6; margin-left: 0; }
+  .connslot:has(.linksok) { order: 5; }
+}
+@media (min-width: 901px) and (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {       /* undoes the desktop bar's fixed spot for the theme button */
+  .top { position: static; padding-right: 12px; }
+  .themebtn { position: static; }
+}
 .connslot:empty { display: none; }    /* wider screens: the connections stay with the other chips */
 /* Phone tap targets of at least 32 px: the top bar's chips and tabs grow; the ? and the ⓘ keep their look and get
    a bigger invisible hit area. On a touch screen a tap on an ⓘ shows its text (app.js), since tooltips never do. */
-@media (max-width: 700px) {
+@media (max-width: 700px), (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
   .top .chip { min-height: 32px; }
   .subtab { display: inline-flex; align-items: center; min-height: 32px; }
   .helplink { position: relative; }

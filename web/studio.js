@@ -1110,7 +1110,7 @@ Object.assign(studio, {
   showAll: {},        // per long list: shown in full
 });
 
-const stacked = () => window.matchMedia("(max-width: 900px)").matches;    // the panel sits under the map
+const stacked = () => STACKED.matches;    // the panel sits under the map
 
 // `quiet`: switch without redrawing (the caller is about to redraw anyway).
 function setStudioTab(id, quiet = false) {

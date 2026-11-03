@@ -114,7 +114,7 @@ function switchChip(key, label, on, what) {
 // When no camera's coverage holds the robot (and none is pinned), the camera layout puts the map back in the big
 // slot until one does; the emergency buttons stay at the top of the panel. On a phone the map layout's panel sits under
 // the map, so during a run the emergency buttons lead it there too (Control's own buttons are a screen further down).
-const PHONE_LIVE = window.matchMedia("(max-width: 700px)");
+const PHONE_LIVE = STACKED;
 PHONE_LIVE.addEventListener("change", () => { if (state.view === "live") refreshLive(); });
 const runGoing = (s) => !!s.run || (!!s.activity && !["docked", "idle"].includes(s.activity));
 async function liveExtras(s) {
