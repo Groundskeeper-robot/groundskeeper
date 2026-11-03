@@ -128,12 +128,11 @@ The Control gate check fits at 375 × 812 (527 px tall, Close 40 px). The dialog
 on a phone is the height without the browser's bars, so a long dialog's buttons could sit under Safari's toolbar;
 it is now `100dvh` on a phone. Restore and Wi-Fi join were not opened (see the top).
 
-### 14. Safe-area insets are inert
+### 14. Safe-area insets — fixed, to confirm on an iPhone
 
-`index.html`'s viewport has no `viewport-fit=cover`, so on iOS `env(safe-area-inset-*)` is always 0 and the
-bottom nav's padding does nothing; Safari letterboxes instead, which is safe. Fix (small PR, needs a real
-iPhone): add `viewport-fit=cover`, then pad the sticky top bar with `env(safe-area-inset-top)` and both bars with
-the left and right insets for landscape.
+`index.html`'s viewport had no `viewport-fit=cover`, so on iOS `env(safe-area-inset-*)` was always 0 and the bottom
+nav's padding did nothing. Now the viewport covers the screen, the phone's sticky top bar pads the top inset and
+`.shell` the side insets for landscape. Checked with emulated insets only, not on a real iPhone.
 
 ### 15. Map attribution over the legend while imagery loads — fixed
 
