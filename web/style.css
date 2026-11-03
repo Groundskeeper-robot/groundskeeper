@@ -833,7 +833,10 @@ button.subtab { border: 0; background: none; font: inherit; font-size: 13px; cur
   .connslot { order: 7; flex: 1 0 100%; display: flex; min-width: 0; overflow-x: auto; scrollbar-width: none; }
   .connslot::-webkit-scrollbar { display: none; }
   .connslot .chipgroup.conn { flex: 1 0 auto; margin-left: 0; }
-  .connslot .chipgroup.conn > .chip { flex: 1 0 auto; justify-content: center; }
+  .connslot .chipgroup.conn > .chip { flex: 1 0 auto; justify-content: center; padding-inline: 8px; }
+  /* A phone has no tooltip: a link that is not fine says why (renderChips marks it), and the row wraps if that is long. */
+  .connslot .chip.notok .more { display: inline; }
+  .connslot .chipgroup.conn { flex: 1 1 100%; min-width: 0; flex-wrap: wrap; border-radius: 16px; }
   /* While all is well the connections are one short chip (renderChips): it ends the title row, after the theme
      button, and the bar is two rows again. Last in the row, it is what wraps when a narrow screen has no room. */
   .connslot:has(.linksok) { order: 1; flex: none; }
@@ -848,6 +851,10 @@ button.subtab { border: 0; background: none; font: inherit; font-size: 13px; cur
   .helplink::after { content: ""; position: absolute; inset: -6px; }
   .toast { width: max-content; }      /* left: 50% would squeeze a long one into half the screen */
   .sitem, .shapebtn { min-height: 32px; }
+  details > summary, .sadvanced > summary { padding-block: 7px; }   /* the small folds: Every check, History, Advanced */
+  select, .toolsel select, input[type=range], .chipbtn { min-height: 32px; }
+  .readiness .linkbtn, .shelp.src .linkbtn { position: relative; }  /* inline in a sentence: the hit area grows, not the line */
+  .readiness .linkbtn::after, .shelp.src .linkbtn::after { content: ""; position: absolute; inset: -9px -4px; }
   .rowedit { width: 32px; height: 32px; }
   .maplibregl-ctrl-group button { width: 36px; height: 36px; }   /* the zoom buttons; the tool bars start at 52 px */
   /* iOS zooms the page into any field under 16 px when it is focused, and leaves it zoomed */

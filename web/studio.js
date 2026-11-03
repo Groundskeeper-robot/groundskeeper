@@ -1190,13 +1190,13 @@ function nameEditor(f) {
 
 /* ------------------------------------------------------------ shapes tab */
 function emptyHint() {
-  const keys = ["Click a shape to select it. Drag a white corner to move it, an orange dot to add a corner; right-click a corner to remove it.",
+  const keys = ["Pick a shape to select it. Drag a white corner to move it, an orange dot to add a corner; right-click a corner to remove it.",
     "No-go and no-vision zones can be dragged whole.",
     "+ Area, + No-go, + No-vision, + Pathway and + Dead end on the map draw new shapes; Shift snaps to 15°, Alt places freely.",
     "Del deletes · Ctrl+Z undoes · Esc deselects · F2 renames.",
     "Edits go into a draft; nothing reaches the robot until you send it."].join("\n");
   return h("div", { class: "card" },
-    h("details", { class: "hintfold" }, h("summary", { class: "muted small" }, "Click a shape on the map or in the list. ", icon("help")),
+    h("details", { class: "hintfold" }, h("summary", { class: "muted small" }, "Pick a shape on the map or in the list. ", icon("help")),
       h("ul", { class: "small keys" }, keys.split("\n").map((k) => h("li", null, k)))));
 }
 

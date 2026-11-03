@@ -5,6 +5,15 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ## Unreleased
 
+### Changed
+- **On a phone a connection that isn't fine says why** in the top bar (*Cloud: signed out*, *RTK no corrections*),
+  since a tooltip never shows on touch. The row wraps if that's long.
+- **Easier to tap on a phone:** the small folds (*Every check*, *History*, *Advanced*), *check again*, the track colour
+  select, the replay slider and Map Studio's tolerance chip are all at least 32 px tall.
+
+### Fixed
+- **On a phone the map's credit stays folded** when the imagery loads late, instead of covering the legend.
+
 ## 0.19.3 — 2026-10-29
 
 ### Added
