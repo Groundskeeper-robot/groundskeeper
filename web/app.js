@@ -80,6 +80,7 @@ const dur = (s) => {
   return `${(s / 3600).toFixed(1)} h`;
 };
 const dot = (color) => h("span", { class: "dot", style: `background:${color}` });
+const STACKED = window.matchMedia("(max-width: 900px), (orientation: landscape) and (max-height: 500px) and (pointer: coarse)");   // style.css: narrow screens, or a phone on its side
 const chip = (color, ...content) => h("span", { class: "chip" }, color ? dot(color) : null, ...content);
 // A chip that goes where you can act on it.
 const chipLink = (href, color, ...content) => h("a", { class: "chip link", href }, color ? dot(color) : null, ...content);
@@ -252,7 +253,7 @@ async function initMap() {
   new ResizeObserver(() => { map.resize(); if (MAP_EL.closest(".minimap")) fitYard(); }).observe(MAP_EL);
   if (MAP_EL.closest(".minimap")) lockMiniMap(true);              // Camera was the saved layout: the map starts in the card
   map.on("movestart", (e) => {
-    if (e.originalEvent || !window.matchMedia("(max-width: 900px)").matches) return;
+    if (e.originalEvent || !STACKED.matches) return;
     const box = $(".mapwrap").getBoundingClientRect();
     if (box.bottom < box.height / 2) $(".mapwrap").scrollIntoView({ behavior: "smooth", block: "start" });
   });
@@ -301,7 +302,7 @@ async function initMap() {
     const fold = () => {
       const el = $(".maplibregl-ctrl-attrib");
       if (!el?.classList.contains("maplibregl-compact-show")) return;
-      if (window.matchMedia("(max-width: 900px)").matches) el.classList.remove("maplibregl-compact-show");
+      if (STACKED.matches) el.classList.remove("maplibregl-compact-show");
       state.map.off("sourcedata", fold);
     };
     state.map.on("sourcedata", fold);
@@ -1128,9 +1129,8 @@ function rtkColor(status) {
   return CORAL;
 }
 
-// The phone layout in style.css (max-width: 700px); crossing it moves the connections between their two places.
-const PHONE = window.matchMedia("(max-width: 700px)");
-PHONE.addEventListener("change", () => { if (state.status) renderChips(state.status); });
+// Crossing into the stacked layout moves the connections between their two places.
+STACKED.addEventListener("change", () => { if (state.status) renderChips(state.status); });
 // A link is fine while its dot or bars are green: the colour each chip already picks (compared as the browser spells it).
 const GREEN_CSS = dot(GREEN).style.backgroundColor;
 const isGreen = (el) => { const m = el.querySelector(".dot, .sigbars"); return !!m && (m.style.backgroundColor || m.style.color) === GREEN_CSS; };
@@ -1148,13 +1148,13 @@ function renderChips(s, streamOk = true) {
   // A phone's bar has no room to spare: while every link is fine one chip says so (its tooltip lists them); the
   // moment one is not, they are all spelled out again. The RTK chip is grey on the dock, where that is normal, but
   // corrections that stopped are amber there too and keep it spelled out.
-  const linksOk = PHONE.matches && links.every((c) => isGreen(c) || (c === rtk && docked && !correctionsLate(r.rtk)));
+  const linksOk = STACKED.matches && links.every((c) => isGreen(c) || (c === rtk && docked && !correctionsLate(r.rtk)));
   /* Left to right: what needs you (tinted), the switches; then, pushed right, the connections as one pill
      (cloud, local broker, RTK: short words while all is well, the problem spelled out when not), and at the far right
      the robot itself, its state and battery, in the slot that stays in view on a phone. */
   const st = s.pause_reason ? `paused: ${s.pause_reason}` : s.state;
   fill($("#chips"),
-    s.demo ? titled(chip(SKY, ...(PHONE.matches ? [h("b", null, "Demo")] : [h("b", null, "Demo data"), " · synthetic robot"])), "Demo data · synthetic robot") : null,
+    s.demo ? titled(chip(SKY, ...(STACKED.matches ? [h("b", null, "Demo")] : [h("b", null, "Demo data"), " · synthetic robot"])), "Demo data · synthetic robot") : null,
     s.plan_error || s.recharge_error ? alertChip("#health", CORAL, h("b", null, "Robot error"), ` ${s.plan_error || s.recharge_error}`) : null,
     s.stalled ? alertChip("#live", CORAL, h("b", null, "Not moving"), ` for ${dur(s.stalled_s)}`) : null,
     s.rtk_wait ? alertChip("#live", AMBER, h("b", null, "Waiting for an RTK fix"), ` for ${dur(s.stalled_s)}`) : null,
@@ -1164,8 +1164,8 @@ function renderChips(s, streamOk = true) {
     linksOk ? chipGroup("conn linksok", "Connections", titled(chipLink("#settings/robot", GREEN, "Links ok"), links.map((c) => c.title).join("\n")))
             : chipGroup("conn", "Connections", links));
   // On a phone the connections get a row of their own instead of scrolling out of sight behind the robot pill.
-  if (PHONE.matches) for (const c of links) c.classList.toggle("notok", !isGreen(c));
-  fill($("#conn"), PHONE.matches ? $("#chips > .chipgroup.conn") : null);
+  if (STACKED.matches) for (const c of links) c.classList.toggle("notok", !isGreen(c));
+  fill($("#conn"), STACKED.matches ? $("#chips > .chipgroup.conn") : null);
   fill($("#battery"), chipGroup("robot", "Robot",
     titled(chipLink("#live", stateColor(s), st), `Robot: ${st}`),
     batteryChip(r.battery)));
