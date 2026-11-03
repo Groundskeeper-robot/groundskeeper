@@ -296,10 +296,16 @@ async function initMap() {
     if (state.status) styleRobot(state.status);
     state.mapReady = true;
     sync3d();
-    // MapLibre opens the compact attribution expanded; on a phone it would sit over the legend until the first drag.
-    const fold = () => { if (window.matchMedia("(max-width: 900px)").matches) $(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show"); };
+    // MapLibre opens the compact attribution expanded, once, when the first source with a credit arrives (that can be
+    // long after load); on a phone it would sit over the legend until the first drag.
+    const fold = () => {
+      const el = $(".maplibregl-ctrl-attrib");
+      if (!el?.classList.contains("maplibregl-compact-show")) return;
+      if (window.matchMedia("(max-width: 900px)").matches) el.classList.remove("maplibregl-compact-show");
+      state.map.off("sourcedata", fold);
+    };
+    state.map.on("sourcedata", fold);
     fold();
-    setTimeout(fold, 1500);
   });
 }
 
@@ -1148,7 +1154,7 @@ function renderChips(s, streamOk = true) {
      the robot itself, its state and battery, in the slot that stays in view on a phone. */
   const st = s.pause_reason ? `paused: ${s.pause_reason}` : s.state;
   fill($("#chips"),
-    s.demo ? chip(SKY, h("b", null, "Demo data"), " · synthetic robot") : null,
+    s.demo ? titled(chip(SKY, ...(PHONE.matches ? [h("b", null, "Demo")] : [h("b", null, "Demo data"), " · synthetic robot"])), "Demo data · synthetic robot") : null,
     s.plan_error || s.recharge_error ? alertChip("#health", CORAL, h("b", null, "Robot error"), ` ${s.plan_error || s.recharge_error}`) : null,
     s.stalled ? alertChip("#live", CORAL, h("b", null, "Not moving"), ` for ${dur(s.stalled_s)}`) : null,
     s.rtk_wait ? alertChip("#live", AMBER, h("b", null, "Waiting for an RTK fix"), ` for ${dur(s.stalled_s)}`) : null,
@@ -1158,6 +1164,7 @@ function renderChips(s, streamOk = true) {
     linksOk ? chipGroup("conn linksok", "Connections", titled(chipLink("#settings/robot", GREEN, "Links ok"), links.map((c) => c.title).join("\n")))
             : chipGroup("conn", "Connections", links));
   // On a phone the connections get a row of their own instead of scrolling out of sight behind the robot pill.
+  if (PHONE.matches) for (const c of links) c.classList.toggle("notok", !isGreen(c));
   fill($("#conn"), PHONE.matches ? $("#chips > .chipgroup.conn") : null);
   fill($("#battery"), chipGroup("robot", "Robot",
     titled(chipLink("#live", stateColor(s), st), `Robot: ${st}`),
