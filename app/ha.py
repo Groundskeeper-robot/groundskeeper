@@ -115,6 +115,60 @@ def entities_from(status: dict, conditions: dict | None, last_run: dict | None) 
     return out
 
 
+# -- summary for a Home Assistant integration (GET /api/ha/summary, #12) -----------------------------------------
+# One small read that an integration polls with an API token. It carries no position, map or camera data. Bump
+# SUMMARY_API when a field changes meaning or goes away; adding a field does not need a bump.
+SUMMARY_API = 1
+
+
+def next_window(upcoming: list[dict]) -> dict | None:
+    for u in upcoming or []:
+        if u.get("active") or u.get("next"):
+            w = u.get("window") or {}
+            return {"id": w.get("id"), "name": w.get("name"), "plan_id": w.get("plan_id"), "next": u.get("next"),
+                    "active": bool(u.get("active")), "auto_start": bool(w.get("auto_start"))}
+    return None
+
+
+def summary(status: dict, ops_status: dict, last_run: dict | None, upcoming: list[dict], plans: list[dict],
+            start: dict | None, version: dict) -> dict:
+    """What an integration shows: state, battery, positioning, lawn, last run, the next schedule window, and whether
+    a start would go out now and if not why (start = the controller's preview of start_plan, or None)."""
+    r, run = status["robot"], status.get("run")
+    nxt = next_window(upcoming)
+    plan_names = {p.get("id"): p.get("name") for p in plans or []}
+    if nxt:
+        nxt["plan_name"] = plan_names.get(nxt["plan_id"])
+    can_start = None
+    if start is not None:
+        can_start = {"plan_id": start.get("plan_id"), "plan_name": plan_names.get(start.get("plan_id")),
+                     "would_send": bool(start.get("would_send")), "reason": start.get("reason") or None,
+                     "why": [{"code": w["code"], "title": w["title"], "fix": w["fix"]} for w in start.get("why") or []]}
+    held = (ops_status.get("why") or {}).get("held")
+    lr = None
+    if last_run:
+        lr = {k: last_run.get(k) for k in ("id", "started", "ended", "end_reason", "distance_m", "rtk_fixed_pct")}
+    return {
+        "api": SUMMARY_API, **version, "sn": status.get("sn"),
+        "state": status["state"], "activity": status.get("activity"), "error_code": r["error_code"],
+        "pause_reason": status.get("pause_reason"), "plan_error": status.get("plan_error"),
+        "held": {"code": held["code"], "title": held["title"]} if held else None,
+        "battery": r["battery"], "charging": r.get("charging_status"), "head": r["head"],
+        "rtk": {"label": r["rtk"]["label"], "sats": r["rtk"]["sats"]},
+        "running": bool(run),
+        "run": {"id": run["id"], "started": run["started"], "distance_m": run["distance_m"]} if run else None,
+        "local_link": bool(status["transport"]["local"].get("connected")),
+        "cloud": (ops_status.get("cloud") or {}).get("state"),
+        "control_enabled": bool(ops_status.get("control_enabled")),
+        "lawn": status.get("conditions"),
+        "last_run": lr,
+        "next_window": nxt,
+        "pending_confirm": bool(ops_status.get("pending")),
+        "can_start": can_start,
+        "snapshot_age_s": status.get("snapshot_age_s"),
+    }
+
+
 # -- presence -----------------------------------------------------------------------------------------------------
 # "Is anyone home?" from one HA entity. An alarm panel (Alarmo) armed away or on vacation means nobody; any other
 # armed state or disarmed means someone. A person, device tracker or group of them: home means someone, anything
