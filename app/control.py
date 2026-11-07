@@ -46,6 +46,7 @@ GATE_DEFAULTS = {
     "guard_resume_after_min": 5,    # ...and has stayed gone this long
 }
 GUARD_ACTIONS = ("pause", "dock", "notify", "ignore")
+STRICT_ACTORS = ("mcp", "token")    # an AI assistant, or a program with an API token: nobody here is watching
 
 
 def _i(t: dict, k: str) -> int:
@@ -102,8 +103,8 @@ def check(cmd: str, args: dict, ctx: dict, cfg: dict, actor: str) -> list[dict]:
         w = ctx.get("writing")
         add("No write to the robot in progress", w is False,
             "a write to the robot is in progress" if w else "no write in progress" if w is False else "unknown")
-    if cmd == "resume" and actor in ("guard", "mcp"):
-        # Nobody pressed this here (a guard, or an AI assistant): every check is hard and unknown counts as a fail
+    if cmd == "resume" and (actor == "guard" or actor in STRICT_ACTORS):
+        # Nobody pressed this here (a guard, an AI assistant, an API token): every check is hard and unknown counts as a fail
         # (blades start spinning).
         add("No active error", not ctx["error_code"], f"error code {ctx['error_code'] or 'none'}")
         yc = ctx["yard"]
@@ -127,9 +128,10 @@ def check(cmd: str, args: dict, ctx: dict, cfg: dict, actor: str) -> list[dict]:
     add("Battery", batt is not None and batt >= cfg["min_battery_pct"],
         f"{batt}% (minimum {cfg['min_battery_pct']}%)" if batt is not None else "unknown")
     add("Not already running", not ctx["running"], "a run is in progress" if ctx["running"] else "idle")
-    # An assistant's start (actor "mcp") is held to the strictest reading: what is unknown counts as a fail, and the
-    # lawn and presence checks are hard whenever they are switched on. A person at the panel can see the unknowns.
-    strict = actor == "mcp"
+    # A start from an assistant or an API token (STRICT_ACTORS) is held to the strictest reading: what is unknown counts
+    # as a fail, and the lawn and presence checks are hard whenever they are switched on. A person at the panel can see
+    # the unknowns.
+    strict = actor in STRICT_ACTORS
     yc = ctx["yard"]
     if strict and cfg.get("yard_clear_required", True):
         add("Yard clear (Frigate)", yc["ok"] is True, yc["detail"])

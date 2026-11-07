@@ -103,6 +103,100 @@ def test_api_tokens(client):
     assert bot.get("/api/auth/tokens").status_code == 401
 
 
+def _token(client):
+    signed_in(client)
+    return client.c.post("/api/auth/tokens", json={"name": "script"}).json()["token"]
+
+
+def _bot(token):
+    return TestClient(main.app, base_url="http://panel.test", headers={"Authorization": f"Bearer {token}"})
+
+
+CLOSED_TO_TOKENS = [
+    ("PUT", "/api/settings/control_enabled", True),
+    ("PUT", "/api/settings/map_write_enabled", True),
+    ("PUT", "/api/settings/mcp_control_enabled", True),
+    ("PUT", "/api/settings/gates", {"guard_resume": True}),
+    ("PUT", "/api/settings/robot_route", "cloud"),
+    ("PUT", "/api/integrations/robot", {"host": "192.0.2.20"}),
+    ("POST", "/api/mcp/token", None),
+    ("POST", "/api/cloud/login", {"username": "a", "password": "b"}),
+    ("POST", "/api/studio/draft/apply", {}),
+    ("POST", "/api/schedule/pending/confirm", None),
+    ("DELETE", "/api/studio/overlay", None),
+    ("POST", "/api/a/route/added/later", {}),            # closed by default, not by being listed somewhere
+]
+
+
+@pytest.mark.parametrize("method, path, body", CLOSED_TO_TOKENS)
+def test_a_token_cannot_change_anything_but_ask_for_commands(client, method, path, body):
+    bot = _bot(_token(client))
+    settings = lambda: [tuple(row) for row in client.store.db.execute("SELECT k, v FROM settings WHERE k != 'api_tokens' ORDER BY k")]   # noqa: E731
+    before = settings()
+    r = bot.request(method, path, json=body, headers={"X-Panel-Request": "1"})
+    assert r.status_code == 403, r.text
+    assert "password" in r.json()["detail"]
+    assert settings() == before
+
+
+def test_a_token_can_still_read(client):
+    bot = _bot(_token(client))
+    assert bot.get("/api/auth/tokens").status_code == 200
+    assert bot.get("/api/events").status_code == 200
+
+
+def test_a_person_can_still_change_settings(client):
+    signed_in(client)
+    r = client.c.put("/api/settings/control_enabled", json=True)
+    assert r.status_code == 200 and client.store.setting("control_enabled") is True
+
+
+def test_a_token_is_limited_even_beside_a_signed_in_cookie(client):
+    token = _token(client)                               # client.c also holds the session cookie
+    r = client.c.put("/api/settings/control_enabled", json=True, headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 403 and client.store.setting("control_enabled") is None
+
+
+class RecordingController:
+    """Says who the route named as the actor. Sends nothing."""
+
+    def __init__(self):
+        self.calls = []
+
+    def enabled(self):
+        return False
+
+    async def preview(self, cmd, args, actor="user"):
+        self.calls.append(("preview", actor))
+        return {"cmd": cmd, "would_send": False}
+
+    async def send(self, cmd, args=None, actor="user", override=False, wait=True):
+        self.calls.append(("send", actor))
+        return {"sent": False, "cmd": cmd}
+
+
+@pytest.fixture
+def controller(monkeypatch):
+    fake = RecordingController()
+    monkeypatch.setattr(main.app.state, "ops", SimpleNamespace(controller=fake), raising=False)
+    return fake
+
+
+def test_a_token_asks_for_commands_as_a_token_and_a_person_as_a_user(client, controller):
+    bot = _bot(_token(client))
+    for who, actor in ((bot, "token"), (client.c, "user")):
+        controller.calls.clear()
+        assert who.post("/api/control/preview", json={"cmd": "pause"}).status_code == 200
+        assert who.post("/api/control/send", json={"cmd": "pause", "confirm": True}).status_code == 200
+        assert controller.calls == [("preview", actor), ("send", actor)]
+
+
+def test_with_sign_in_off_the_panel_treats_callers_as_before(client, controller, monkeypatch):
+    monkeypatch.setenv("PANEL_AUTH", "off")
+    assert client.c.post("/api/control/send", json={"cmd": "pause", "confirm": True}).status_code == 200
+    assert controller.calls == [("send", "user")]
+
+
 def test_cross_site_changes_are_refused(client):
     signed_in(client)
     evil = client.c.post("/api/auth/tokens", json={"name": "x"}, headers={"Origin": "http://evil.example"})

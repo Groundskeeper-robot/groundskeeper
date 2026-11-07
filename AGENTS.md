@@ -104,7 +104,8 @@ link it in the PR. Document the payload and the capture in `docs/dev/map-writes.
 `docs/user/not-yet.md`. Expect a maintainer to test it on a real robot before merging.
 
 **Add an API route.** Add it to `app/main.py`. Paths under `/api/` are locked behind sign-in automatically; never add
-to `OPEN_PATHS`. A route that changes the password or tokens needs a person's session (`_person`). Test with
+to `OPEN_PATHS`. A route that changes the password or tokens needs a person's session (`_person`). A new route that
+writes is closed to API tokens unless it is added to `TOKEN_WRITES` (`app/auth.py`), so leave it closed. Test with
 FastAPI's `TestClient`. Don't expose it to AI assistants (`app/mcp_server.py` `ROUTES`) unless the issue asks; any
 MCP change gets its own review.
 
@@ -148,6 +149,8 @@ labels with tooltips, works at phone width. Regenerate the screenshots.
 - Sign-in (`app/auth.py`) guards every path that returns data. New routes under `/api/`, `/tiles/` or `/imagery/`
   are locked automatically. Never add a path to `OPEN_PATHS` that returns data.
 - Password and token changes need a person's session (`_person` in `app/main.py`), never an API token.
+- API tokens read, and may ask for robot commands as actor `token` (the strict checks, no override). Every other write
+  is refused by default (`TOKEN_WRITES` in `app/auth.py`).
 - MCP tools stay inside the `ROUTES` allowlist, only ever tighten rules, and `scrub` their results.
 
 ### Privacy

@@ -38,8 +38,10 @@ someone else on your network cannot claim the panel before you do. Sessions last
 
 - **Change password** (Settings → Access) signs out every other browser.
 - **API tokens** are for programs, such as a Home Assistant integration or a script. They send
-  `Authorization: Bearer <token>` and are held to the same safety checks as the pages. A token is shown once, and
-  it cannot change the password or make more tokens. AI assistants use their own token, set in
+  `Authorization: Bearer <token>`. A token can read, and can ask for robot commands while control is on, under the
+  strictest checks: anything unknown blocks a start or resume, and it cannot override. It cannot change settings,
+  safety switches, the map, the password or other tokens; those need you, signed in. A token is shown once. AI
+  assistants use their own token, set in
   [AI assistant](#settings/assistant).
 - **Forgot the password?** Run `docker exec groundskeeper python -m app.auth reset` and restart the container.
   This also removes every session and API token. The log then shows a new setup code.
