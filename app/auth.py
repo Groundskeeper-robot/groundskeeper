@@ -4,6 +4,10 @@
 Everything is locked except /health, the sign-in page and its assets: the API, the event stream, the yard imagery
 and tiles (they show where the yard is). /mcp has its own token (app/mcp_server.py) and is left to it.
 
+An API token reads, and may ask for robot commands (TOKEN_WRITES); it changes nothing else. A new route that writes is
+closed to tokens until it is added there. Its commands run as actor "token" (app/control.py): nobody is watching, so
+they get the strict checks and no override. Settings, safety switches and the map need a person's session.
+
 First run: no password is set yet, so the panel prints a one-time setup code to its log (`docker logs ...`), and
 the sign-in page asks for that code with the new password. Whoever reaches the panel first on the network cannot
 claim it without access to the host. Forgotten password: `python -m app.auth reset` (inside the container) clears
@@ -42,6 +46,8 @@ OPEN_PREFIXES = ("/brand/",)
 # Locked: data. The static UI files (plain JS/CSS from this repo) carry no data and stay open; "/" redirects.
 LOCKED_PREFIXES = ("/api/", "/tiles/", "/imagery/")
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+# The only changes an API token may ask for; everything else that is not a read needs a person. Default closed.
+TOKEN_WRITES = {("POST", "/api/control/preview"), ("POST", "/api/control/send")}
 # Paths a signed, expiring link may open without a session: the camera snapshot in a phone notification, which the
 # phone's notification service fetches with no cookie (sign_path).
 SIGNED_PREFIXES = ("/api/frigate/snapshot/",)
@@ -249,6 +255,11 @@ class Auth:
         if method in ("GET", "HEAD") and self.signed_ok(path, query):
             return "signed"
         return None
+
+
+def token_may(method: str, path: str) -> bool:
+    """May an API token make this request? Any read, and the short list of writes."""
+    return method in SAFE_METHODS or (method, path) in TOKEN_WRITES
 
 
 def same_origin(method: str, headers, panel_url: str | None = None) -> bool:

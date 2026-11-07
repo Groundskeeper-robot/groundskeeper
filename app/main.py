@@ -133,6 +133,9 @@ async def signed_in(request: Request, call_next):
     panel_url = getattr(getattr(request.app.state, "cfg", None), "panel_url", None)
     if who == "session" and not auth_mod.same_origin(request.method, request.headers, panel_url):
         return JSONResponse({"detail": "cross-site request refused"}, status_code=403)
+    if who == "token" and not auth_mod.token_may(request.method, path):
+        return JSONResponse({"detail": "an API token cannot change this: sign in with the password"}, status_code=403)
+    request.state.who = who
     return await call_next(request)
 
 
@@ -1513,19 +1516,24 @@ async def control_catalogue(request: Request):
             "blocked": sorted(control.HARD_BLOCKED), "gates": control.gates(rec(request).store)}
 
 
+def _actor(request: Request) -> str:
+    """Who a command is from, for the interlocks and the audit log: a program with an API token, or a person."""
+    return "token" if getattr(request.state, "who", None) == "token" else "user"
+
+
 @app.post("/api/control/preview")
 async def control_preview(request: Request, body: dict = Body(...)):
     cmd = body.get("cmd", "")
     if cmd not in control.CATALOGUE:
         raise HTTPException(400, f"{cmd!r} is not in the catalogue")
-    return await ops(request).controller.preview(cmd, body.get("args") or {})
+    return await ops(request).controller.preview(cmd, body.get("args") or {}, actor=_actor(request))
 
 
 @app.post("/api/control/send")
 async def control_send(request: Request, body: dict = Body(...)):
     if body.get("confirm") is not True:
         raise HTTPException(400, "confirm: true is required")
-    return await ops(request).controller.send(body.get("cmd", ""), body.get("args") or {}, actor="user",
+    return await ops(request).controller.send(body.get("cmd", ""), body.get("args") or {}, actor=_actor(request),
                                               override=bool(body.get("override")), wait="background")
 
 

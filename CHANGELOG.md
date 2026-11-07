@@ -5,6 +5,13 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ## Unreleased
 
+### Changed
+
+- **API tokens are limited to reading and asking for robot commands.** Settings, safety switches and the map now need
+  a person signed in with the password; a program that changes them with a token gets a 403. Commands from a token
+  need control on, face the strictest checks (anything unknown blocks a start or resume), cannot override and show as
+  `token` in the log. Existing tokens keep working with these limits.
+
 ## 0.19.4 — 2026-11-03
 
 ### Changed

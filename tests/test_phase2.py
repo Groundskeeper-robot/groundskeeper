@@ -244,6 +244,42 @@ def test_a_start_or_resume_waits_for_a_write_in_progress(cmd, args, writing):
         assert not ok and "write to the robot" in reason
 
 
+# -- API tokens: nobody is watching, so the strict reading, the same as an AI assistant ------------------------------
+@pytest.mark.parametrize("cmd, args", [("start_plan", {"plan_id": 1}), ("resume", {})])
+@pytest.mark.parametrize("over, name", [({"yard": {"ok": None, "detail": "Frigate not set up", "events": []}}, "Yard clear"),
+                                        ({"phone_app_active": None}, "Phone app"),
+                                        ({"conditions": None}, "Lawn dry"),
+                                        ({"conditions": "Wet"}, "Lawn dry"),
+                                        ({"presence": None}, "Someone home")])
+def test_a_token_start_or_resume_fails_on_anything_unknown_and_cannot_override(cmd, args, over, name):
+    checks = control.check(cmd, args, good_ctx(**over), control.GATE_DEFAULTS, "token")
+    ok, reason = control.verdict(checks, override=True)
+    assert not ok and name in reason
+
+
+def test_a_token_resume_faces_an_active_error():
+    checks = control.check("resume", {}, good_ctx(error_code=1), control.GATE_DEFAULTS, "token")
+    assert not control.verdict(checks, override=False)[0]
+
+
+def test_a_token_start_goes_ahead_when_every_check_passes():
+    checks = control.check("start_plan", {"plan_id": 1}, good_ctx(), control.GATE_DEFAULTS, "token")
+    assert control.verdict(checks, override=False)[0]
+
+
+def test_a_token_send_ignores_override_and_is_audited_as_a_token(tmp_path):
+    store, cloud, c = make_controller(tmp_path, good_ctx(presence=None), enabled=True)
+    r = run(c.send("start_plan", {"plan_id": 1}, actor="token", override=True, wait=False))
+    assert not r["sent"] and "Someone home" in r["refused"] and cloud.sent == []
+    assert store.control_log()[0]["actor"] == "token"
+
+
+def test_a_token_cannot_command_while_control_is_off(tmp_path):
+    _, cloud, c = make_controller(tmp_path)
+    r = run(c.send("pause", actor="token"))
+    assert not r["sent"] and "switched off" in r["refused"] and cloud.sent == []
+
+
 @pytest.mark.parametrize("cmd", ["pause", "stop", "cmd_recharge"])
 def test_stopping_commands_are_never_held_back_by_a_write(cmd):
     checks = control.check(cmd, {}, good_ctx(writing=True), control.GATE_DEFAULTS, "user")
