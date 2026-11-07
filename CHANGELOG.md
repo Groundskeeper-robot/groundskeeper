@@ -5,6 +5,8 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ## Unreleased
 
+## 0.19.5 — 2026-11-07
+
 ### Changed
 
 - **API tokens are limited to reading and asking for robot commands.** Settings, safety switches and the map now need
