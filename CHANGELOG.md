@@ -5,6 +5,12 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ## Unreleased
 
+### Added
+
+- **`GET /api/ha/summary` for a Home Assistant integration** (#12): one small read with the robot's state, battery,
+  positioning, lawn, last run, the next schedule window and whether a start would go out now (with the reasons when
+  not), checked as the caller, so a token gets the strict checks. It carries no position, map or camera data.
+
 ## 0.19.5 — 2026-11-07
 
 ### Changed

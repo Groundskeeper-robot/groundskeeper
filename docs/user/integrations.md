@@ -22,4 +22,6 @@ All optional. Each is set in Settings and has a Test button.
 - **Notifications** ([Notifications](#settings/alerts)): an HA notify service, picked from the ones your Home
   Assistant has (the companion app's phones first), and/or a webhook. Alerts: robot
   error, stuck, head changed, cloud needs sign-in, maintenance due, schedule confirmations.
-- **API:** every endpoint with its schema is at [/api/docs](/api/docs).
+- **API:** every endpoint with its schema is at [/api/docs](/api/docs). A program such as a Home Assistant
+  integration can poll `GET /api/ha/summary` with an [API token](#settings/access): state, battery, positioning,
+  lawn, last run, the next schedule window and whether a start would go out now, and why not. It carries no position.

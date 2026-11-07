@@ -1,0 +1,141 @@
+"""GET /api/ha/summary (#12): the one read a Home Assistant integration polls with an API token. Synthetic status
+only; no robot, no network."""
+import json
+from types import SimpleNamespace
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app import auth, ha, main
+from app.store import Store
+
+
+def robot_status(run=None, battery=82):
+    return {
+        "sn": "YB0000DEMO0001", "state": "docked", "activity": "idle", "pause_reason": None, "plan_error": None,
+        "snapshot_age_s": 2.0, "run": run, "conditions": {"state": "Dry", "dry_by": None},
+        "transport": {"local": {"connected": True}},
+        "robot": {"battery": battery, "charging_status": 1, "error_code": 0, "head": "Mower",
+                  "position": {"lon": -76.49, "lat": 38.98, "x": 1.0, "y": 2.0, "heading": 90, "t": 1},
+                  "rtk": {"label": "RTK fixed", "sats": 31}},
+    }
+
+
+def ops_status(control=True, held=None):
+    return {"cloud": {"state": "connected"}, "control_enabled": control, "why": {"held": held, "last_run": None},
+            "pending": None}
+
+
+PLANS = [{"id": 3, "name": "Front"}, {"id": 7, "name": "Back"}]
+WINDOW = {"window": {"id": "w1", "name": "Mornings", "plan_id": 7, "auto_start": False}, "next": 1_800_000_000.0,
+          "active": False}
+
+
+def test_the_summary_carries_no_position():
+    s = ha.summary(robot_status(), ops_status(), None, [WINDOW], PLANS, None, {"version": "0.0.0", "build": None})
+    text = json.dumps(s)
+    assert "38.98" not in text and "-76.49" not in text and "position" not in text
+    assert s["battery"] == 82 and s["rtk"] == {"label": "RTK fixed", "sats": 31} and s["local_link"] is True
+
+
+def test_the_next_window_names_its_plan():
+    s = ha.summary(robot_status(), ops_status(), None, [{"window": {"id": "old"}, "next": None, "active": False}, WINDOW],
+                   PLANS, None, {"version": "0.0.0", "build": None})
+    assert s["next_window"] == {"id": "w1", "name": "Mornings", "plan_id": 7, "plan_name": "Back",
+                                "next": 1_800_000_000.0, "active": False, "auto_start": False}
+
+
+def test_a_refused_start_says_why():
+    start = {"plan_id": 7, "would_send": False, "reason": "lawn is Wet",
+             "why": [{"code": "lawn_wet", "title": "The lawn is wet", "fix": "Wait until it dries", "link": "#x",
+                      "detail": "", "severity": "block", "source": "check"}]}
+    s = ha.summary(robot_status(), ops_status(), None, [], PLANS, start, {"version": "0.0.0", "build": None})
+    assert s["can_start"] == {"plan_id": 7, "plan_name": "Back", "would_send": False, "reason": "lawn is Wet",
+                              "why": [{"code": "lawn_wet", "title": "The lawn is wet", "fix": "Wait until it dries"}]}
+
+
+def test_a_run_in_progress_and_the_last_run():
+    run = {"id": 12, "started": 1.0, "distance_m": 40.2, "points": 9, "held_since": None, "plan": None}
+    last = {"id": 11, "started": 0.0, "ended": 1.0, "end_reason": "finished", "distance_m": 300.0,
+            "rtk_fixed_pct": 99.0, "summary_json": "{}"}
+    s = ha.summary(robot_status(run=run), ops_status(), last, [], PLANS, None, {"version": "0.0.0", "build": None})
+    assert s["running"] is True and s["run"] == {"id": 12, "started": 1.0, "distance_m": 40.2}
+    assert s["last_run"] == {"id": 11, "started": 0.0, "ended": 1.0, "end_reason": "finished", "distance_m": 300.0,
+                             "rtk_fixed_pct": 99.0}
+
+
+# -- the route ----------------------------------------------------------------------------------------------------
+class FakeRec:
+    def __init__(self, store):
+        self.store, self.plans = store, PLANS
+
+    def status(self):
+        return robot_status()
+
+    def local_status(self):
+        return {"connected": True}
+
+
+class FakeController:
+    def __init__(self):
+        self.calls = []
+
+    def enabled(self):
+        return True
+
+    async def preview(self, cmd, args, actor="user"):
+        self.calls.append((cmd, args, actor))
+        return {"cmd": cmd, "would_send": True, "reason": "", "why": []}
+
+
+@pytest.fixture
+def client(tmp_path, monkeypatch):
+    monkeypatch.delenv("PANEL_AUTH", raising=False)
+    store = Store(str(tmp_path))
+    gate = auth.Auth(store)
+    gate.announce()
+    ctl = FakeController()
+    upcoming = [WINDOW]
+    fake_ops = SimpleNamespace(controller=ctl, status=ops_status,
+                               scheduler=SimpleNamespace(upcoming=lambda now: upcoming))
+    old = {k: getattr(main.app.state, k, None) for k in ("auth", "rec", "ops")}
+    main.app.state.auth, main.app.state.rec, main.app.state.ops = gate, FakeRec(store), fake_ops
+    c = TestClient(main.app, base_url="http://panel.test")
+    yield SimpleNamespace(c=c, auth=gate, store=store, ctl=ctl, upcoming=upcoming)
+    for k, v in old.items():
+        setattr(main.app.state, k, v)
+
+
+def _token(t):
+    assert t.c.post("/api/auth/setup", json={"code": t.auth.setup_code, "password": "correct horse"}).status_code == 200
+    return t.c.post("/api/auth/tokens", json={"name": "ha"}).json()["token"]
+
+
+def test_a_token_reads_the_summary_and_its_start_check_is_the_strict_one(client):
+    bot = TestClient(main.app, base_url="http://panel.test", headers={"Authorization": f"Bearer {_token(client)}"})
+    r = bot.get("/api/ha/summary")
+    assert r.status_code == 200, r.text
+    s = r.json()
+    assert s["api"] == ha.SUMMARY_API and s["version"] and s["control_enabled"] is True
+    assert s["can_start"]["would_send"] is True and s["can_start"]["plan_name"] == "Back"
+    assert client.ctl.calls == [("start_plan", {"plan_id": 7}, "token")]       # the next window's plan, as a token
+
+
+def test_without_a_window_the_start_check_uses_the_first_plan(client):
+    client.upcoming.clear()
+    _token(client)
+    assert client.c.get("/api/ha/summary").json()["next_window"] is None
+    assert client.ctl.calls == [("start_plan", {"plan_id": 3}, "user")]
+
+
+def test_the_summary_is_locked(client):
+    assert client.c.get("/api/ha/summary").status_code == 401
+
+
+def test_a_start_check_that_fails_leaves_the_rest(client, monkeypatch):
+    async def boom(*a, **k):
+        raise RuntimeError("frigate down")
+    monkeypatch.setattr(client.ctl, "preview", boom)
+    _token(client)
+    s = client.c.get("/api/ha/summary").json()
+    assert s["can_start"] is None and s["battery"] == 82
