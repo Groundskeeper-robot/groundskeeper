@@ -303,6 +303,27 @@ async def status(request: Request):
     return full_status(request)
 
 
+@app.get("/api/ha/summary")
+async def ha_summary(request: Request):
+    """One small read for a Home Assistant integration (#12): state, battery, positioning, lawn, last run, the next
+    schedule window and whether a start would go out now. No position, map or camera data. The start check runs the
+    interlocks for the next window's plan (else the robot's first plan) as the caller, so a token gets the strict ones;
+    nothing is sent."""
+    r, o = rec(request), ops(request)
+    upcoming = o.scheduler.upcoming(datetime.now())
+    nxt = ha_mod.next_window(upcoming)
+    plan_id = nxt["plan_id"] if nxt and nxt["plan_id"] is not None else next(
+        (p.get("id") for p in r.plans or []), None)
+    try:
+        start = {**await o.controller.preview("start_plan", {"plan_id": plan_id}, actor=_actor(request)),
+                 "plan_id": plan_id}
+    except Exception:
+        log.exception("start check for the HA summary failed")
+        start = None
+    runs = r.store.runs(1)
+    return ha_mod.summary(r.status(), o.status(), runs[0] if runs else None, upcoming, r.plans, start, version_info())
+
+
 @app.get("/api/stream")
 async def stream(request: Request):
     r = rec(request)
