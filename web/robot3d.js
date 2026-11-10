@@ -278,6 +278,9 @@ function r3dGate(s, now) {
   const df = dist(s, f), gf = gap(s, f, now, f.at);
   if (fits(df, gf)) return take(df, gf);
   const h = R3D.held;
+  // The held sample again (the status repeats the newest pose, which the pose stream also sends): not a second
+  // sample, so it confirms nothing and the hold stands.
+  if (h && (s.t != null ? s.t === h.s.t : s.lon === h.s.lon && s.lat === h.s.lat)) return false;
   if (h && now - h.at <= R3D_GATE_HOLD_S * 1000) {
     const dh = dist(s, h.s), gh = gap(s, h.s, now, h.at);
     if (fits(dh, gh)) return take(dh, gh);

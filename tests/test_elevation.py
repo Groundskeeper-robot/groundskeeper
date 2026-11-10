@@ -248,6 +248,8 @@ def test_heights_are_kept_and_only_the_new_rows_are_read_again(tmp_path):
     pts, runs = st.height_points()
     assert len(pts) == 6 and pts[-1][2] == 291.0 and runs == 2 and len(raw_reads) == 1   # no full read again
     assert st.height_points()[0] is pts                          # nothing new: the same list
+    st._heights = None
+    assert st.height_points()[0] == pts                          # read in full: the same points, in the same order
 
 
 def test_a_run_ending_or_old_snapshots_going_reads_the_heights_again(tmp_path):

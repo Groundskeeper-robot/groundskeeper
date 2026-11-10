@@ -690,6 +690,16 @@ async function refreshGround() {
   let meta;
   try { meta = await getJSON("/api/elevation/ground"); } catch { return; }      // the ground on show stays
   if (meta.version === state.ground3dMeta.version || !map.getSource("ground3d")) return;
+  const old = state.ground3dMeta;
+  if (meta.minzoom !== old.minzoom || meta.maxzoom !== old.maxzoom || String(meta.bounds) !== String(old.bounds)) {
+    // A ground over a different area (the robot's map grew): a source's bounds and zooms are fixed when it is
+    // added, so take both off and let sync3d add them again from the new ground.
+    if (map.getTerrain()) map.setTerrain(null);
+    if (map.getLayer("ground3d-shade")) map.removeLayer("ground3d-shade");
+    for (const id of ["ground3d", "ground3d-shade"]) if (map.getSource(id)) map.removeSource(id);
+    state.ground3dMeta = null;
+    return sync3d(false);
+  }
   state.ground3dMeta = meta;
   for (const id of ["ground3d", "ground3d-shade"]) map.getSource(id).setTiles([groundTiles(meta)]);
   syncGround3dTools();

@@ -273,6 +273,7 @@ class Store:
         last = float("-inf") if last is None else last
         runs = {r[0] for r in self.db.execute("SELECT DISTINCT run_id FROM telemetry WHERE hgt IS NOT NULL AND run_id IS NOT NULL")}
         first = self.db.execute("SELECT MIN(ts) FROM telemetry WHERE hgt IS NOT NULL").fetchone()[0]
+        older: list = []                    # runs from before telemetry had heights (oldest first)
         for run in self.db.execute("SELECT id, started, ended FROM runs WHERE ended IS NOT NULL ORDER BY started").fetchall():
             if run[0] in runs or (first is not None and run[1] >= first):
                 continue
@@ -281,11 +282,11 @@ class Store:
                 r = snap.get("RTKMSG") if isinstance(snap, dict) else None
                 if isinstance(r, dict) and str(r.get("status")) == "4" and isinstance(r.get("hgt"), (int, float)) \
                         and isinstance(r.get("lan"), (int, float)) and isinstance(r.get("lon"), (int, float)) and r["lan"]:
-                    pts.append((float(r["lon"]), float(r["lan"]), float(r["hgt"])))
+                    older.append((float(r["lon"]), float(r["lan"]), float(r["hgt"])))
                     got += 1
             if got:
                 runs.add(run[0])
-        return pts, runs, last
+        return older + pts, runs, last      # so a full read and a kept list topped up give the same order
 
     def prune_raw(self, keep_days: float) -> int:
         return self.db.execute("DELETE FROM snapshot_raw WHERE ts < ?", (time.time() - keep_days * 86400,)).rowcount
