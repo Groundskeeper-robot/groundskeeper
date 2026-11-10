@@ -557,5 +557,6 @@ The panel was built in this order; each step works without the next.
 - Not yet known: exactly who wins when the phone app and the panel command the robot at the same moment (§5.5).
 - Not yet known: how the app's remaining area settings map to the robot's numbers (mowing height scale, turning
   mode, route pattern and others; see `map-writes.md`).
-- Not yet known: which of the robot's three headings (RTK heading, odometry `phi`, IMU yaw) best matches the
-  direction of travel.
+- Of the robot's three headings (RTK heading, odometry `phi`, IMU yaw), the panel draws odometry `phi` (the 2D arrow
+  and the 3D model): it was checked against the direction actually driven and matched it (`telemetry.heading_deg`).
+  RTK heading and IMU yaw have not been compared.

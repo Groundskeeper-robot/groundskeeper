@@ -1,4 +1,5 @@
 """The 3D ground's maths (app/elevation.py) on grids whose answers are known: planes, gaps, edges."""
+import asyncio
 import io
 import math
 
@@ -159,3 +160,133 @@ def test_blend_with_one_source_uses_that_source():
 def test_resample_onto_the_same_grid_is_the_grid():
     z = np.arange(12 * 10, dtype=np.float64).reshape(12, 10)
     assert np.array_equal(el.resample(z, BOX, BOX, z.shape), z)
+
+
+def test_a_coarse_slope_onto_a_finer_grid_comes_out_as_a_slope_not_steps():
+    coarse = plane(0.1, shape=(20, 24))                       # ~6.8 m cells, rising 0.68 m a cell
+    fine_shape = (100, 120)
+    dx = el.cell_m(BOX, fine_shape)[0]
+    steps = lambda z: np.abs(np.diff(z[50, 10:-10]))           # away from the edges, where it holds the edge cell
+    near, smooth = el.resample(coarse, BOX, BOX, fine_shape), el.resample_smooth(coarse, BOX, BOX, fine_shape)
+    assert steps(near).max() > 0.5                              # nearest: flat, then a jump of a whole cell
+    assert np.allclose(steps(smooth), 0.1 * dx, atol=0.01)      # bilinear: the plane's own rise, every cell
+
+
+def test_smooth_resampling_keeps_the_gaps_where_they_are():
+    z = plane(0.1, shape=(20, 24))
+    z[:, :8] = np.nan
+    near, smooth = el.resample(z, BOX, BOX, (100, 120)), el.resample_smooth(z, BOX, BOX, (100, 120))
+    assert np.array_equal(np.isnan(near), np.isnan(smooth))
+    assert np.allclose(el.resample_smooth(z, BOX, BOX, z.shape), z, atol=1e-4, equal_nan=True)   # same grid: itself
+
+
+def _held(tmp_path, fetched=1):
+    e = el.Elevation(str(tmp_path))
+    e.src["lidar"].update(z=plane(0.02), meta={"box": BOX, "fetched": fetched})
+    return e
+
+
+def test_a_tile_asked_for_under_an_older_grounds_version_is_not_current(tmp_path):
+    e = _held(tmp_path)
+    v1 = asyncio.run(e.ground(True, False))["version"]
+    assert e.is_current(v1) and e.is_current(None)
+    e.src["lidar"]["meta"] = {"box": BOX, "fetched": 2}
+    v2 = asyncio.run(e.ground(True, False))["version"]
+    assert v2 != v1 and e.is_current(v2) and not e.is_current(v1)
+
+
+def test_a_tile_drawn_while_the_ground_changes_stays_out_of_the_new_grounds_cache(tmp_path):
+    async def go():
+        e = _held(tmp_path)
+        await e.ground(True, False)
+        old = e.g["tiles"]
+        tile = asyncio.create_task(e.ground_tile(14, 0, 0))
+        await asyncio.sleep(0)                                   # it has started, on the first ground
+        e.src["lidar"]["meta"] = {"box": BOX, "fetched": 2}
+        await e.ground(True, False)
+        await tile
+        return e, old
+
+    e, old = asyncio.run(go())
+    assert (14, 0, 0) in old and not e.g["tiles"]
+
+
+def test_cell_medians_match_numpys_median_per_cell():
+    rng = np.random.default_rng(7)
+    cell, value = rng.integers(0, 40, 3000), rng.normal(280, 2, 3000)
+    got = el.cell_medians(cell, value, 50)
+    for i in range(50):
+        vals = value[cell == i]
+        assert np.isnan(got[i]) if not len(vals) else abs(got[i] - np.median(vals)) < 1e-12
+    assert np.isnan(el.cell_medians(np.array([], dtype=int), np.array([]), 3)).all()
+
+
+def _mown(st, run, t0, n, hgt=278.0):
+    for k in range(n):
+        st.add_telemetry({"ts": t0 + k, "run_id": run, "lon": -76.5004, "lat": 39.0004, "rtk_status": 4, "hgt": hgt + k})
+
+
+def _store_with_an_old_run(tmp_path):
+    from app.store import Store
+    st = Store(str(tmp_path))
+    old = st.start_run(1000.0, 5, None)                          # before hgt was recorded: raw snapshots only
+    st.db.execute("UPDATE runs SET ended = 1100 WHERE id = ?", (old,))
+    st.add_raw(1010.0, {"RTKMSG": {"status": "4", "hgt": 279.1, "lan": 39.0005, "lon": -76.5005}})
+    run = st.start_run(2000.0, 5, None)
+    _mown(st, run, 2001.0, 3)
+    return st, run
+
+
+def test_heights_are_kept_and_only_the_new_rows_are_read_again(tmp_path):
+    st, run = _store_with_an_old_run(tmp_path)
+    raw_reads = []
+    read = st.raw
+    st.raw = lambda a, b: raw_reads.append(a) or read(a, b)
+    pts, runs = st.height_points()
+    assert len(pts) == 4 and runs == 2 and len(raw_reads) == 1
+    _mown(st, run, 2010.0, 2, hgt=290.0)                         # the run carries on
+    pts, runs = st.height_points()
+    assert len(pts) == 6 and pts[-1][2] == 291.0 and runs == 2 and len(raw_reads) == 1   # no full read again
+    assert st.height_points()[0] is pts                          # nothing new: the same list
+    st._heights = None
+    assert st.height_points()[0] == pts                          # read in full: the same points, in the same order
+
+
+def test_a_run_ending_or_old_snapshots_going_reads_the_heights_again(tmp_path):
+    st, run = _store_with_an_old_run(tmp_path)
+    assert len(st.height_points()[0]) == 4
+    st.db.execute("UPDATE runs SET ended = 2100 WHERE id = ?", (run,))
+    _mown(st, run, 2050.0, 1)
+    assert len(st.height_points()[0]) == 5
+    st.prune_raw(0)                                              # the old run's snapshots are gone
+    pts, runs = st.height_points()
+    assert len(pts) == 4 and runs == 1
+
+
+def test_requests_that_arrive_together_work_the_ground_out_once(tmp_path, monkeypatch):
+    calls = []
+    real = el.blend
+    monkeypatch.setattr(el, "blend", lambda *a: calls.append(1) or real(*a))
+    e = _held(tmp_path)
+
+    async def go():
+        return await asyncio.gather(*(e.ground(True, False) for _ in range(5)))
+
+    metas = asyncio.run(go())
+    assert len(calls) == 1 and len({m["version"] for m in metas}) == 1
+
+
+def test_robot_surfaces_asked_for_together_are_worked_out_once(tmp_path, monkeypatch):
+    calls = []
+    real = el.measured_surface
+    monkeypatch.setattr(el, "measured_surface", lambda *a, **k: calls.append(1) or real(*a, **k))
+    e = el.Elevation(str(tmp_path))
+    rng = np.random.default_rng(1)
+    pts = [(BOX[0] + 0.001 + rng.uniform(-5e-4, 5e-4), BOX[1] + 0.0005 + rng.uniform(-3e-4, 3e-4), 280.0)
+           for _ in range(200)]
+
+    async def go():
+        return await asyncio.gather(*(e.ensure_robot(pts, BOX, 2000, 1) for _ in range(4)))
+
+    asyncio.run(go())
+    assert len(calls) == 1

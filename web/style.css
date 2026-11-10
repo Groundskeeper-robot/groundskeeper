@@ -15,7 +15,9 @@
   --area: #E8EEEA; --nogo: #E5484D; --nogo-label: #FFB3B5; --novis: #79B8F0; --fence: #E8D44D; --road: #69736E;
   --trk-fixed: #8BD49A; --trk-float: #F0B955; --trk-single: #F2784B; --gap: #FF5FA2; --offplan: #FF5FA2; --edge: #B79CF0;
   --robot: #79B8F0; --robot-held: #F0B955; --robot-error: #F08A6E;
-  --robot-body: #6B6F6C; --robot-track: #2A2D2B; --robot-trim: #F0B955;     /* the 3D map's robot model */
+  /* the 3D map's robot model: shell, frame, tracks, Yarbo yellow, the stop button, headlights */
+  --robot-body: #2A2D30; --robot-frame: #4A5055; --robot-track: #17191A; --robot-trim: #F2C01E; --robot-stop: #D8322B;
+  --robot-light: #F4F7FA;
   --onmap: #F2F5F3; --cam-label: #9FD3F0; --camera: #F2F5F3;
   --sidewalk: #C9D4CE; --route: #C3C9CC; --map-ink: #0E1311;   /* sidewalks, a planned route, dark outlines on the map */
   --prob-stuck: #F08A6E; --prob-error: #E46FB8; --prob-steep: #F0B955; --prob-position: #9AA7FF; --prob-effort: #D9D46A;

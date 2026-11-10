@@ -241,12 +241,39 @@ class Store:
     def height_points(self) -> tuple[list[tuple[float, float, float]], int]:
         """The robot's RTK-fixed heights while it worked, as (lon, lat, metres), and how many runs they come from.
         Telemetry has them from 2026-10-08 (column hgt); runs before that only in the raw snapshots (RTKMSG, one a
-        minute, kept RAW_KEEP_DAYS)."""
+        minute, kept RAW_KEEP_DAYS).
+        Kept between calls, since every look at the 3D view asks and a season of mowing is a lot of rows: telemetry
+        is only ever added to (a merge moves rows between runs, never out of one), so while the runs and the kept
+        snapshots are the same, only rows that arrived since the last call are read. Anything else reads it all
+        again. The list is shared: callers must not change it."""
+        key = (tuple(self.db.execute("SELECT COUNT(*), MAX(id), TOTAL(ended) FROM runs").fetchone()),
+               self.db.execute("SELECT MIN(ts) FROM snapshot_raw").fetchone()[0])
+        c = getattr(self, "_heights", None)
+        if c is not None and c["key"] == key:
+            new = self.db.execute(
+                "SELECT ts, lon, lat, hgt, rtk_status FROM telemetry WHERE ts > ? AND hgt IS NOT NULL "
+                "AND run_id IS NOT NULL AND lon IS NOT NULL ORDER BY ts", (c["ts"],)).fetchall()
+            if new:
+                c["pts"].extend((r[1], r[2], r[3]) for r in new if r[4] == 4)
+                c["runs"].update(r[0] for r in self.db.execute(
+                    "SELECT DISTINCT run_id FROM telemetry WHERE ts > ? AND hgt IS NOT NULL AND run_id IS NOT NULL",
+                    (c["ts"],)))
+                c["ts"] = new[-1][0]
+            return c["pts"], len(c["runs"])
+        pts, runs, last = self._read_heights()
+        self._heights = {"key": key, "pts": pts, "runs": runs, "ts": last}
+        return pts, len(runs)
+
+    def _read_heights(self) -> tuple[list, set, float]:
+        """All of `height_points` from the database: (points, run ids, the arrival time of the newest row)."""
         pts = [(r[0], r[1], r[2]) for r in self.db.execute(
             "SELECT lon, lat, hgt FROM telemetry WHERE hgt IS NOT NULL AND rtk_status = 4 AND run_id IS NOT NULL "
             "AND lon IS NOT NULL ORDER BY ts")]
+        last = self.db.execute("SELECT MAX(ts) FROM telemetry").fetchone()[0]     # every row so far has been looked at
+        last = float("-inf") if last is None else last
         runs = {r[0] for r in self.db.execute("SELECT DISTINCT run_id FROM telemetry WHERE hgt IS NOT NULL AND run_id IS NOT NULL")}
         first = self.db.execute("SELECT MIN(ts) FROM telemetry WHERE hgt IS NOT NULL").fetchone()[0]
+        older: list = []                    # runs from before telemetry had heights (oldest first)
         for run in self.db.execute("SELECT id, started, ended FROM runs WHERE ended IS NOT NULL ORDER BY started").fetchall():
             if run[0] in runs or (first is not None and run[1] >= first):
                 continue
@@ -255,11 +282,11 @@ class Store:
                 r = snap.get("RTKMSG") if isinstance(snap, dict) else None
                 if isinstance(r, dict) and str(r.get("status")) == "4" and isinstance(r.get("hgt"), (int, float)) \
                         and isinstance(r.get("lan"), (int, float)) and isinstance(r.get("lon"), (int, float)) and r["lan"]:
-                    pts.append((float(r["lon"]), float(r["lan"]), float(r["hgt"])))
+                    older.append((float(r["lon"]), float(r["lan"]), float(r["hgt"])))
                     got += 1
             if got:
                 runs.add(run[0])
-        return pts, len(runs)
+        return older + pts, runs, last      # so a full read and a kept list topped up give the same order
 
     def prune_raw(self, keep_days: float) -> int:
         return self.db.execute("DELETE FROM snapshot_raw WHERE ts < ?", (time.time() - keep_days * 86400,)).rowcount
