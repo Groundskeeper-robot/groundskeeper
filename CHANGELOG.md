@@ -7,6 +7,9 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ### Added
 
+- **Installable with pip or uv** (`pyproject.toml`): another Python tool can depend on Groundskeeper's `app` package,
+  and `uv sync` sets up a checkout. The Docker image and `requirements*.txt` are unchanged, and a test keeps the two
+  dependency lists the same. Running the panel itself still needs a checkout or the container.
 - **Single sign-on with OpenID Connect** (Authentik, Keycloak, Authelia, Google, ...): "Sign in with …" on the sign-in
   page, set with `OIDC_*` in the environment and modelled on Grafana's generic OAuth sign-in. Only the allowed groups
   or email domains get in, and the panel refuses to start with single sign-on on and neither set. `PANEL_PASSWORD=off`
