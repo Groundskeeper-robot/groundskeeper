@@ -5,6 +5,13 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ## Unreleased
 
+### Added
+
+- **A Helm chart** (`deploy/helm/groundskeeper/`, community-maintained): deploy the panel on Kubernetes as a
+  single-pod StatefulSet with a Service and a PersistentVolumeClaim for `/data`, and a documented `values.yaml`. A
+  StatefulSet, so a replacement pod never runs beside the old one. Everything site-specific stays in the panel's
+  Settings, and control is off on a new install as always.
+
 ## 0.19.6 — 2026-11-09
 
 ### Added
