@@ -7,6 +7,7 @@
    Live, it takes every position sample the robot sends (the stream's pose events, #35: ~1 a second while the phone
    app is open, else the panel's own reads),
    in the robot's own time order: a late one from the backlog after a dropout is dropped instead of drawn as a detour.
+   A single sample further away than the robot could have driven is held until the next one confirms or drops it.
    Between samples it carries on at the reported speed and heading for up to 2.5 s, then catches up with the next
    real position, faster the further behind it is but never in a jump. In a replay it follows the replay point.
    three.js is loaded the first time the 3D view is switched on.
@@ -18,6 +19,8 @@ const R3D = {
   THREE: null, loading: null, layer: null,
   pose: null,         // what is drawn: {lon, lat, heading, pitch, roll}
   fix: null,          // the last live position: {lon, lat, heading, pitch, roll, speed, t (robot time), at}
+  held: null,         // a far sample waiting for the next one to confirm it (the speed gate): {s, at}
+  pace: 0,            // metres a second between recent samples, smoothed (the speed gate)
   glide: null,        // a replay step: {from, to, t0, ms}
   mode: "live",       // live (the robot now) | replay (a selected run's replay point)
   colour: null,
@@ -25,12 +28,16 @@ const R3D = {
   follow: { on: false, offset: 45, cam: null, turning: false, hands: false, wheelAt: 0 },   // cam: the heading the camera has turned to
 };
 const R3D_DEG = Math.PI / 180;
-const R3D_LEN = 1.05;            // metres, nose to tail
+const R3D_LEN = 1.35;            // metres, the mower deck's bumper to the back of the tracks
 const R3D_MIN_PX = 34;           // the model is never drawn shorter than this on screen
 const R3D_AHEAD_S = 2.5;         // keep moving on the last speed and heading for this long, then wait
 const R3D_EASE_S = 0.5;          // how quickly it closes on where it should be
 const R3D_JUMP_M = 25;           // further behind than this (a new run, a long gap): put it there at once
 const R3D_RESET_S = 30;          // nothing newer by the robot's clock this long: take the next sample anyway
+const R3D_GATE_MPS = 2;          // faster than this between two samples is a stray reading, not the robot (it does ~1 m/s)
+const R3D_GATE_PACE = 2.5;       // ...or than this many times the pace it has been keeping (a sped-up demo is faster)
+const R3D_GATE_M = 3;            // ...beyond this much room for noise, whatever the time between them
+const R3D_GATE_HOLD_S = 6;       // a far sample nothing confirms is dropped; one this much later is taken anyway
 const R3D_FOLLOW_SIDE = 45;      // the camera sits behind the robot and this far round to one side
 const R3D_FOLLOW_TURN = 40;      // degrees a second it turns at most to stay behind the robot
 const R3D_FOLLOW_LEAD = 1.5;     // metres ahead of the robot the camera looks at
@@ -56,24 +63,63 @@ function r3dBuild(THREE) {
     m.renderOrder = -1 - i;
     g.add(m);
   });
-  const box = (w, l, h, c, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, l, h), mat(c)); m.position.set(x, y, z); g.add(m); return m; };
-  box(0.18, 0.95, 0.26, MAP.track3d, 0.33, 0, 0.13);                      // tracks
-  box(0.18, 0.95, 0.26, MAP.track3d, -0.33, 0, 0.13);
-  box(0.50, 0.80, 0.30, MAP.body3d, 0, 0, 0.36);                          // body
-  box(0.44, 0.62, 0.08, MAP.track3d, 0, -0.04, 0.55);                     // top cover
-  box(0.82, 0.36, 0.14, MAP.track3d, 0, 0.60, 0.10);                      // mower deck in front
-  box(0.50, 0.06, 0.06, MAP.trim3d, 0, 0.79, 0.20);                       // its front trim
-  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.38), mat(MAP.body3d));
-  mast.rotation.x = Math.PI / 2;
-  mast.position.set(0, -0.28, 0.78);
-  g.add(mast);
-  const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.025, 16), mat(MAP.onmap));
-  disc.rotation.x = Math.PI / 2;
-  disc.position.set(0, -0.28, 0.98);
-  g.add(disc);
-  R3D.lamp = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 8), new THREE.MeshBasicMaterial({ color: R3D.colour || MAP.robot }));
-  R3D.lamp.position.set(0, 0.12, 0.62);
-  g.add(R3D.lamp);
+  // A Yarbo core with the mower head, about life size: rounded tracks, the body with its top cover and carry handle,
+  // the two GNSS antennas on top, a light bar in the status colour, and the deck in front. Simple solids, so it
+  // reads at 34 px as well as close up.
+  const dark = mat(MAP.track3d), body = mat(MAP.body3d), trim = mat(MAP.trim3d);
+  const add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); g.add(o); return o; };
+  // A rounded rectangle, w across and l long, centred on 0,0.
+  const rounded = (w, l, r) => {
+    const s = new THREE.Shape(), x = w / 2, y = l / 2;
+    s.moveTo(-x + r, -y);
+    s.lineTo(x - r, -y); s.quadraticCurveTo(x, -y, x, -y + r);
+    s.lineTo(x, y - r); s.quadraticCurveTo(x, y, x - r, y);
+    s.lineTo(-x + r, y); s.quadraticCurveTo(-x, y, -x, y - r);
+    s.lineTo(-x, -y + r); s.quadraticCurveTo(-x, -y, -x + r, -y);
+    return s;
+  };
+  // A slab of that outline, `h` tall from its base, with softened edges.
+  const slab = (w, l, h, r, bevel = 0.015) => {
+    const geo = new THREE.ExtrudeGeometry(rounded(w - 2 * bevel, l - 2 * bevel, r), {
+      depth: h - 2 * bevel, bevelEnabled: true, bevelSize: bevel, bevelThickness: bevel, bevelSegments: 2, curveSegments: 8 });
+    geo.translate(0, 0, bevel);
+    return geo;
+  };
+  // Tracks: a stadium seen from the side (0.95 m long, 0.26 m tall), 0.17 m wide, with a hub at each end.
+  const track = new THREE.ExtrudeGeometry(rounded(0.95, 0.26, 0.13), {
+    depth: 0.15, bevelEnabled: true, bevelSize: 0.01, bevelThickness: 0.01, bevelSegments: 2, curveSegments: 12 });
+  track.rotateY(Math.PI / 2);                              // the outline's across -> along, its depth -> across
+  track.rotateX(Math.PI / 2);                              // its height -> up
+  track.translate(-0.075, 0, 0.13);
+  const hub = new THREE.CylinderGeometry(0.07, 0.07, 0.02, 20);
+  hub.rotateZ(Math.PI / 2);
+  for (const side of [1, -1]) {
+    add(track, dark, side * 0.33, 0, 0);
+    for (const y of [0.34, -0.34]) add(hub, body, side * 0.42, y, 0.13);
+  }
+  add(slab(0.50, 0.82, 0.30, 0.08), body, 0, -0.02, 0.21);                  // body
+  add(slab(0.44, 0.60, 0.05, 0.06), dark, 0, -0.06, 0.50);                  // top cover
+  const handle = new THREE.TorusGeometry(0.17, 0.018, 8, 24, Math.PI);       // carry handle across the back
+  handle.rotateX(Math.PI / 2);
+  add(handle, dark, 0, -0.38, 0.50);
+  const puck = new THREE.CylinderGeometry(0.065, 0.075, 0.035, 20);          // the two GNSS antennas
+  puck.rotateX(Math.PI / 2);
+  for (const y of [0.16, -0.24]) add(puck, mat(MAP.onmap), 0, y, 0.57);
+  R3D.lamp = add(new THREE.BoxGeometry(0.34, 0.03, 0.04), new THREE.MeshBasicMaterial({ color: R3D.colour || MAP.robot }),
+                 0, 0.39, 0.44);                                             // light bar across the front, status colour
+  add(new THREE.BoxGeometry(0.30, 0.16, 0.08), dark, 0, 0.47, 0.16);        // the arm the head hangs on
+  const deck = new THREE.Shape();                                            // the mower deck: square back, round front
+  deck.moveTo(-0.41, -0.18);
+  deck.lineTo(0.41, -0.18);
+  deck.lineTo(0.41, 0.04);
+  deck.quadraticCurveTo(0.41, 0.20, 0.20, 0.20);
+  deck.lineTo(-0.20, 0.20);
+  deck.quadraticCurveTo(-0.41, 0.20, -0.41, 0.04);
+  deck.lineTo(-0.41, -0.18);
+  const deckGeo = new THREE.ExtrudeGeometry(deck, {
+    depth: 0.10, bevelEnabled: true, bevelSize: 0.015, bevelThickness: 0.015, bevelSegments: 2, curveSegments: 12 });
+  add(deckGeo, dark, 0, 0.66, 0.035);
+  add(slab(0.44, 0.035, 0.035, 0.012, 0.008), trim, 0, 0.875, 0.08);        // its bumper strip
   return g;
 }
 
@@ -204,11 +250,40 @@ function r3dTake(s) {
   const now = performance.now(), f = R3D.fix;
   if (f && f.t != null && s.t != null && (s.t === f.t || (s.t < f.t && now - f.at < R3D_RESET_S * 1000))) return;
   if (f && s.t == null && s.lon === f.lon && s.lat === f.lat) return;     // no robot time: the same sample again
+  if (!r3dGate(s, now)) return;
   R3D.fix = { lon: s.lon, lat: s.lat, heading: s.heading ?? (f ? f.heading : 0), pitch: s.pitch || 0, roll: s.roll || 0,
               speed: s.speed || 0, t: s.t ?? null, at: now };
   if (!state.map || !state.map.getLayer("robot3d") || R3D.mode !== "live") return;      // kept for when 3D comes on
   if (!R3D.pose) R3D.pose = { ...R3D.fix };
   r3dKick();
+}
+
+// The speed gate: whether to take a sample. One that is further from the last than the robot could have driven in
+// the time between them is held, not drawn: a single stray position would otherwise send the model off and back.
+// The next sample decides. Near the held one, the robot really moved (it was carried, or a long gap ended) and the
+// jump is taken; near the last one, the held one was a stray and is dropped. A held sample that nothing has
+// confirmed for R3D_GATE_HOLD_S is dropped, and after that long with nothing taken the next sample is taken as it is.
+// The pace it allows is the larger of R3D_GATE_MPS and R3D_GATE_PACE times the pace kept between recent samples.
+function r3dGate(s, now) {
+  const f = R3D.fix;
+  if (!f || now - f.at > R3D_GATE_HOLD_S * 1000) { R3D.held = null; R3D.pace = 0; return true; }
+  const dist = (a, b) => { const [kx, ky] = r3dMetres(b.lat); return Math.hypot((a.lon - b.lon) * kx, (a.lat - b.lat) * ky); };
+  const gap = (a, b, aAt, bAt) => Math.max(0, a.t != null && b.t != null ? a.t - b.t : (aAt - bAt) / 1000);
+  const fits = (d, secs) => d <= R3D_GATE_M + Math.max(R3D_GATE_MPS, R3D_GATE_PACE * (R3D.pace || 0)) * secs;
+  const take = (d, secs) => {          // a sample taken: the pace between it and the one before, smoothed
+    if (secs > 0.2 && secs <= 3) R3D.pace = 0.7 * (R3D.pace || 0) + 0.3 * Math.min(10, d / secs);
+    R3D.held = null;
+    return true;
+  };
+  const df = dist(s, f), gf = gap(s, f, now, f.at);
+  if (fits(df, gf)) return take(df, gf);
+  const h = R3D.held;
+  if (h && now - h.at <= R3D_GATE_HOLD_S * 1000) {
+    const dh = dist(s, h.s), gh = gap(s, h.s, now, h.at);
+    if (fits(dh, gh)) return take(dh, gh);
+  }
+  R3D.held = { s, at: now };           // too far from the last: wait for the next one to confirm it
+  return false;
 }
 
 // A replay step: glide from where the model is to the replay row over the next timer tick.

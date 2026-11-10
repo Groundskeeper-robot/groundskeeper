@@ -83,6 +83,20 @@ def parse_tiff(data: bytes) -> np.ndarray:
     return z
 
 
+def cell_medians(cell: np.ndarray, value: np.ndarray, n: int) -> np.ndarray:
+    """The median of `value` per cell index (0..n-1), NaN for a cell with none: what np.median gives per cell, worked
+    out in one sort rather than a Python loop over a season's heights."""
+    out = np.full(n, np.nan, dtype=np.float64)
+    if not len(cell):
+        return out
+    order = np.lexsort((value, cell))                                 # by cell, then by value within a cell
+    c, v = np.asarray(cell)[order], np.asarray(value, dtype=np.float64)[order]
+    start = np.flatnonzero(np.r_[True, c[1:] != c[:-1]])
+    count = np.diff(np.r_[start, len(c)])
+    out[c[start]] = (v[start + (count - 1) // 2] + v[start + count // 2]) / 2
+    return out
+
+
 def measured_surface(pts: np.ndarray, box, area_m2: float, per_cell: float = 3.0, reach: int = 2) -> tuple[np.ndarray, float]:
     """A height grid from the robot's own heights (rows of lon, lat, metres): about `per_cell` points per cell over the
     mowed area, the median per cell, empty cells within `reach` cells filled by inverse distance, a 3x3 smoothing;
@@ -94,13 +108,7 @@ def measured_surface(pts: np.ndarray, box, area_m2: float, per_cell: float = 3.0
     h = max(2, math.ceil((box[3] - box[1]) * M_LAT / res))
     col = np.clip(((pts[:, 0] - box[0]) * kx / res).astype(int), 0, w - 1)
     row = np.clip(((box[3] - pts[:, 1]) * M_LAT / res).astype(int), 0, h - 1)
-    cells: dict = {}
-    for i, v in zip((row * w + col).tolist(), pts[:, 2].tolist()):
-        cells.setdefault(i, []).append(v)
-    z = np.full(h * w, np.nan, dtype=np.float64)
-    for i, vals in cells.items():
-        z[i] = float(np.median(vals))
-    z = z.reshape(h, w)
+    z = cell_medians(row * w + col, pts[:, 2], h * w).reshape(h, w)
 
     def shifted(a, dy, dx):
         out = np.full_like(a, np.nan)
@@ -298,6 +306,9 @@ class Elevation:
         self.src: dict = {"lidar": {"z": None, "meta": None}, "robot": {"z": None, "meta": None, "key": None}}
         self.g: dict = {"key": None, "z": None, "box": None, "meta": None, "tiles": OrderedDict()}   # the 3D ground
         self._lock = asyncio.Lock()
+        # One rebuild of the robot's surface or the ground at a time: after a restart the page's tiles all ask for
+        # the ground at once, and each would otherwise work it out again in its own thread.
+        self._build = asyncio.Lock()
         self._load()
 
     def _load(self) -> None:
@@ -344,8 +355,16 @@ class Elevation:
                sum(len(r) for r in rings or []))
         if R["key"] == key and R["z"] is not None:
             return R["meta"]
+        pts = np.asarray(points, dtype=np.float64)                    # a copy: the store keeps adding to its list
+        async with self._build:
+            if R["key"] == key and R["z"] is not None:               # worked out while this call waited
+                return R["meta"]
+            return await self._robot_surface(pts, key, bounds, area_m2, runs, rings)
+
+    async def _robot_surface(self, points: np.ndarray, key, bounds, area_m2: float, runs: int, rings) -> dict:
+        R = self.src["robot"]
         box = box_around(bounds)
-        z, res = await asyncio.to_thread(measured_surface, np.asarray(points, dtype=np.float64), box, area_m2)
+        z, res = await asyncio.to_thread(measured_surface, points, box, area_m2)
         if rings:
             z = np.where(inside_rings(box, z.shape, rings, margin_m=1.0), z, np.nan).astype(np.float32)
         if not np.isfinite(z).any():
@@ -367,6 +386,13 @@ class Elevation:
         key = ((L["meta"] or {}).get("fetched") if lz is not None else None, R["key"] if rz is not None else None)
         if self.g["key"] == key and self.g["z"] is not None:
             return self.g["meta"]
+        async with self._build:
+            if self.g["key"] == key and self.g["z"] is not None:          # worked out while this call waited
+                return self.g["meta"]
+            return await self._ground_build(lz, rz, key)
+
+    async def _ground_build(self, lz, rz, key) -> dict:
+        L, R = self.src["lidar"], self.src["robot"]
         z, box, share = await asyncio.to_thread(blend, lz, (L["meta"] or {}).get("box"), rz, (R["meta"] or {}).get("box"))
         lat = (box[1] + box[3]) / 2
         dx, dy = (FLAT_M + TAPER_M) / m_per_lon(lat), (FLAT_M + TAPER_M) / M_LAT

@@ -43,8 +43,9 @@ are pink, edge passes violet.
 - **3D:** tilts the map and raises the ground: the robot's own heights over the lawns (they sharpen with every mow),
   public lidar elevation (USGS 3DEP) around them. The **1× to 3×** menu next to it draws it taller so small slopes show. Right-drag, or two fingers on
   a phone, turns and tilts; the compass resets north. The same view works in Runs, for replay. In 3D the robot is a
-  small 3D model: it faces where it is heading, leans with its own tilt, and glides between updates instead of
-  jumping. In a replay it drives the run. **Follow** (in 3D) puts the camera behind the robot and a little to one
+  small 3D model of a Yarbo with its mower head: it faces where it is heading, leans with its own tilt, stands on a
+  soft shadow and glides between updates instead of jumping. A single stray position is ignored; a real jump (the
+  robot carried, or back after a long gap) is taken once the next update agrees. In a replay it drives the run. **Follow** (in 3D) puts the camera behind the robot and a little to one
   side and keeps it there as the robot turns; right-drag moves the camera round it, and a drag or Fit yard lets go.
 - **Signal:** HaLow strength, RTK fixed share or satellites across the yard (30 days of runs, 2 m cells), or
   **Wi-Fi (survey)**: one network's signal in 4 m cells, picked from the networks the robot heard. Wi-Fi needs the

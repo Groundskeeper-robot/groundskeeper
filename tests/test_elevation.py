@@ -209,3 +209,82 @@ def test_a_tile_drawn_while_the_ground_changes_stays_out_of_the_new_grounds_cach
 
     e, old = asyncio.run(go())
     assert (14, 0, 0) in old and not e.g["tiles"]
+
+
+def test_cell_medians_match_numpys_median_per_cell():
+    rng = np.random.default_rng(7)
+    cell, value = rng.integers(0, 40, 3000), rng.normal(280, 2, 3000)
+    got = el.cell_medians(cell, value, 50)
+    for i in range(50):
+        vals = value[cell == i]
+        assert np.isnan(got[i]) if not len(vals) else abs(got[i] - np.median(vals)) < 1e-12
+    assert np.isnan(el.cell_medians(np.array([], dtype=int), np.array([]), 3)).all()
+
+
+def _mown(st, run, t0, n, hgt=278.0):
+    for k in range(n):
+        st.add_telemetry({"ts": t0 + k, "run_id": run, "lon": -76.5004, "lat": 39.0004, "rtk_status": 4, "hgt": hgt + k})
+
+
+def _store_with_an_old_run(tmp_path):
+    from app.store import Store
+    st = Store(str(tmp_path))
+    old = st.start_run(1000.0, 5, None)                          # before hgt was recorded: raw snapshots only
+    st.db.execute("UPDATE runs SET ended = 1100 WHERE id = ?", (old,))
+    st.add_raw(1010.0, {"RTKMSG": {"status": "4", "hgt": 279.1, "lan": 39.0005, "lon": -76.5005}})
+    run = st.start_run(2000.0, 5, None)
+    _mown(st, run, 2001.0, 3)
+    return st, run
+
+
+def test_heights_are_kept_and_only_the_new_rows_are_read_again(tmp_path):
+    st, run = _store_with_an_old_run(tmp_path)
+    raw_reads = []
+    read = st.raw
+    st.raw = lambda a, b: raw_reads.append(a) or read(a, b)
+    pts, runs = st.height_points()
+    assert len(pts) == 4 and runs == 2 and len(raw_reads) == 1
+    _mown(st, run, 2010.0, 2, hgt=290.0)                         # the run carries on
+    pts, runs = st.height_points()
+    assert len(pts) == 6 and pts[-1][2] == 291.0 and runs == 2 and len(raw_reads) == 1   # no full read again
+    assert st.height_points()[0] is pts                          # nothing new: the same list
+
+
+def test_a_run_ending_or_old_snapshots_going_reads_the_heights_again(tmp_path):
+    st, run = _store_with_an_old_run(tmp_path)
+    assert len(st.height_points()[0]) == 4
+    st.db.execute("UPDATE runs SET ended = 2100 WHERE id = ?", (run,))
+    _mown(st, run, 2050.0, 1)
+    assert len(st.height_points()[0]) == 5
+    st.prune_raw(0)                                              # the old run's snapshots are gone
+    pts, runs = st.height_points()
+    assert len(pts) == 4 and runs == 1
+
+
+def test_requests_that_arrive_together_work_the_ground_out_once(tmp_path, monkeypatch):
+    calls = []
+    real = el.blend
+    monkeypatch.setattr(el, "blend", lambda *a: calls.append(1) or real(*a))
+    e = _held(tmp_path)
+
+    async def go():
+        return await asyncio.gather(*(e.ground(True, False) for _ in range(5)))
+
+    metas = asyncio.run(go())
+    assert len(calls) == 1 and len({m["version"] for m in metas}) == 1
+
+
+def test_robot_surfaces_asked_for_together_are_worked_out_once(tmp_path, monkeypatch):
+    calls = []
+    real = el.measured_surface
+    monkeypatch.setattr(el, "measured_surface", lambda *a, **k: calls.append(1) or real(*a, **k))
+    e = el.Elevation(str(tmp_path))
+    rng = np.random.default_rng(1)
+    pts = [(BOX[0] + 0.001 + rng.uniform(-5e-4, 5e-4), BOX[1] + 0.0005 + rng.uniform(-3e-4, 3e-4), 280.0)
+           for _ in range(200)]
+
+    async def go():
+        return await asyncio.gather(*(e.ensure_robot(pts, BOX, 2000, 1) for _ in range(4)))
+
+    asyncio.run(go())
+    assert len(calls) == 1
