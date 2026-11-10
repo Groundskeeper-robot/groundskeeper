@@ -829,15 +829,18 @@ async def elevation_ground(request: Request):
 
 
 @app.get("/api/elevation/ground/{z}/{x}/{y}.png")
-async def elevation_ground_tile(request: Request, z: int, x: int, y: int):
-    """One Terrarium-encoded tile of the 3D ground (MapLibre raster-dem)."""
+async def elevation_ground_tile(request: Request, z: int, x: int, y: int, v: str | None = None):
+    """One Terrarium-encoded tile of the 3D ground (MapLibre raster-dem). `v` is the ground's version the page read;
+    if the ground has changed since, the tile is of the new one and the browser is told not to keep it under the old
+    address (the page asks for the new ground when a run ends)."""
     if not (0 <= z <= 24 and 0 <= x < 2 ** z and 0 <= y < 2 ** z):
         raise HTTPException(400, "no such tile")
     el = request.app.state.elevation
     if el.g["z"] is None:                                    # a restart since the page read /api/elevation/ground
         await _ground(request)
+    keep = el.is_current(v)
     data = await el.ground_tile(z, x, y)
-    return Response(data, media_type="image/png", headers={"Cache-Control": "max-age=86400"})
+    return Response(data, media_type="image/png", headers={"Cache-Control": "max-age=86400" if keep else "no-store"})
 
 
 @app.get("/api/pathways/{pid}/settings")

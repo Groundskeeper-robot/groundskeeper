@@ -29,7 +29,8 @@ const MAP = {
   gap: tok("--gap", "#FF5FA2"), offplan: tok("--offplan", "#FF5FA2"), edge: tok("--edge", "#B79CF0"),
   robot: tok("--robot", "#79B8F0"), held: tok("--robot-held", "#F0B955"), error: tok("--robot-error", "#F08A6E"),
   onmap: tok("--onmap", "#F2F5F3"), road: tok("--road", "#69736E"), camera: tok("--camera", "#E8EEEA"),
-  body3d: tok("--robot-body", "#6B6F6C"), track3d: tok("--robot-track", "#2A2D2B"), trim3d: tok("--robot-trim", "#F0B955"),
+  body3d: tok("--robot-body", "#2A2D30"), frame3d: tok("--robot-frame", "#4A5055"), track3d: tok("--robot-track", "#17191A"),
+  trim3d: tok("--robot-trim", "#F2C01E"), stop3d: tok("--robot-stop", "#D8322B"), light3d: tok("--robot-light", "#F4F7FA"),
   sidewalk: tok("--sidewalk", "#C9D4CE"), route: tok("--route", "#C3C9CC"), ink: tok("--map-ink", "#0E1311"),
 };
 // Neutral data (neither good nor bad) is drawn in these, never in status colours.
@@ -244,6 +245,7 @@ async function initMap() {
     if (b) start = { bounds: [[b[0], b[1]], [b[2], b[3]]], fitBoundsOptions: { padding: 50 } };
   } catch { /* the robot's map is not fetched yet; loadZones fits later */ }
   const map = new maplibregl.Map({ container: MAP_EL, style: baseStyle(), maxZoom: 22,
+                                   antialias: true,          // smooth edges on the 3D robot (drawn into the map's canvas)
                                    attributionControl: { compact: true }, ...start });
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
   map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-right");
@@ -605,7 +607,12 @@ function bindMapTools() {
   bindToolMore();
   $("#recenter").addEventListener("click", () => { robot3dFollow(false); fitYard(400); });
   $("#follow3d").addEventListener("click", () => robot3dFollow(!R3D.follow.on));
-  $("#ground3d").addEventListener("click", () => { state.ground3d = !state.ground3d; writePref("ground3d", state.ground3d); sync3d(); });
+  $("#ground3d").addEventListener("click", () => {
+    state.ground3d = !state.ground3d;
+    writePref("ground3d", state.ground3d);
+    sync3d();
+    if (state.ground3d) refreshGround();
+  });
   $("#ground3dsel").value = String(state.ground3dX);
   $("#ground3dsel").addEventListener("change", (e) => {
     state.ground3dX = Number(e.target.value);
@@ -674,6 +681,31 @@ function syncGround3dTools() {
     `${m.sources.includes("lidar") ? ", public lidar (USGS 3DEP) around them" : ""}. Right-drag (two fingers on a phone) turns and tilts.`;
 }
 
+const groundTiles = (meta) => `/api/elevation/ground/{z}/{x}/{y}.png?v=${meta.version}`;
+
+// The ground changes when a mow adds heights. A page that already shows one asks again (when a run ends, when 3D is
+// switched back on) and, if it is a new one, draws all of it from the new tiles instead of a mix of the two.
+async function refreshGround() {
+  const map = state.map;
+  if (!map || !state.ground3dMeta || !map.getSource("ground3d")) return;
+  let meta;
+  try { meta = await getJSON("/api/elevation/ground"); } catch { return; }      // the ground on show stays
+  if (meta.version === state.ground3dMeta.version || !map.getSource("ground3d")) return;
+  const old = state.ground3dMeta;
+  if (meta.minzoom !== old.minzoom || meta.maxzoom !== old.maxzoom || String(meta.bounds) !== String(old.bounds)) {
+    // A ground over a different area (the robot's map grew): a source's bounds and zooms are fixed when it is
+    // added, so take both off and let sync3d add them again from the new ground.
+    if (map.getTerrain()) map.setTerrain(null);
+    if (map.getLayer("ground3d-shade")) map.removeLayer("ground3d-shade");
+    for (const id of ["ground3d", "ground3d-shade"]) if (map.getSource(id)) map.removeSource(id);
+    state.ground3dMeta = null;
+    return sync3d(false);
+  }
+  state.ground3dMeta = meta;
+  for (const id of ["ground3d", "ground3d-shade"]) map.getSource(id).setTiles([groundTiles(meta)]);
+  syncGround3dTools();
+}
+
 async function sync3d(animate = true) {
   const map = state.map;
   syncGround3dTools();
@@ -690,12 +722,15 @@ async function sync3d(animate = true) {
     }
     if (map.getSource("ground3d") || !want3d()) return sync3d(animate);     // a second call got there first, or it was switched off
     state.ground3dMeta = meta;
-    const dem = { type: "raster-dem", tiles: [`/api/elevation/ground/{z}/{x}/{y}.png?v=${meta.version}`], tileSize: 256,
+    const dem = { type: "raster-dem", tiles: [groundTiles(meta)], tileSize: 256,
                   encoding: meta.encoding, minzoom: meta.minzoom, maxzoom: meta.maxzoom, bounds: meta.bounds };
     map.addSource("ground3d", dem);
     map.addSource("ground3d-shade", { ...dem });                 // MapLibre wants its own source for the shading
     map.addLayer({ id: "ground3d-shade", type: "hillshade", source: "ground3d-shade", layout: { visibility: "none" },
-                   paint: { "hillshade-exaggeration": 0.3, "hillshade-shadow-color": "#0E1311", "hillshade-accent-color": "#0E1311",
+                   // Lit from 335° on the map, not the screen, so turning the view does not move the light, and the
+                   // robot model (web/robot3d.js) is lit from the same side.
+                   paint: { "hillshade-illumination-anchor": "map", "hillshade-illumination-direction": 335,
+                            "hillshade-exaggeration": 0.3, "hillshade-shadow-color": "#0E1311", "hillshade-accent-color": "#0E1311",
                             "hillshade-highlight-color": "#FFFFFF" } }, firstLayer(...CONTENT_LAYERS));
     raiseGroundShade();
     syncGround3dTools();
@@ -2306,12 +2341,14 @@ function reloadIfOutdated(s) {
 
 function connectStream() {
   const es = new EventSource("/api/stream");
-  let lastRender = 0, lastTrack = 0, lastRunGrow = 0, liveSel = null;
+  let lastRender = 0, lastTrack = 0, lastRunGrow = 0, liveSel = null, wasRun = false;
   es.addEventListener("pose", (ev) => robot3dPoses(JSON.parse(ev.data)));
   es.addEventListener("status", (ev) => {
     const s = JSON.parse(ev.data);
     reloadIfOutdated(s);
     state.status = s;
+    if (wasRun && !s.run) refreshGround();                 // the run's heights are in: the 3D ground may be a new one
+    wasRun = !!s.run;
     renderChips(s, true);
     setRobot(s.robot.position);
     robot3dLive(s.robot);

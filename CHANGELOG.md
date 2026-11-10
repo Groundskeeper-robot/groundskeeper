@@ -14,6 +14,24 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   map or camera data, and no serial number: the robot is named by a hash of it. The
   [Home Assistant integration](https://github.com/Groundskeeper-robot/groundskeeper-ha) reads it.
 
+### Changed
+
+- **The robot in 3D looks like a Yarbo with the Lawn Mower Pro:** black shell on rubber tracks, yellow shoulders with
+  the two antennas, the red stop button, a beacon in the status colour, and the mower in front with its yellow
+  handles and headlights. The mower hangs on the core's hitch and lies on the ground under it, so over a crest or at
+  the foot of a bank it tips a little differently from the core. Smooth edges, on a soft shadow, lit from the same
+  side as the ground's shading, which now stays put when the map is turned.
+- **The robot's own heights draw as smooth slopes** on the 3D ground instead of small steps.
+- **The 3D view opens faster after a season of mowing:** the robot's heights are kept between looks and only new
+  ones are read, and the surface is worked out once however many requests arrive together.
+
+### Fixed
+
+- **3D:** a single stray position no longer sends the robot model off and back (a real jump is taken once the next
+  update agrees); Follow no longer freezes after a touch the browser takes over, or moves under a second finger;
+  switching 3D off and on no longer builds a new model each time; and after a mow an open page draws the new ground
+  when the run ends instead of a mix of old and new.
+
 ## 0.19.5 — 2026-11-07
 
 ### Changed

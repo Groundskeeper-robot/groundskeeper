@@ -83,6 +83,20 @@ def parse_tiff(data: bytes) -> np.ndarray:
     return z
 
 
+def cell_medians(cell: np.ndarray, value: np.ndarray, n: int) -> np.ndarray:
+    """The median of `value` per cell index (0..n-1), NaN for a cell with none: what np.median gives per cell, worked
+    out in one sort rather than a Python loop over a season's heights."""
+    out = np.full(n, np.nan, dtype=np.float64)
+    if not len(cell):
+        return out
+    order = np.lexsort((value, cell))                                 # by cell, then by value within a cell
+    c, v = np.asarray(cell)[order], np.asarray(value, dtype=np.float64)[order]
+    start = np.flatnonzero(np.r_[True, c[1:] != c[:-1]])
+    count = np.diff(np.r_[start, len(c)])
+    out[c[start]] = (v[start + (count - 1) // 2] + v[start + count // 2]) / 2
+    return out
+
+
 def measured_surface(pts: np.ndarray, box, area_m2: float, per_cell: float = 3.0, reach: int = 2) -> tuple[np.ndarray, float]:
     """A height grid from the robot's own heights (rows of lon, lat, metres): about `per_cell` points per cell over the
     mowed area, the median per cell, empty cells within `reach` cells filled by inverse distance, a 3x3 smoothing;
@@ -94,13 +108,7 @@ def measured_surface(pts: np.ndarray, box, area_m2: float, per_cell: float = 3.0
     h = max(2, math.ceil((box[3] - box[1]) * M_LAT / res))
     col = np.clip(((pts[:, 0] - box[0]) * kx / res).astype(int), 0, w - 1)
     row = np.clip(((box[3] - pts[:, 1]) * M_LAT / res).astype(int), 0, h - 1)
-    cells: dict = {}
-    for i, v in zip((row * w + col).tolist(), pts[:, 2].tolist()):
-        cells.setdefault(i, []).append(v)
-    z = np.full(h * w, np.nan, dtype=np.float64)
-    for i, vals in cells.items():
-        z[i] = float(np.median(vals))
-    z = z.reshape(h, w)
+    z = cell_medians(row * w + col, pts[:, 2], h * w).reshape(h, w)
 
     def shifted(a, dy, dx):
         out = np.full_like(a, np.nan)
@@ -164,6 +172,27 @@ def resample(z: np.ndarray, box, to_box, to_shape) -> np.ndarray:
     return out
 
 
+def resample_smooth(z: np.ndarray, box, to_box, to_shape) -> np.ndarray:
+    """Like `resample`, but bilinear between cell centres wherever the four cells around a point all have a height,
+    so a coarse grid onto a finer one comes out as a slope rather than steps (nearest cell at the gaps' edges; NaN
+    where `resample` gives NaN)."""
+    near = resample(z, box, to_box, to_shape)
+    H, W = z.shape
+    if H < 2 or W < 2:
+        return near
+    h, w = to_shape
+    lon = to_box[0] + (np.arange(w) + 0.5) * (to_box[2] - to_box[0]) / w
+    lat = to_box[3] - (np.arange(h) + 0.5) * (to_box[3] - to_box[1]) / h
+    C = (lon - box[0]) / (box[2] - box[0]) * W - 0.5                   # in cells, 0 at the first cell's centre
+    R = (box[3] - lat) / (box[3] - box[1]) * H - 0.5
+    c0, r0 = np.clip(np.floor(C).astype(int), 0, W - 2), np.clip(np.floor(R).astype(int), 0, H - 2)
+    fc, fr = np.clip(C - c0, 0, 1)[None, :], np.clip(R - r0, 0, 1)[:, None]
+    a, b = z[np.ix_(r0, c0)], z[np.ix_(r0, c0 + 1)]
+    c, d = z[np.ix_(r0 + 1, c0)], z[np.ix_(r0 + 1, c0 + 1)]
+    bil = (a * (1 - fc) + b * fc) * (1 - fr) + (c * (1 - fc) + d * fc) * fr
+    return np.where(np.isfinite(near), np.where(np.isfinite(bil), bil, near), np.nan)
+
+
 def blend(lidar: np.ndarray | None, lidar_box, robot: np.ndarray | None, robot_box) -> tuple[np.ndarray, list, float]:
     """One ground for the 3D view: the robot's own heights where it has mowed, the lidar around them shifted by the
     median difference where both exist, and the step left at the seam eased out over SEAM_M (2026-10-10).
@@ -180,7 +209,7 @@ def blend(lidar: np.ndarray | None, lidar_box, robot: np.ndarray | None, robot_b
         if robot is None:
             z, share = L, 0.0
         else:
-            r = resample(robot, robot_box, box, L.shape)
+            r = resample_smooth(robot, robot_box, box, L.shape)         # its ~1 m cells onto the 0.5 m grid, no steps
             mask = np.isfinite(r) & np.isfinite(L)
             if not mask.any():
                 z, share = L, 0.0
@@ -277,6 +306,9 @@ class Elevation:
         self.src: dict = {"lidar": {"z": None, "meta": None}, "robot": {"z": None, "meta": None, "key": None}}
         self.g: dict = {"key": None, "z": None, "box": None, "meta": None, "tiles": OrderedDict()}   # the 3D ground
         self._lock = asyncio.Lock()
+        # One rebuild of the robot's surface or the ground at a time: after a restart the page's tiles all ask for
+        # the ground at once, and each would otherwise work it out again in its own thread.
+        self._build = asyncio.Lock()
         self._load()
 
     def _load(self) -> None:
@@ -323,8 +355,16 @@ class Elevation:
                sum(len(r) for r in rings or []))
         if R["key"] == key and R["z"] is not None:
             return R["meta"]
+        pts = np.asarray(points, dtype=np.float64)                    # a copy: the store keeps adding to its list
+        async with self._build:
+            if R["key"] == key and R["z"] is not None:               # worked out while this call waited
+                return R["meta"]
+            return await self._robot_surface(pts, key, bounds, area_m2, runs, rings)
+
+    async def _robot_surface(self, points: np.ndarray, key, bounds, area_m2: float, runs: int, rings) -> dict:
+        R = self.src["robot"]
         box = box_around(bounds)
-        z, res = await asyncio.to_thread(measured_surface, np.asarray(points, dtype=np.float64), box, area_m2)
+        z, res = await asyncio.to_thread(measured_surface, points, box, area_m2)
         if rings:
             z = np.where(inside_rings(box, z.shape, rings, margin_m=1.0), z, np.nan).astype(np.float32)
         if not np.isfinite(z).any():
@@ -346,6 +386,13 @@ class Elevation:
         key = ((L["meta"] or {}).get("fetched") if lz is not None else None, R["key"] if rz is not None else None)
         if self.g["key"] == key and self.g["z"] is not None:
             return self.g["meta"]
+        async with self._build:
+            if self.g["key"] == key and self.g["z"] is not None:          # worked out while this call waited
+                return self.g["meta"]
+            return await self._ground_build(lz, rz, key)
+
+    async def _ground_build(self, lz, rz, key) -> dict:
+        L, R = self.src["lidar"], self.src["robot"]
         z, box, share = await asyncio.to_thread(blend, lz, (L["meta"] or {}).get("box"), rz, (R["meta"] or {}).get("box"))
         lat = (box[1] + box[3]) / 2
         dx, dy = (FLAT_M + TAPER_M) / m_per_lon(lat), (FLAT_M + TAPER_M) / M_LAT
@@ -359,15 +406,20 @@ class Elevation:
         self.g.update(key=key, z=z, smooth=smooth, box=box, meta=meta, tiles=OrderedDict())
         return meta
 
+    def is_current(self, version: str | None) -> bool:
+        """Whether a tile asked for under `version` (the ?v= of its URL) is a tile of the ground held now. A page that
+        read an older ground keeps asking under the old version; what it gets then must not be kept by the browser."""
+        return version is None or version == (self.g["meta"] or {}).get("version")
+
     async def ground_tile(self, tz: int, tx: int, ty: int) -> bytes:
         """One Terrarium tile of the 3D ground (call `ground` first); kept for the most recent TILE_CACHE tiles."""
-        g = self.g
-        k = (tz, tx, ty)
-        if k in g["tiles"]:
-            g["tiles"].move_to_end(k)
-            return g["tiles"][k]
-        data = await asyncio.to_thread(lambda: terrarium_png(dem_tile(g["z"], g["box"], tz, tx, ty, smooth=g.get("smooth"))))
-        g["tiles"][k] = data
-        while len(g["tiles"]) > TILE_CACHE:
-            g["tiles"].popitem(last=False)
+        z, box, smooth, tiles = self.g["z"], self.g["box"], self.g.get("smooth"), self.g["tiles"]
+        k = (tz, tx, ty)                                    # one ground throughout: `ground` may swap it meanwhile
+        if k in tiles:
+            tiles.move_to_end(k)
+            return tiles[k]
+        data = await asyncio.to_thread(lambda: terrarium_png(dem_tile(z, box, tz, tx, ty, smooth=smooth)))
+        tiles[k] = data
+        while len(tiles) > TILE_CACHE:
+            tiles.popitem(last=False)
         return data
