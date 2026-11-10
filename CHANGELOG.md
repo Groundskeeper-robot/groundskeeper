@@ -20,7 +20,8 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   turns the password off once it works. See Help → Settings → Signing in.
 - **Replay speed.** Next to the replay slider in Runs: 1×, 10×, 60× or 300× real time, or Whole run (about 30 s, as
   before). Where the robot stands still (parked, charging) or the samples stop, the replay hurries through, and between
-  samples the robot moves smoothly, so a replay, and Follow in 3D, can be watched at a real pace.
+  samples the robot moves smoothly, so a replay, and Follow in 3D, can be watched at a real pace. The 3D map's 1×–3×
+  menu is now labelled Height: it draws the ground taller, it is not a speed.
 
 ## 0.19.6 — 2026-11-09
 

@@ -1622,12 +1622,14 @@ function runDetail() {
       playButton(),
       h("input", { type: "range", id: "scrub", min: "0", max: String(Math.max(0, rows.length - 1)), value: String(state.replayIndex),
                    "aria-label": "Replay position", oninput: (e) => { state.replayOn = true; state.replayT = null; setReplay(Number(e.target.value)); } }),
-      h("select", { id: "replayspeed", class: "field slim", "aria-label": "Replay speed",
-                    title: "Replay speed, times real time. Stretches where the robot stands still go by quickly. Whole run plays it in about 30 s.",
-                    onchange: (e) => { state.replaySpeed = Number(e.target.value); writePref("replaySpeed", state.replaySpeed);
-                                       if (state.replayTimer) { stopPlay(); togglePlay(); } } },
-        [[1, "1×"], [10, "10×"], [60, "60×"], [300, "300×"], [0, "Whole run"]].map(([v, t]) =>
-          h("option", { value: String(v), selected: v === state.replaySpeed || null }, t)))),
+      h("label", { class: "replayspeed",
+                    title: "Replay speed, times real time. Stretches where the robot stands still go by quickly. Whole run plays it in about 30 s." },
+        "Speed",
+        h("select", { id: "replayspeed", class: "field slim", "aria-label": "Replay speed",
+                      onchange: (e) => { state.replaySpeed = Number(e.target.value); writePref("replaySpeed", state.replaySpeed);
+                                         if (state.replayTimer) { stopPlay(); togglePlay(); } } },
+          [[1, "1×"], [10, "10×"], [60, "60×"], [300, "300×"], [0, "Whole run"]].map(([v, t]) =>
+            h("option", { value: String(v), selected: v === state.replaySpeed || null }, t))))),
     h("p", { class: "mono small", id: "replayinfo" }, replayText(replay, idx)),
     areas.length ? h("div", null, h("p", { class: "label", style: "margin-top:10px" }, "Coverage by area"),
       areas.map((a) => kv(a.name, `${num(a.coverage_pct_of_known)}% · ${num(a.covered_m2)} m² · gaps ${num(a.gap_m2, 1)} m²`)),
