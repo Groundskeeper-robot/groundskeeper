@@ -315,13 +315,30 @@ async def ha_summary(request: Request):
     plan_id = nxt["plan_id"] if nxt and nxt["plan_id"] is not None else next(
         (p.get("id") for p in r.plans or []), None)
     try:
-        start = {**await o.controller.preview("start_plan", {"plan_id": plan_id}, actor=_actor(request)),
-                 "plan_id": plan_id}
+        start = await _ha_start_check(request, plan_id)
     except Exception:
         log.exception("start check for the HA summary failed")
         start = None
-    runs = r.store.runs(1)
-    return ha_mod.summary(r.status(), o.status(), runs[0] if runs else None, upcoming, r.plans, start, version_info())
+    last = next((x for x in r.store.runs(5) if x.get("ended")), None)      # the last finished run, not one going now
+    return ha_mod.summary(r.status(), o.status(), last, upcoming, r.plans, start, version_info())
+
+
+HA_START_CHECK_S = 30   # how long a summary's start check is reused: it asks Frigate and presence, and HA polls often
+
+
+async def _ha_start_check(request: Request, plan_id) -> dict:
+    """The start_plan preview for the summary, reused for HA_START_CHECK_S per caller kind (a person and a token get
+    different checks). A failed check is not kept."""
+    key, now = (_actor(request), plan_id), time.monotonic()
+    cache = getattr(request.app.state, "ha_start_cache", None) or {}
+    hit = cache.get(key)
+    if hit and now - hit[0] < HA_START_CHECK_S:
+        return hit[1]
+    start = {**await ops(request).controller.preview("start_plan", {"plan_id": plan_id}, actor=_actor(request)),
+             "plan_id": plan_id}
+    request.app.state.ha_start_cache = {**{k: v for k, v in cache.items() if now - v[0] < HA_START_CHECK_S},
+                                        key: (now, start)}
+    return start
 
 
 @app.get("/api/stream")

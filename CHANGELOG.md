@@ -9,7 +9,10 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 - **`GET /api/ha/summary` for a Home Assistant integration** (#12): one small read with the robot's state, battery,
   positioning, lawn, last run, the next schedule window and whether a start would go out now (with the reasons when
-  not), checked as the caller, so a token gets the strict checks. It carries no position, map or camera data.
+  not), checked as the caller, so a token gets the strict checks, at most every 30 s. It also says when the robot is
+  stuck, waiting for its RTK fix or out of touch, and its last run is the last finished one. It carries no position,
+  map or camera data, and no serial number: the robot is named by a hash of it. The
+  [Home Assistant integration](https://github.com/Groundskeeper-robot/groundskeeper-ha) reads it.
 
 ## 0.19.5 — 2026-11-07
 

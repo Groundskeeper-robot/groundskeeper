@@ -1,5 +1,6 @@
 """GET /api/ha/summary (#12): the one read a Home Assistant integration polls with an API token. Synthetic status
 only; no robot, no network."""
+import hashlib
 import json
 from types import SimpleNamespace
 
@@ -98,8 +99,9 @@ def client(tmp_path, monkeypatch):
     upcoming = [WINDOW]
     fake_ops = SimpleNamespace(controller=ctl, status=ops_status,
                                scheduler=SimpleNamespace(upcoming=lambda now: upcoming))
-    old = {k: getattr(main.app.state, k, None) for k in ("auth", "rec", "ops")}
+    old = {k: getattr(main.app.state, k, None) for k in ("auth", "rec", "ops", "ha_start_cache")}
     main.app.state.auth, main.app.state.rec, main.app.state.ops = gate, FakeRec(store), fake_ops
+    main.app.state.ha_start_cache = None
     c = TestClient(main.app, base_url="http://panel.test")
     yield SimpleNamespace(c=c, auth=gate, store=store, ctl=ctl, upcoming=upcoming)
     for k, v in old.items():
@@ -139,3 +141,59 @@ def test_a_start_check_that_fails_leaves_the_rest(client, monkeypatch):
     _token(client)
     s = client.c.get("/api/ha/summary").json()
     assert s["can_start"] is None and s["battery"] == 82
+
+
+def test_the_summary_names_the_robot_by_a_hash_never_its_serial():
+    s = ha.summary(robot_status(), ops_status(), None, [], PLANS, None, {"version": "0.0.0", "build": None})
+    assert "YB0000DEMO0001" not in json.dumps(s) and "sn" not in s
+    assert s["robot_id"] == hashlib.sha256(b"YB0000DEMO0001").hexdigest()[:16]
+    no_robot = {**robot_status(), "sn": None}
+    assert ha.summary(no_robot, ops_status(), None, [], PLANS, None, {"version": "0", "build": None})["robot_id"] is None
+
+
+def test_the_summary_says_when_the_robot_is_stuck_or_out_of_touch():
+    s = ha.summary(robot_status(), ops_status(), None, [], PLANS, None, {"version": "0.0.0", "build": None})
+    assert (s["stalled"], s["stalled_s"], s["rtk_wait"], s["lost_contact"]) == (False, 0, False, False)
+    stuck = {**robot_status(), "stalled": True, "stalled_s": 420, "rtk_wait": False, "lost_contact": True}
+    s = ha.summary(stuck, ops_status(), None, [], PLANS, None, {"version": "0.0.0", "build": None})
+    assert (s["stalled"], s["stalled_s"], s["lost_contact"]) == (True, 420, True)
+
+
+def test_the_last_run_is_the_last_finished_one_not_the_run_going_now(client, monkeypatch):
+    going = {"id": 12, "started": 5.0, "ended": None, "end_reason": None, "distance_m": 10.0, "rtk_fixed_pct": 90.0}
+    done = {"id": 11, "started": 1.0, "ended": 2.0, "end_reason": "finished", "distance_m": 300.0, "rtk_fixed_pct": 99.0}
+    monkeypatch.setattr(client.store, "runs", lambda limit=100: [going, done])
+    _token(client)
+    assert client.c.get("/api/ha/summary").json()["last_run"]["id"] == 11
+
+
+def test_the_start_check_is_reused_for_30_seconds(client, monkeypatch):
+    now = [1000.0]
+    monkeypatch.setattr(main.time, "monotonic", lambda: now[0])
+    _token(client)
+    for _ in range(3):
+        assert client.c.get("/api/ha/summary").json()["can_start"]["would_send"] is True
+    assert len(client.ctl.calls) == 1                      # Frigate and presence asked once, not on every read
+    now[0] += 31
+    client.c.get("/api/ha/summary")
+    assert len(client.ctl.calls) == 2
+
+
+def test_the_start_check_is_kept_apart_for_a_person_and_a_token(client):
+    bot = TestClient(main.app, base_url="http://panel.test", headers={"Authorization": f"Bearer {_token(client)}"})
+    client.c.get("/api/ha/summary")
+    bot.get("/api/ha/summary")
+    assert [c[2] for c in client.ctl.calls] == ["user", "token"]
+
+
+def test_a_failed_start_check_is_not_reused(client, monkeypatch):
+    real, fails = client.ctl.preview, [True]
+
+    async def flaky(*a, **k):
+        if fails.pop() if fails else False:
+            raise RuntimeError("frigate down")
+        return await real(*a, **k)
+    monkeypatch.setattr(client.ctl, "preview", flaky)
+    _token(client)
+    assert client.c.get("/api/ha/summary").json()["can_start"] is None
+    assert client.c.get("/api/ha/summary").json()["can_start"]["would_send"] is True
