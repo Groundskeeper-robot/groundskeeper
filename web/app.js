@@ -605,7 +605,12 @@ function bindMapTools() {
   bindToolMore();
   $("#recenter").addEventListener("click", () => { robot3dFollow(false); fitYard(400); });
   $("#follow3d").addEventListener("click", () => robot3dFollow(!R3D.follow.on));
-  $("#ground3d").addEventListener("click", () => { state.ground3d = !state.ground3d; writePref("ground3d", state.ground3d); sync3d(); });
+  $("#ground3d").addEventListener("click", () => {
+    state.ground3d = !state.ground3d;
+    writePref("ground3d", state.ground3d);
+    sync3d();
+    if (state.ground3d) refreshGround();
+  });
   $("#ground3dsel").value = String(state.ground3dX);
   $("#ground3dsel").addEventListener("change", (e) => {
     state.ground3dX = Number(e.target.value);
@@ -674,6 +679,21 @@ function syncGround3dTools() {
     `${m.sources.includes("lidar") ? ", public lidar (USGS 3DEP) around them" : ""}. Right-drag (two fingers on a phone) turns and tilts.`;
 }
 
+const groundTiles = (meta) => `/api/elevation/ground/{z}/{x}/{y}.png?v=${meta.version}`;
+
+// The ground changes when a mow adds heights. A page that already shows one asks again (when a run ends, when 3D is
+// switched back on) and, if it is a new one, draws all of it from the new tiles instead of a mix of the two.
+async function refreshGround() {
+  const map = state.map;
+  if (!map || !state.ground3dMeta || !map.getSource("ground3d")) return;
+  let meta;
+  try { meta = await getJSON("/api/elevation/ground"); } catch { return; }      // the ground on show stays
+  if (meta.version === state.ground3dMeta.version || !map.getSource("ground3d")) return;
+  state.ground3dMeta = meta;
+  for (const id of ["ground3d", "ground3d-shade"]) map.getSource(id).setTiles([groundTiles(meta)]);
+  syncGround3dTools();
+}
+
 async function sync3d(animate = true) {
   const map = state.map;
   syncGround3dTools();
@@ -690,7 +710,7 @@ async function sync3d(animate = true) {
     }
     if (map.getSource("ground3d") || !want3d()) return sync3d(animate);     // a second call got there first, or it was switched off
     state.ground3dMeta = meta;
-    const dem = { type: "raster-dem", tiles: [`/api/elevation/ground/{z}/{x}/{y}.png?v=${meta.version}`], tileSize: 256,
+    const dem = { type: "raster-dem", tiles: [groundTiles(meta)], tileSize: 256,
                   encoding: meta.encoding, minzoom: meta.minzoom, maxzoom: meta.maxzoom, bounds: meta.bounds };
     map.addSource("ground3d", dem);
     map.addSource("ground3d-shade", { ...dem });                 // MapLibre wants its own source for the shading
@@ -2306,12 +2326,14 @@ function reloadIfOutdated(s) {
 
 function connectStream() {
   const es = new EventSource("/api/stream");
-  let lastRender = 0, lastTrack = 0, lastRunGrow = 0, liveSel = null;
+  let lastRender = 0, lastTrack = 0, lastRunGrow = 0, liveSel = null, wasRun = false;
   es.addEventListener("pose", (ev) => robot3dPoses(JSON.parse(ev.data)));
   es.addEventListener("status", (ev) => {
     const s = JSON.parse(ev.data);
     reloadIfOutdated(s);
     state.status = s;
+    if (wasRun && !s.run) refreshGround();                 // the run's heights are in: the 3D ground may be a new one
+    wasRun = !!s.run;
     renderChips(s, true);
     setRobot(s.robot.position);
     robot3dLive(s.robot);

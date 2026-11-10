@@ -1,4 +1,5 @@
 """The 3D ground's maths (app/elevation.py) on grids whose answers are known: planes, gaps, edges."""
+import asyncio
 import io
 import math
 
@@ -159,3 +160,34 @@ def test_blend_with_one_source_uses_that_source():
 def test_resample_onto_the_same_grid_is_the_grid():
     z = np.arange(12 * 10, dtype=np.float64).reshape(12, 10)
     assert np.array_equal(el.resample(z, BOX, BOX, z.shape), z)
+
+
+def _held(tmp_path, fetched=1):
+    e = el.Elevation(str(tmp_path))
+    e.src["lidar"].update(z=plane(0.02), meta={"box": BOX, "fetched": fetched})
+    return e
+
+
+def test_a_tile_asked_for_under_an_older_grounds_version_is_not_current(tmp_path):
+    e = _held(tmp_path)
+    v1 = asyncio.run(e.ground(True, False))["version"]
+    assert e.is_current(v1) and e.is_current(None)
+    e.src["lidar"]["meta"] = {"box": BOX, "fetched": 2}
+    v2 = asyncio.run(e.ground(True, False))["version"]
+    assert v2 != v1 and e.is_current(v2) and not e.is_current(v1)
+
+
+def test_a_tile_drawn_while_the_ground_changes_stays_out_of_the_new_grounds_cache(tmp_path):
+    async def go():
+        e = _held(tmp_path)
+        await e.ground(True, False)
+        old = e.g["tiles"]
+        tile = asyncio.create_task(e.ground_tile(14, 0, 0))
+        await asyncio.sleep(0)                                   # it has started, on the first ground
+        e.src["lidar"]["meta"] = {"box": BOX, "fetched": 2}
+        await e.ground(True, False)
+        await tile
+        return e, old
+
+    e, old = asyncio.run(go())
+    assert (14, 0, 0) in old and not e.g["tiles"]

@@ -359,15 +359,20 @@ class Elevation:
         self.g.update(key=key, z=z, smooth=smooth, box=box, meta=meta, tiles=OrderedDict())
         return meta
 
+    def is_current(self, version: str | None) -> bool:
+        """Whether a tile asked for under `version` (the ?v= of its URL) is a tile of the ground held now. A page that
+        read an older ground keeps asking under the old version; what it gets then must not be kept by the browser."""
+        return version is None or version == (self.g["meta"] or {}).get("version")
+
     async def ground_tile(self, tz: int, tx: int, ty: int) -> bytes:
         """One Terrarium tile of the 3D ground (call `ground` first); kept for the most recent TILE_CACHE tiles."""
-        g = self.g
-        k = (tz, tx, ty)
-        if k in g["tiles"]:
-            g["tiles"].move_to_end(k)
-            return g["tiles"][k]
-        data = await asyncio.to_thread(lambda: terrarium_png(dem_tile(g["z"], g["box"], tz, tx, ty, smooth=g.get("smooth"))))
-        g["tiles"][k] = data
-        while len(g["tiles"]) > TILE_CACHE:
-            g["tiles"].popitem(last=False)
+        z, box, smooth, tiles = self.g["z"], self.g["box"], self.g.get("smooth"), self.g["tiles"]
+        k = (tz, tx, ty)                                    # one ground throughout: `ground` may swap it meanwhile
+        if k in tiles:
+            tiles.move_to_end(k)
+            return tiles[k]
+        data = await asyncio.to_thread(lambda: terrarium_png(dem_tile(z, box, tz, tx, ty, smooth=smooth)))
+        tiles[k] = data
+        while len(tiles) > TILE_CACHE:
+            tiles.popitem(last=False)
         return data

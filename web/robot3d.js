@@ -2,7 +2,8 @@
    A three.js custom layer, built from simple shapes about the robot's size (forward is +Y, up is +Z, in metres). It
    stands on the drawn ground, turns to the robot's compass heading and tilts by its pitch and roll: on run 4 the
    pitch read positive nose-down and the roll positive left side up. On a ground drawn taller than it is, the tilt is
-   drawn taller to match (atan(height x tan(angle))). Zoomed out it keeps a minimum size on screen.
+   drawn taller to match (atan(height x tan(angle))). Zoomed out it keeps a minimum size on screen. It is lit from
+   the north-west whichever way it faces.
    Live, it takes every position sample the robot sends (the stream's pose events, #35: ~1 a second while the phone
    app is open, else the panel's own reads),
    in the robot's own time order: a late one from the backlog after a dropout is dropped instead of drawn as a detour.
@@ -65,15 +66,21 @@ function r3dBuild(THREE) {
 function r3dLayer(THREE) {
   return {
     id: "robot3d", type: "custom", renderingMode: "3d",
+    // The layer comes off and goes back on with the 3D view; the scene and renderer are made once and kept, so
+    // switching does not leave a renderer and its buffers behind each time.
     onAdd(map, gl) {
       this.map = map;
+      if (this.renderer) return;
       this.camera = new THREE.Camera();
-      this.scene = new THREE.Scene();
-      this.scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.6));
+      this.scene = new THREE.Scene();                 // x east, y north, z up, in metres: the light stays put as the robot turns
+      const sky = new THREE.HemisphereLight(0xffffff, 0x444444, 1.6);
+      sky.position.set(0, 0, 1);                      // the sky is up
+      this.scene.add(sky);
       const sun = new THREE.DirectionalLight(0xffffff, 1.2);
-      sun.position.set(-1, -2, 3);
+      sun.position.set(-1, 2, 3);                    // from the north-west, where the ground's shading is lit from
       this.scene.add(sun);
-      this.scene.add(r3dBuild(THREE));
+      this.robot = r3dBuild(THREE);
+      this.scene.add(this.robot);
       this.renderer = new THREE.WebGLRenderer({ canvas: map.getCanvas(), context: gl, antialias: true });
       this.renderer.autoClear = false;
     },
@@ -88,11 +95,9 @@ function r3dLayer(THREE) {
       const nose = Math.atan(x * Math.tan(-(p.pitch || 0) * R3D_DEG));
       const left = Math.atan(x * Math.tan((p.roll || 0) * R3D_DEG));
       const M = THREE.Matrix4;
-      const model = new M().makeTranslation(mc.x, mc.y, mc.z).scale(new THREE.Vector3(s, -s, s))
-        .multiply(new M().makeRotationZ(-(p.heading || 0) * R3D_DEG))
-        .multiply(new M().makeRotationX(nose))
-        .multiply(new M().makeRotationY(left));
-      this.camera.projectionMatrix = new M().fromArray(matrix).multiply(model);
+      this.robot.rotation.set(nose, left, -(p.heading || 0) * R3D_DEG, "ZXY");      // heading, then pitch, then roll
+      const place = new M().makeTranslation(mc.x, mc.y, mc.z).scale(new THREE.Vector3(s, -s, s));
+      this.camera.projectionMatrix = new M().fromArray(matrix).multiply(place);
       this.renderer.resetState();
       this.renderer.render(this.scene, this.camera);
     },
@@ -133,18 +138,24 @@ async function robot3dSync() {
     }
     if (!r3dWanted()) return;
   }
-  if (!map.getLayer("robot3d")) map.addLayer(r3dLayer(R3D.THREE));        // on top of everything
+  if (!map.getLayer("robot3d")) map.addLayer(R3D.layer ||= r3dLayer(R3D.THREE));        // on top of everything
   if (!R3D.bound) {
     R3D.bound = true;
     map.on("dragstart", (e) => { if (e.originalEvent && R3D.follow.on) robot3dFollow(false); });   // a pan lets go
     map.on("rotatestart", (e) => { if (e.originalEvent) R3D.follow.turning = true; });
     map.on("zoomend", (e) => { if (e.originalEvent && R3D.follow.on) r3dKick(); });    // a zoom about the cursor: back on the robot
     // Moving the camera stops any gesture under way, so it holds still while a finger or button is on the map (and
-    // just after a wheel zoom): a pan then gets through (and lets go), a right-drag sets a new angle.
-    const box = map.getCanvasContainer();
-    box.addEventListener("pointerdown", () => { R3D.follow.hands = true; });
+    // just after a wheel zoom): a pan then gets through (and lets go), a right-drag sets a new angle. Every finger
+    // is counted, so lifting one of two does not move the camera under the other, and a touch the browser takes
+    // over (pointercancel) lets go like a lifted one.
+    const box = map.getCanvasContainer(), down = new Set();
+    const free = () => { if (!R3D.follow.hands) return; R3D.follow.hands = false; if (R3D.follow.on) r3dKick(); };
+    const lift = (e) => { down.delete(e.pointerId); if (!down.size) free(); };
+    box.addEventListener("pointerdown", (e) => { down.add(e.pointerId); R3D.follow.hands = true; });
     box.addEventListener("wheel", () => { R3D.follow.wheelAt = performance.now(); }, { passive: true });
-    window.addEventListener("pointerup", () => { if (!R3D.follow.hands) return; R3D.follow.hands = false; if (R3D.follow.on) r3dKick(); });
+    window.addEventListener("pointerup", lift);
+    window.addEventListener("pointercancel", lift);
+    window.addEventListener("blur", () => { down.clear(); free(); });        // a lift the page never hears of
     map.on("rotateend", (e) => {
       if (!R3D.follow.turning) return;
       R3D.follow.turning = false;

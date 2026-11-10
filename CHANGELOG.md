@@ -208,6 +208,10 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   slope image no longer lined up with the photo).
 
 ### Fixed
+- **3D map:** the robot model is lit from the north-west whichever way it faces (the light used to turn with it);
+  Follow no longer stays frozen after a touch the browser took over, or moves under a second finger still on the
+  map; switching 3D on and off no longer builds a new model each time; and after a mow adds heights an open page
+  draws the whole new ground when the run ends, instead of a mix of old and new tiles.
 - **Planned vs driven compares the whole plan.** The robot reports each area's plan as separate passes (the edge
   around the outline and the fill stripes), and the panel kept only the first of them, so a run could be compared
   with a fifth of its plan and look mostly off plan. Every pass is kept now, each from where the run took it up
