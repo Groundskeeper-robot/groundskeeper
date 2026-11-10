@@ -24,4 +24,7 @@ All optional. Each is set in Settings and has a Test button.
   error, stuck, head changed, cloud needs sign-in, maintenance due, schedule confirmations.
 - **API:** every endpoint with its schema is at [/api/docs](/api/docs). A program such as a Home Assistant
   integration can poll `GET /api/ha/summary` with an [API token](#settings/access): state, battery, positioning,
-  lawn, last run, the next schedule window and whether a start would go out now, and why not. It carries no position.
+  lawn, the last finished run, the next schedule window, whether the robot is stuck or out of touch, and whether a
+  start would go out now, and why not (checked at most every 30 s). It carries no position and no serial number: the
+  robot is named by a hash of it. The [Home Assistant integration](https://github.com/Groundskeeper-robot/groundskeeper-ha)
+  reads it.

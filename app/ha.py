@@ -4,6 +4,7 @@ Enabled only when an address and a long-lived access token are set (Settings →
 are re-created on every push; they need no HA-side configuration.
 """
 import asyncio
+import hashlib
 import logging
 import re
 
@@ -130,6 +131,11 @@ def next_window(upcoming: list[dict]) -> dict | None:
     return None
 
 
+def robot_id(serial: str | None) -> str | None:
+    """A stable name for the robot that is not its serial number, so the serial never reaches Home Assistant."""
+    return hashlib.sha256(serial.encode()).hexdigest()[:16] if serial else None
+
+
 def summary(status: dict, ops_status: dict, last_run: dict | None, upcoming: list[dict], plans: list[dict],
             start: dict | None, version: dict) -> dict:
     """What an integration shows: state, battery, positioning, lawn, last run, the next schedule window, and whether
@@ -149,7 +155,7 @@ def summary(status: dict, ops_status: dict, last_run: dict | None, upcoming: lis
     if last_run:
         lr = {k: last_run.get(k) for k in ("id", "started", "ended", "end_reason", "distance_m", "rtk_fixed_pct")}
     return {
-        "api": SUMMARY_API, **version, "sn": status.get("sn"),
+        "api": SUMMARY_API, **version, "robot_id": robot_id(status.get("sn")),
         "state": status["state"], "activity": status.get("activity"), "error_code": r["error_code"],
         "pause_reason": status.get("pause_reason"), "plan_error": status.get("plan_error"),
         "held": {"code": held["code"], "title": held["title"]} if held else None,
@@ -166,6 +172,9 @@ def summary(status: dict, ops_status: dict, last_run: dict | None, upcoming: lis
         "pending_confirm": bool(ops_status.get("pending")),
         "can_start": can_start,
         "snapshot_age_s": status.get("snapshot_age_s"),
+        # The panel's own stuck check (never the robot's StateMSG.stuck), as on Live and in the alerts.
+        "stalled": bool(status.get("stalled")), "stalled_s": status.get("stalled_s") or 0,
+        "rtk_wait": bool(status.get("rtk_wait")), "lost_contact": bool(status.get("lost_contact")),
     }
 
 
