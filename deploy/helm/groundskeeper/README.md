@@ -4,9 +4,8 @@ Run [Groundskeeper](https://github.com/Groundskeeper-robot/groundskeeper) on Kub
 Service, and a PersistentVolumeClaim for its `/data`. Everything site-specific (the robot's address, Home Assistant, Frigate,
 imagery) is configured in the panel's **Settings** UI after it starts — not in `values.yaml`.
 
-> **Community-maintained.** This chart is kept up by community contributors (the people who run it on Kubernetes),
-> not by the Groundskeeper maintainer, who doesn't run Kubernetes. Open an issue for a problem with the chart and say
-> it is about the Helm chart.
+> **Community-maintained.** This chart is kept up by community contributors who run the panel on Kubernetes. Open an
+> issue for a problem with the chart and say it is about the Helm chart.
 
 > Groundskeeper controls a machine with blades and stores the location of a home. Control, map writing, guard
 > auto-resume and assistant commands are **off** on a new install; turn them on deliberately in **Settings → Safety**.
