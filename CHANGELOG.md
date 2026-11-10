@@ -13,9 +13,11 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ### Changed
 
-- **The robot in 3D looks like a Yarbo:** rounded tracks, the body with its handle and two antennas, a light bar in
-  the status colour and the mower head in front, with smooth edges, on a soft shadow. It is lit from the same side
-  as the ground's shading, which now stays put when the map is turned.
+- **The robot in 3D looks like a Yarbo with the Lawn Mower Pro:** black shell on rubber tracks, yellow shoulders with
+  the two antennas, the red stop button, a beacon in the status colour, and the mower in front with its yellow
+  handles and headlights. The mower hangs on the core's hitch and lies on the ground under it, so over a crest or at
+  the foot of a bank it tips a little differently from the core. Smooth edges, on a soft shadow, lit from the same
+  side as the ground's shading, which now stays put when the map is turned.
 - **The robot's own heights draw as smooth slopes** on the 3D ground instead of small steps.
 - **The 3D view opens faster after a season of mowing:** the robot's heights are kept between looks and only new
   ones are read, and the surface is worked out once however many requests arrive together.

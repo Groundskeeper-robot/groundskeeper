@@ -29,7 +29,8 @@ const MAP = {
   gap: tok("--gap", "#FF5FA2"), offplan: tok("--offplan", "#FF5FA2"), edge: tok("--edge", "#B79CF0"),
   robot: tok("--robot", "#79B8F0"), held: tok("--robot-held", "#F0B955"), error: tok("--robot-error", "#F08A6E"),
   onmap: tok("--onmap", "#F2F5F3"), road: tok("--road", "#69736E"), camera: tok("--camera", "#E8EEEA"),
-  body3d: tok("--robot-body", "#6B6F6C"), track3d: tok("--robot-track", "#2A2D2B"), trim3d: tok("--robot-trim", "#F0B955"),
+  body3d: tok("--robot-body", "#2A2D30"), frame3d: tok("--robot-frame", "#4A5055"), track3d: tok("--robot-track", "#17191A"),
+  trim3d: tok("--robot-trim", "#F2C01E"), stop3d: tok("--robot-stop", "#D8322B"), light3d: tok("--robot-light", "#F4F7FA"),
   sidewalk: tok("--sidewalk", "#C9D4CE"), route: tok("--route", "#C3C9CC"), ink: tok("--map-ink", "#0E1311"),
 };
 // Neutral data (neither good nor bad) is drawn in these, never in status colours.
