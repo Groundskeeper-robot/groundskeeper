@@ -164,6 +164,27 @@ def resample(z: np.ndarray, box, to_box, to_shape) -> np.ndarray:
     return out
 
 
+def resample_smooth(z: np.ndarray, box, to_box, to_shape) -> np.ndarray:
+    """Like `resample`, but bilinear between cell centres wherever the four cells around a point all have a height,
+    so a coarse grid onto a finer one comes out as a slope rather than steps (nearest cell at the gaps' edges; NaN
+    where `resample` gives NaN)."""
+    near = resample(z, box, to_box, to_shape)
+    H, W = z.shape
+    if H < 2 or W < 2:
+        return near
+    h, w = to_shape
+    lon = to_box[0] + (np.arange(w) + 0.5) * (to_box[2] - to_box[0]) / w
+    lat = to_box[3] - (np.arange(h) + 0.5) * (to_box[3] - to_box[1]) / h
+    C = (lon - box[0]) / (box[2] - box[0]) * W - 0.5                   # in cells, 0 at the first cell's centre
+    R = (box[3] - lat) / (box[3] - box[1]) * H - 0.5
+    c0, r0 = np.clip(np.floor(C).astype(int), 0, W - 2), np.clip(np.floor(R).astype(int), 0, H - 2)
+    fc, fr = np.clip(C - c0, 0, 1)[None, :], np.clip(R - r0, 0, 1)[:, None]
+    a, b = z[np.ix_(r0, c0)], z[np.ix_(r0, c0 + 1)]
+    c, d = z[np.ix_(r0 + 1, c0)], z[np.ix_(r0 + 1, c0 + 1)]
+    bil = (a * (1 - fc) + b * fc) * (1 - fr) + (c * (1 - fc) + d * fc) * fr
+    return np.where(np.isfinite(near), np.where(np.isfinite(bil), bil, near), np.nan)
+
+
 def blend(lidar: np.ndarray | None, lidar_box, robot: np.ndarray | None, robot_box) -> tuple[np.ndarray, list, float]:
     """One ground for the 3D view: the robot's own heights where it has mowed, the lidar around them shifted by the
     median difference where both exist, and the step left at the seam eased out over SEAM_M (2026-10-10).
@@ -180,7 +201,7 @@ def blend(lidar: np.ndarray | None, lidar_box, robot: np.ndarray | None, robot_b
         if robot is None:
             z, share = L, 0.0
         else:
-            r = resample(robot, robot_box, box, L.shape)
+            r = resample_smooth(robot, robot_box, box, L.shape)         # its ~1 m cells onto the 0.5 m grid, no steps
             mask = np.isfinite(r) & np.isfinite(L)
             if not mask.any():
                 z, share = L, 0.0

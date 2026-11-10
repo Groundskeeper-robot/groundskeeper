@@ -244,6 +244,7 @@ async function initMap() {
     if (b) start = { bounds: [[b[0], b[1]], [b[2], b[3]]], fitBoundsOptions: { padding: 50 } };
   } catch { /* the robot's map is not fetched yet; loadZones fits later */ }
   const map = new maplibregl.Map({ container: MAP_EL, style: baseStyle(), maxZoom: 22,
+                                   antialias: true,          // smooth edges on the 3D robot (drawn into the map's canvas)
                                    attributionControl: { compact: true }, ...start });
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
   map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-right");
@@ -715,7 +716,10 @@ async function sync3d(animate = true) {
     map.addSource("ground3d", dem);
     map.addSource("ground3d-shade", { ...dem });                 // MapLibre wants its own source for the shading
     map.addLayer({ id: "ground3d-shade", type: "hillshade", source: "ground3d-shade", layout: { visibility: "none" },
-                   paint: { "hillshade-exaggeration": 0.3, "hillshade-shadow-color": "#0E1311", "hillshade-accent-color": "#0E1311",
+                   // Lit from 335° on the map, not the screen, so turning the view does not move the light, and the
+                   // robot model (web/robot3d.js) is lit from the same side.
+                   paint: { "hillshade-illumination-anchor": "map", "hillshade-illumination-direction": 335,
+                            "hillshade-exaggeration": 0.3, "hillshade-shadow-color": "#0E1311", "hillshade-accent-color": "#0E1311",
                             "hillshade-highlight-color": "#FFFFFF" } }, firstLayer(...CONTENT_LAYERS));
     raiseGroundShade();
     syncGround3dTools();

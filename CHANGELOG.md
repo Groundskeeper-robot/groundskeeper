@@ -212,6 +212,9 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   Follow no longer stays frozen after a touch the browser took over, or moves under a second finger still on the
   map; switching 3D on and off no longer builds a new model each time; and after a mow adds heights an open page
   draws the whole new ground when the run ends, instead of a mix of old and new tiles.
+- **3D map looks:** the robot model has smooth edges and stands on a soft shadow; the ground's shading is lit from
+  the same side as the model and no longer moves when the map is turned; the robot's own heights no longer show as
+  steps on the lawns (they are drawn as a smooth slope between its measurements).
 - **Planned vs driven compares the whole plan.** The robot reports each area's plan as separate passes (the edge
   around the outline and the fill stripes), and the panel kept only the first of them, so a run could be compared
   with a fifth of its plan and look mostly off plan. Every pass is kept now, each from where the run took it up

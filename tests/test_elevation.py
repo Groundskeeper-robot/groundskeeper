@@ -162,6 +162,24 @@ def test_resample_onto_the_same_grid_is_the_grid():
     assert np.array_equal(el.resample(z, BOX, BOX, z.shape), z)
 
 
+def test_a_coarse_slope_onto_a_finer_grid_comes_out_as_a_slope_not_steps():
+    coarse = plane(0.1, shape=(20, 24))                       # ~6.8 m cells, rising 0.68 m a cell
+    fine_shape = (100, 120)
+    dx = el.cell_m(BOX, fine_shape)[0]
+    steps = lambda z: np.abs(np.diff(z[50, 10:-10]))           # away from the edges, where it holds the edge cell
+    near, smooth = el.resample(coarse, BOX, BOX, fine_shape), el.resample_smooth(coarse, BOX, BOX, fine_shape)
+    assert steps(near).max() > 0.5                              # nearest: flat, then a jump of a whole cell
+    assert np.allclose(steps(smooth), 0.1 * dx, atol=0.01)      # bilinear: the plane's own rise, every cell
+
+
+def test_smooth_resampling_keeps_the_gaps_where_they_are():
+    z = plane(0.1, shape=(20, 24))
+    z[:, :8] = np.nan
+    near, smooth = el.resample(z, BOX, BOX, (100, 120)), el.resample_smooth(z, BOX, BOX, (100, 120))
+    assert np.array_equal(np.isnan(near), np.isnan(smooth))
+    assert np.allclose(el.resample_smooth(z, BOX, BOX, z.shape), z, atol=1e-4, equal_nan=True)   # same grid: itself
+
+
 def _held(tmp_path, fetched=1):
     e = el.Elevation(str(tmp_path))
     e.src["lidar"].update(z=plane(0.02), meta={"box": BOX, "fetched": fetched})

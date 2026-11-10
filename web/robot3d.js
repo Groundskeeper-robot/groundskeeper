@@ -3,7 +3,7 @@
    stands on the drawn ground, turns to the robot's compass heading and tilts by its pitch and roll: on run 4 the
    pitch read positive nose-down and the roll positive left side up. On a ground drawn taller than it is, the tilt is
    drawn taller to match (atan(height x tan(angle))). Zoomed out it keeps a minimum size on screen. It is lit from
-   the north-west whichever way it faces.
+   the north-north-west whichever way it faces, as the ground's shading is, and stands on a soft shadow.
    Live, it takes every position sample the robot sends (the stream's pose events, #35: ~1 a second while the phone
    app is open, else the panel's own reads),
    in the robot's own time order: a late one from the backlog after a dropout is dropped instead of drawn as a detour.
@@ -42,6 +42,20 @@ const r3dAngle = (a) => ((a % 360) + 540) % 360 - 180;            // -180..180
 function r3dBuild(THREE) {
   const g = new THREE.Group();
   const mat = (c) => new THREE.MeshLambertMaterial({ color: c });
+  // A soft shadow on the ground under it, so it stands on the lawn instead of floating over it: three see-through
+  // ellipses, darker toward the middle. They are drawn through the ground (the map's ground hides anything level
+  // with it) but before the robot, so it covers them: blended in the opaque pass, which keeps renderOrder.
+  // Both sides drawn, so the way they face never hides them. (A faded texture or per-vertex alpha did not show here.)
+  [[0.75, 0.9], [0.62, 0.76], [0.5, 0.62]].forEach(([rx, ry], i) => {
+    const m = new THREE.Mesh(new THREE.CircleGeometry(1, 40), new THREE.MeshBasicMaterial({
+      color: 0x000000, opacity: 0.28, transparent: false, blending: THREE.CustomBlending,
+      blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
+      depthTest: false, depthWrite: false, side: THREE.DoubleSide }));
+    m.scale.set(rx, ry, 1);
+    m.position.set(0, 0.06, 0.01);
+    m.renderOrder = -1 - i;
+    g.add(m);
+  });
   const box = (w, l, h, c, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, l, h), mat(c)); m.position.set(x, y, z); g.add(m); return m; };
   box(0.18, 0.95, 0.26, MAP.track3d, 0.33, 0, 0.13);                      // tracks
   box(0.18, 0.95, 0.26, MAP.track3d, -0.33, 0, 0.13);
@@ -77,7 +91,7 @@ function r3dLayer(THREE) {
       sky.position.set(0, 0, 1);                      // the sky is up
       this.scene.add(sky);
       const sun = new THREE.DirectionalLight(0xffffff, 1.2);
-      sun.position.set(-1, 2, 3);                    // from the north-west, where the ground's shading is lit from
+      sun.position.set(-1, 2, 3);                    // from 333°, about where the ground's shading is lit from (335°)
       this.scene.add(sun);
       this.robot = r3dBuild(THREE);
       this.scene.add(this.robot);
