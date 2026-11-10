@@ -251,7 +251,8 @@ a { color: var(--link); }
 .legendrow i { display: inline-block; width: 14px; height: 5px; border-radius: 2px; }
 .legendrow i.ramp { width: 90px; height: 7px; }
 .replay { display: flex; align-items: center; gap: 10px; }
-.replay input { flex: 1; accent-color: var(--ok); }
+.replay input { flex: 1; min-width: 0; accent-color: var(--ok); }
+.replay select { flex: none; width: auto; }
 .gaplist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
 .gaplist li { display: flex; align-items: center; gap: 10px; }
 .runlist .label { margin: 8px 4px; }
