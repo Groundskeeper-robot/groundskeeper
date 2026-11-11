@@ -12,7 +12,8 @@ const ROBOT = { uid: 1, hasVideo: true, videoTrack: { play: (...a) => log("play"
 const SDK_USER = ROBOT;
 let client;
 const knobs = { leaveGate: null, roleGate: null, joinGate: null, joinEmit: false, refuseToken: false, remote: [],
-                subscribeFail: false, joinFail: null, tokenFail: null, tokenGate: null, writeOnLeave: false, sdkPresent: true, fastSdk: false, videoOff: false, scripts: [] };
+                subscribeFail: false, joinFail: null, tokenFail: null, tokenGate: null, writeOnLeave: false,
+                sdkPresent: true, fastSdk: false, videoOff: false, scripts: [] };
 const storage = {};
 const AgoraRTC = {
   checkSystemRequirements: () => true,
@@ -35,16 +36,28 @@ const AgoraRTC = {
         if (knobs.joinEmit) await handlers["user-published"](ROBOT, "video");   // the robot was already publishing
         if (knobs.joinGate) await knobs.joinGate;
       },
-      subscribe: async (u, t) => { if (knobs.subscribeFail) throw { code: "SUBSCRIBE_FAILED", message: "token=007tok" }; log("subscribe", u.uid, t); },
-      leave: async () => { log("leave"); if (knobs.leaveGate) await knobs.leaveGate; if (knobs.writeOnLeave) storage["websdk_ng_cache_parameter"] = "written-as-it-leaves"; },
+      subscribe: async (u, t) => {
+        if (knobs.subscribeFail) throw { code: "SUBSCRIBE_FAILED", message: "token=007tok" };
+        log("subscribe", u.uid, t);
+      },
+      leave: async () => {
+        log("leave");
+        if (knobs.leaveGate) await knobs.leaveGate;
+        if (knobs.writeOnLeave) storage["websdk_ng_cache_parameter"] = "written-as-it-leaves";
+      },
       handlers,
     };
     return client;
   },
 };
 const sandbox = {
-  window: { get AgoraRTC() { log("sdkRead"); return knobs.sdkPresent ? AgoraRTC : undefined; }, addEventListener: (e, f) => { listeners[e] = f; } },
-  document: { hidden: false, addEventListener: (e, f) => { listeners[e] = f; }, head: { append: (el) => knobs.scripts.push(el) } },
+  window: {
+    get AgoraRTC() { log("sdkRead"); return knobs.sdkPresent ? AgoraRTC : undefined; },
+    addEventListener: (e, f) => { listeners[e] = f; },
+  },
+  document: {
+    hidden: false, addEventListener: (e, f) => { listeners[e] = f; }, head: { append: (el) => knobs.scripts.push(el) },
+  },
   // Like a real Storage: its own keys are the stored items, and the methods are not among them.
   localStorage: new Proxy(storage, { get: (t, p) => ({
     getItem: (k) => (k in t ? t[k] : null),
@@ -60,7 +73,8 @@ const sandbox = {
       if (knobs.tokenGate) await knobs.tokenGate;
       if (knobs.tokenFail) throw knobs.tokenFail;
       if (knobs.refuseToken) throw new Error("The panel refused.");
-      return { app_id: "0".repeat(32), channel: "YB0000DEMO0001_middle_image", token: "007tok", uid: 888881, key: "k", salt: "AQID" };
+      return { app_id: "0".repeat(32), channel: "YB0000DEMO0001_middle_image", token: "007tok", uid: 888881,
+               key: "k", salt: "AQID" };
     }
     return { sent: true };
   },
@@ -128,7 +142,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   // 4. A failed subscribe in user-published leaves and shows a sanitized error.
   sandbox.camerasOpen(); await settle();
   knobs.subscribeFail = true;
-  mark("publish-fails"); try { await client.handlers["user-published"](SDK_USER, "video"); } catch { /* unhandled in the old code */ } await settle(); phase();
+  mark("publish-fails");
+  try { await client.handlers["user-published"](SDK_USER, "video"); } catch { /* unhandled in the old code */ }
+  await settle(); phase();
   knobs.subscribeFail = false; sandbox.camerasStop(); await settle();
   // 5. Control switched on after the last card render: the command still goes out (the latest status is read).
   await sandbox.camerasCard({ ops: { control_enabled: false } });
@@ -202,7 +218,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   knobs.sdkPresent = false;
   const keys = () => calls.push(["storage", Object.keys(storage).sort().join(",")]);
   mark("sdk-load"); sandbox.camerasOpen(); await settle(); keys();
-  storage["websdk_ng_install_id"] = "new-device"; storage["websdk_ng_cache_parameter"] = "x";   // what the SDK does as it starts
+  // What the SDK does as it starts:
+  storage["websdk_ng_install_id"] = "new-device"; storage["websdk_ng_cache_parameter"] = "x";
   knobs.sdkPresent = true; knobs.scripts[0].onload(); await settle(); keys();
   storage["websdk_ng_global_parameter"] = "written-while-joined"; knobs.writeOnLeave = true;
   knobs.leaveGate = new Promise((r) => { release = r; });
@@ -218,7 +235,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   // 16. A lost connection leaves and says so; a disconnect that is our own leave is not an error.
   sandbox.camerasOpen(); await settle();
   mark("own-leave"); client.handlers["connection-state-change"]("DISCONNECTED", "CONNECTED", "LEAVE"); phase();
-  mark("connection-lost"); client.handlers["connection-state-change"]("DISCONNECTED", "CONNECTED", "NETWORK_ERROR"); phase();
+  mark("connection-lost");
+  client.handlers["connection-state-change"]("DISCONNECTED", "CONNECTED", "NETWORK_ERROR"); phase();
   await settle(); sandbox.camerasStop(); await settle();
   console.log(JSON.stringify(calls));
 })();
