@@ -44,7 +44,7 @@ someone else on your network cannot claim the panel before you do. Sessions last
   assistants use their own token, set in
   [AI assistant](#settings/assistant).
   - **A full token reaches** every read under `/api/` (the map, run tracks, positions, settings without their
-    secrets, Frigate snapshots and the live yard-camera streams), the aerial tiles under `/tiles/` and `/imagery/`,
+    secrets and Frigate snapshots), the aerial tiles under `/tiles/` and `/imagery/`,
     and robot commands while Control is on (strict checks, never camera-on). Treat it like a key to the yard.
   - **A metrics-only token** (tick **Metrics only** when you create it) reaches `GET /api/metrics` and nothing else:
     every other locked path (`/api/`, `/tiles/`, `/imagery/`, including the live stream and the command routes)

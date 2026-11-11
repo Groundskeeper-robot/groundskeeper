@@ -423,6 +423,33 @@ def test_one_hash_in_two_rows_gets_the_narrower_scope(client):
     assert _bot("gk_dup").get("/api/events").status_code == 403
 
 
+def test_a_new_token_id_is_never_one_the_other_store_has(client, monkeypatch):
+    signed_in(client)
+    first = _scoped(client, "metrics", "m1")
+    ids = iter([first["id"], first["id"], "aaaa1111"])                  # a collision, twice, then a free id
+    monkeypatch.setattr(auth.secrets, "token_hex", lambda n: next(ids))
+    second = _scoped(client, None, "f1")
+    assert second["id"] == "aaaa1111"
+    client.c.delete(f"/api/auth/tokens/{second['id']}")
+    assert [t["name"] for t in client.c.get("/api/auth/tokens").json()["tokens"]] == ["m1"]    # the metrics one stayed
+
+
+@pytest.mark.parametrize("junk", [None, "oops", 7, ["x"]])
+def test_a_row_that_is_not_a_dict_is_skipped_not_a_500(client, junk):
+    signed_in(client)
+    good = _scoped(client, None, "good")
+    metrics = _scoped(client, "metrics", "scrape")
+    for key in ("api_tokens", "api_tokens_metrics"):
+        client.store.set_setting(key, [junk] + client.store.setting(key))
+    assert _bot(good["token"]).get("/api/events").status_code == 200                # the bearer gate still answers
+    assert _bot(metrics["token"]).get("/api/metrics").status_code != 500
+    assert _bot("gk_unknown").get("/api/events").status_code == 401
+    assert client.auth.token_scope(f"Bearer {good['token']}") == "full"
+    assert [t["name"] for t in client.c.get("/api/auth/tokens").json()["tokens"]] == ["good", "scrape"]
+    assert client.c.delete(f"/api/auth/tokens/{metrics['id']}").status_code == 200   # revoking walks past the junk
+    assert client.auth.token_scope(f"Bearer {metrics['token']}") is None
+
+
 def test_creating_a_metrics_token_says_so_in_the_event_log(client):
     _scoped(client, "metrics", "prom")
     _scoped(client, None, "ha")
