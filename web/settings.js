@@ -1112,7 +1112,7 @@ function secPanel(d) {
     scard("Running",
       a ? [
         srow("Version", "What changed in each version is in Help → Changelog.",
-          h("span", null, mono(a.build ? `${a.version} · ${a.build}` : a.version || "—"), " ",
+          h("span", null, mono(a.version ? versionLabel(a) : "—"), " ",
             h("a", { href: "#help/changelog" }, "Changelog"))),
         srow("Data directory", "Everything the panel knows lives here: the database, imagery, the cloud session.", mono(a.data_dir)),
         srow("Port", null, mono(String(a.port))),

@@ -146,6 +146,15 @@ sign-in (optional: a fallback route), the imagery, cameras, Home Assistant and s
 `docker-compose.yml` (for example `:1.0`). Each release's changes are in the [changelog](CHANGELOG.md) and on the
 [releases page](https://github.com/Groundskeeper-robot/groundskeeper/releases).
 
+**Testing what's next.** Pre-release images are in their own package, `ghcr.io/groundskeeper-robot/groundskeeper-dev`:
+`:edge` is built on every merge to `main`, `:nightly` once a night when `main` changed (`:nightly-YYYYMMDD` for a
+given night), and `:sha-<commit>` for an exact commit. Point `docker-compose.yml` at one to try a fix before it is
+released. They passed the same checks as a release but have not been tried on a robot, so back up `./data` first: a
+newer build may change the database in a way the last release cannot read. Settings → This panel shows `nightly` or
+`edge` beside the version; say which when you report a problem. To go back, switch the image to a release; if
+that release then won't start or shows errors about the database, stop the panel, put the backup of `./data` back,
+and start it again.
+
 **Other options** are in [`.env.example`](.env.example). The panel runs as `PUID:PGID` (1000:1000 by default), so
 set those to your own user if you want to edit `./data` by hand. It runs on amd64 and arm64, including a Raspberry
 Pi 4 or 5.

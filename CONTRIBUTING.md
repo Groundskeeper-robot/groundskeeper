@@ -138,6 +138,16 @@ or a change people must act on).
    `ghcr.io/groundskeeper-robot/groundskeeper:X.Y.Z`, `:X.Y` and `:latest` for amd64 and arm64, and creates a GitHub
    release whose notes are that version's changelog section.
 
+### Pre-release images
+
+`.github/workflows/prerelease.yml` builds `ghcr.io/groundskeeper-robot/groundskeeper-dev`: `:edge` on every push to
+`main`, `:nightly` (and `:nightly-YYYYMMDD`) on a schedule when `main` changed, `:sha-<commit>` for each. Each build
+runs `scripts/check.py` first and passes `PANEL_CHANNEL`, so the panel shows the channel beside its version. Nothing
+there writes to the release package or `:latest`. Run the workflow by hand for a nightly now. Old versions are not
+pruned automatically (free storage for a public package; a count-based clean-up can split a multi-arch build).
+
+Once, after the first run, make the package **public** in its settings on GitHub.
+
 ## Security
 
 Please don't open a public issue for a security problem. See [SECURITY.md](SECURITY.md).
