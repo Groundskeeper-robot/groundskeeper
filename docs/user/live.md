@@ -55,7 +55,7 @@ are pink, edge passes violet.
 - **Problem areas:** a weak-positioning spot also says when HaLow was weak there (−77 dBm or lower) or corrections
   came late. A good link there points at the sky view instead: trees, walls, the house.
 - **Cameras:** the robot's own cameras (front, left, right, back), not the yard cameras of the follow-cam. The tile
-  is there only when [Settings → Robot → Robot video](#help/settings) is on and the video service is set. **Open**
+  is there only when [Settings → Robot → Robot video](#help/settings) is on. **Open**
   switches the robot's cameras on (needs Control on) and shows one camera at a time: pick Front, Left, Right or
   Back. The state beside the title is *Connecting*, *Waiting for the robot*, *Live* or an error with **Try again**.
   An error says which step failed and a short reason, such as "Joining failed: OperationError".
