@@ -871,6 +871,23 @@ function toast(text) {
   toast.t = setTimeout(() => { el.hidden = true; }, 5000);
 }
 
+/* The clipboard API needs a secure context, and a panel opened at http://<lan address> is not one: there
+   navigator.clipboard is missing, so fall back to a selected textarea and the old copy command. */
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch { /* not a secure context: fall back */ }
+  const ta = h("textarea", { style: "position:fixed;left:-9999px;top:0", "aria-hidden": "true", readonly: "" });
+  ta.value = text;
+  document.body.append(ta);
+  ta.select();
+  ta.setSelectionRange(0, text.length);   // iOS selects nothing with select() alone
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch { /* nothing more to try */ }
+  ta.remove();
+  return ok;
+}
+const copyToast = async (text) =>
+  toast(await copyText(text) ? "Copied." : "Copy did not work here: select it by hand.");
+
 /* ------------------------------------------------------ imagery alignment */
 const M_PER_DEG = 111320;
 
