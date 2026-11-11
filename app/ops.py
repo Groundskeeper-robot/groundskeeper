@@ -56,13 +56,14 @@ class Ops:
         self.cfg, self.rec, self.store = cfg, rec, rec.store
         self.cloud = CloudTransport(cfg.data_dir, rec.sn, self._from_cloud)
         # Local first, the cloud as a fallback, for reads and commands alike (app/link.py).
-        self.link = RobotLink(rec, self.cloud, self.store, mark_sent=lambda cmd: rec._sent.__setitem__(cmd, time.time()))
+        self.link = RobotLink(rec, self.cloud, self.store, mark_sent=rec.mark_sent)
         self.link.on_change = self._route_changed
         rec.link = self.link
         self.frigate = Frigate(cfg.frigate_url)
         self.notifier = Notifier(self.store, cfg.ha_url, cfg.ha_token)
         rec.on_sn = self.robot_changed
         self.controller = Controller(self.store, self.link, self.context, self.expect_reply, lambda: self.rec.t)
+        self.controller.light_context = self.beat_context
         # Another client's command, other than the one being watched (whose late echo may look like someone else's).
         self.controller.others_at = lambda cmd: max(
             (t for name, t in (getattr(self.rec, "foreign_cmds", None) or {}).items() if name != cmd), default=0.0)
@@ -104,10 +105,12 @@ class Ops:
         """Cloud messages join the recorder's queue (so DeviceMSG and replies are handled once, in one place)
         and also feed phone-app detection."""
         parts = topic.split("/", 3)
+        ours = None
         if len(parts) == 4 and parts[2] == "app" and parts[3] in PHONE_APP_COMMANDS:
-            if time.time() - self.rec._sent.get(parts[3], 0) > 5:
+            ours = self.rec.own_echo(parts[3], ts, data)      # decided once here; the recorder is handed the verdict
+            if not ours:
                 self.phone_app_at = ts
-        self.rec._from_thread(topic, data, ts)
+        self.rec._from_thread(topic, data, ts, ours)
 
     def _route_changed(self, what: str, before: str, after: str) -> None:
         """A route to the robot changed (local <-> cloud): say so once, so a firmware lockout or a 4G spell shows."""
@@ -222,6 +225,13 @@ class Ops:
         if active is None:
             return "the robot's plan state is unknown; nothing was sent"
         return None
+
+    def beat_context(self) -> dict:
+        """What a keep-awake beat's checks read (control.check): no awaits, so a beat never holds the controller's
+        lock across a Frigate or Home Assistant timeout."""
+        r = self.rec
+        return {"snapshot_age_s": round(time.time() - r.snapshot_at, 1) if r.snapshot_at else None,
+                "route_state": self.link.state}
 
     async def context(self, args: dict) -> dict:
         r = self.rec
@@ -654,6 +664,10 @@ class Ops:
     async def _guard_loop(self) -> None:
         while True:
             await asyncio.sleep(5)
+            try:
+                self.controller.keep_awake_tick()           # §13: say when the Cameras tile's keep-awake has stopped
+            except Exception:
+                log.exception("keep-awake check failed")
             try:
                 await self._guard_tick()
             except Exception:

@@ -1,7 +1,8 @@
 """Robot control (spec §10). The only module that can command the robot, and it is OFF until switched on.
 
 Every request passes, in order:
-1. the catalogue (five official run commands; anything else, including manual drive, is refused),
+1. the catalogue (five official run commands, the cameras-on switch and the keep-awake; anything else, including
+   manual drive, is refused),
 2. the master switch (setting `control_enabled`, default False),
 3. the interlocks for that command (§10.3), enforced here and not only in the UI,
 then goes out through app.link.RobotLink (the robot's local broker first, the Yarbo cloud as a fallback) and is
@@ -12,8 +13,10 @@ The robot sends no reply to run commands (seen 2026-10-05: nothing for start_pla
 command is confirmed by the robot's state changing the way the command should change it (CONFIRM below).
 """
 import asyncio
+import contextvars
 import json
 import logging
+import random
 import time
 
 from . import why
@@ -26,8 +29,27 @@ CATALOGUE = {
     "resume": {"label": "Resume", "args": ()},
     "stop": {"label": "Stop", "args": ()},
     "cmd_recharge": {"label": "Return to dock", "args": ()},
+    # From the official app (docs/dev/protocol.md: Robot video, and the phone-app commands table). Switches the robot's
+    # cameras on for the live view, nothing else. Only on: "off" also cut the official app's view on a phone, so a
+    # client leaves switching off to the robot or the app.
+    "smart_vision_control": {"label": "Cameras on", "args": ()},
+    # The keep-awake the official app sends while it is open (docs/dev/protocol.md), so the robot streams its cameras.
+    # Fixed payload {"state": 1}; there is no "state 0". People only, and only inside a window a person started from
+    # the Cameras tile (Controller.keep_awake, §13), so /api/control/send alone cannot keep the robot awake.
+    "set_working_state": {"label": "Keep awake", "args": ()},
 }
 HARD_BLOCKED = {"cmd_vel"}  # manual drive: never, from anyone
+KEEP_AWAKE = "set_working_state"
+KEEP_AWAKE_PAYLOAD = {"state": 1}
+KEEP_AWAKE_MIN_S = 3.0        # at most one beat this often from the panel, whoever asks (a browser sends one every 4 s)
+KEEP_AWAKE_GAP_S = 15.0       # no beat this long = the watching has stopped; the next beat is a new start
+KEEP_AWAKE_MAX_S = 15 * 60    # one press of play keeps the robot awake at most this long; then a person presses again
+KEEP_AWAKE_JITTER_S = 1.0     # each beat waits a random 0..this first, so the app's beats cannot stay in step (§13)
+# A refusal on one of these ends the window: the robot went offline or out of reach, or the time is up.
+KEEP_AWAKE_ENDS_ON = ("Robot online", "Route to the robot", "Within the time limit")
+# Set only while Controller.keep_awake is sending (per task): a keep-awake from anywhere else (/api/control/send, say)
+# has no window, so it is refused, and every beat gets the rate limit and the jitter.
+_IN_BEAT = contextvars.ContextVar("keep_awake_beat", default=False)
 
 GATE_DEFAULTS = {
     "min_battery_pct": 30,
@@ -72,6 +94,8 @@ def payload_for(cmd: str, args: dict) -> dict:
         return {"id": int(args["plan_id"])}
     if cmd == "cmd_recharge":
         return {"cmd": 2}  # the firmware requires cmd=2 (official SDK)
+    if cmd in ("smart_vision_control", KEEP_AWAKE):
+        return {"state": 1}  # a constant: there is no payload a caller can change into "off"
     return {}
 
 
@@ -118,6 +142,33 @@ def check(cmd: str, args: dict, ctx: dict, cfg: dict, actor: str) -> list[dict]:
             add("Someone home (Alarmo)", ctx["presence"] is True,
                 {True: "yes", False: "Alarmo armed away", None: "unknown"}[ctx["presence"]])
         return out
+    if cmd == "smart_vision_control":
+        # Allowed idle or running, like pause, stop and dock: it only starts the robot's video, so the route and
+        # online checks are all it needs. The one extra rule is that "on" is the only thing that can be asked for.
+        # An absent state means on; any other value (0, 2, "1", true, 1.0) fails closed.
+        add("People only", actor == "user",
+            "a person at the panel" if actor == "user"
+            else f"{actor} may not switch the cameras on: the video is for people")
+        s = args.get("state", 1)
+        add("Cameras on only", type(s) is int and s == 1,
+            "switching on" if type(s) is int and s == 1
+            else f"state {s!r} refused: the panel only switches the cameras on")
+    if cmd == KEEP_AWAKE:
+        # Allowed idle or running, like the cameras-on switch: a beat says nothing about a run. The window is the
+        # server's own record (ctx["awake_for_s"], set by Controller.send from Controller.keep_awake), never the
+        # request.
+        add("People only", actor == "user", "a person at the panel" if actor == "user"
+            else f"{actor} may not keep the robot awake: the video is for people")
+        s = args.get("state", 1)
+        add("Keep awake only", type(s) is int and s == 1,
+            "keep awake" if type(s) is int and s == 1 else f"state {s!r} refused: the panel only sends state 1")
+        add("Robot video on", ctx.get("robot_video") is True,
+            "on" if ctx.get("robot_video") is True else "robot video is off (Settings → Robot)")
+        a = ctx.get("awake_for_s")
+        add("Within the time limit", a is not None and a < KEEP_AWAKE_MAX_S,
+            "only the Cameras tile keeps it awake, after a press of play" if a is None else
+            f"{a / 60:.0f} of {KEEP_AWAKE_MAX_S // 60} min" if a < KEEP_AWAKE_MAX_S else
+            f"{KEEP_AWAKE_MAX_S // 60} min are up: press Open on the Cameras tile to keep watching")
     if cmd != "start_plan":
         return out
     plan_ids = {p.get("id") for p in ctx["plans"]}
@@ -191,6 +242,9 @@ def verdict(checks: list[dict], override: bool) -> tuple[bool, str]:
 # could restart a plan.
 SAFE_TO_REPEAT = ("pause", "stop", "cmd_recharge")
 REROUTE_AFTER_S = 10
+# Commands that say nothing about the run: they never stand down another command's repeat (_seq), never count as a
+# person stepping in (last_human_cmd_at) and never replace the status stream's `last` (a Pause's result stays visible).
+RUN_NEUTRAL = frozenset({"smart_vision_control", KEEP_AWAKE})
 
 
 class Controller:
@@ -211,6 +265,12 @@ class Controller:
         self.start_out: dict | None = None  # the last start or resume this panel sent: {"cmd", "at"} (#69)
         self.writing = lambda: False      # a write to the robot holds the writer's lock; set by Ops
         self._tasks: set = set()
+        self._beat_at = None              # monotonic time of the last keep-awake attempt (the rate limit), any viewer
+        self._beat_ok_at = None           # monotonic time of the last one that went out; None = none since it stopped
+        self._awake_since = None          # monotonic start of the keep-awake window a person opened; None = none
+        # () -> {"snapshot_age_s", "route_state"}: all a beat's checks need, without the yard or presence lookups (set
+        # by Ops; None = the full context). A beat every 4 s must not hold the lock across Frigate's timeouts.
+        self.light_context = None
 
     async def _watch(self, cmd: str, fut: asyncio.Future, last: dict, rowid: int, logged: dict) -> None:
         """Confirm a background command; the audit row gets the outcome, the status stream gets `last`."""
@@ -279,6 +339,67 @@ class Controller:
     def enabled(self) -> bool:
         return bool(self.store.setting("control_enabled", False))
 
+    async def keep_awake(self, actor: str = "user", start: bool = False) -> dict:
+        """One keep-awake beat for the Cameras tile (§13), sent through send() and check() like any command.
+
+        The server never repeats a beat: the open tile asks for one every 4 s, so closing it stops them. `start` (a
+        person pressed Open, a camera, or Try again) opens a window of KEEP_AWAKE_MAX_S; check() refuses beats outside
+        one, and a refusal for the time limit, the robot going offline or losing its route ends the window, so the
+        person presses play again. At most one beat every KEEP_AWAKE_MIN_S, whoever asks: a request inside that is
+        dropped quietly before send() (several open tabs would otherwise fill the audit log with refusals). Each beat
+        waits a random 0..KEEP_AWAKE_JITTER_S first, so the phone app's own beats cannot stay in step with the panel's
+        (recorder.own_echo). The start and the stop of the beats are each one event."""
+        now = time.monotonic()
+        if start and actor == "user":
+            self._awake_since = now
+        if self._beat_at is not None and now - self._beat_at < KEEP_AWAKE_MIN_S:
+            return {"sent": False, "limited": True}
+        self._beat_at = now
+        if not self.enabled():
+            # Nothing would go out: answered here, without an audit row per beat, as before send(). The window still
+            # runs out, so a tile left open with Control off stops asking too.
+            out = {"sent": False, "control_off": True, "refused": "control is switched off (Settings → Safety)"}
+            if self._awake_since is None or now - self._awake_since >= KEEP_AWAKE_MAX_S:
+                self._awake_since, out["ended"] = None, True
+            return out
+        await asyncio.sleep(random.uniform(0, KEEP_AWAKE_JITTER_S))
+        token = _IN_BEAT.set(True)
+        try:
+            out = await self.send(KEEP_AWAKE, {}, actor=actor, wait=False)
+        finally:
+            _IN_BEAT.reset(token)
+        failed = {c["name"] for c in out.get("checks") or [] if c["hard"] and c["ok"] is not True}
+        # No route at all (the cloud signed out, say) ends it too: nothing can go out until a person tries again.
+        if not out.get("sent") and (failed & set(KEEP_AWAKE_ENDS_ON) or out.get("error")):
+            capped = "Within the time limit" in failed and self._awake_since is not None
+            self._awake_since = None
+            out["ended"] = True
+            if self._beat_ok_at is not None:
+                self._beat_ok_at = None
+                self.store.event("keep_awake_stopped", "the panel stopped keeping the robot awake: "
+                                 + ("its time was up" if capped else "the robot is offline or out of reach"))
+        if not out.get("sent") and not self.enabled():
+            out["control_off"] = True
+        if out.get("sent"):
+            if self._beat_ok_at is not None and now - self._beat_ok_at > KEEP_AWAKE_GAP_S:
+                self._beat_stopped(self._beat_ok_at, end_window=False)   # noticed late: say it now (this press stands)
+            if self._beat_ok_at is None:
+                self.store.event("keep_awake_started", "the robot is being kept awake for the Cameras tile")
+            self._beat_ok_at = time.monotonic()
+        return out
+
+    def _beat_stopped(self, last_at: float, end_window: bool = True) -> None:
+        self._beat_ok_at = None
+        if end_window:
+            self._awake_since = None      # the window ends with the beats: a later beat needs a new press
+        self.store.event("keep_awake_stopped", f"the Cameras tile stopped keeping the robot awake "
+                                               f"(last beat {time.monotonic() - last_at:.0f} s ago)")
+
+    def keep_awake_tick(self) -> None:
+        """Called from an existing loop: the beats have stopped once none came for KEEP_AWAKE_GAP_S."""
+        if self._beat_ok_at is not None and time.monotonic() - self._beat_ok_at > KEEP_AWAKE_GAP_S:
+            self._beat_stopped(self._beat_ok_at)
+
     async def preview(self, cmd: str, args: dict, actor: str = "user") -> dict:
         ctx = await self._context(args)
         checks = check(cmd, args, ctx, gates(self.store), actor)
@@ -321,7 +442,14 @@ class Controller:
                     raise Refused(f"missing {', '.join(missing)}")
                 if not self.enabled():
                     raise Refused("control is switched off (Settings → Safety)")
-                ctx = await self._context(args)
+                if cmd == KEEP_AWAKE and self.light_context is not None:
+                    ctx = dict(self.light_context())
+                else:
+                    ctx = await self._context(args)
+                if cmd == KEEP_AWAKE:           # the window is the server's own record, never the request's
+                    since = self._awake_since if _IN_BEAT.get() else None
+                    ctx["awake_for_s"] = None if since is None else time.monotonic() - since
+                    ctx["robot_video"] = bool(self.store.setting("robot_video_enabled", False))
                 checks = check(cmd, args, ctx, gates(self.store), actor)
                 ok, reason = verdict(checks, override=override and actor == "user")
                 if not ok:
@@ -335,9 +463,13 @@ class Controller:
                 if cmd in ("start_plan", "resume"):
                     self.start_out = {"cmd": cmd, "at": time.time()}   # before the send: a send that fails half-way holds too
                 route = self.link.command(cmd, payload)
-                self._seq += 1
+                # A run-neutral command (RUN_NEUTRAL) must not bump _seq (a pause or dock still waiting to be seen
+                # would stand down its other-route repeat) nor look like a person taking over (the guards,
+                # ops._people_cmd_at, would stop retrying a pause or dock that didn't take).
+                if cmd not in RUN_NEUTRAL:
+                    self._seq += 1
                 self._spawn(self._follow_up(cmd, payload, args, route, self._seq, actor))
-                if actor != "guard":
+                if actor != "guard" and cmd not in RUN_NEUTRAL:
                     self.last_human_cmd_at = time.time()
                 result = {"sent": True, "cmd": cmd, "payload": payload, "checks": checks, "route": route}
             except Refused as r:
@@ -351,7 +483,9 @@ class Controller:
         # Confirmation runs outside the lock: a Pause pressed while a start is still being confirmed goes out now.
         background = result["sent"] and wait == "background"
         if background:
-            self.last = {"cmd": cmd, "at": started, "actor": actor, "confirmed": None, "confirm": "checking", "done": False}
+            last = {"cmd": cmd, "at": started, "actor": actor, "confirmed": None, "confirm": "checking", "done": False}
+            if cmd not in RUN_NEUTRAL:
+                self.last = last        # else a camera-on would hide a Pause's result from the panel's toast
             result.update(confirmed=None, confirm="checking", at=started)
         elif result["sent"] and not wait:
             fut.cancel()
@@ -363,7 +497,7 @@ class Controller:
         result["latency_ms"] = round((time.time() - started) * 1000)
         rowid = self.store.log_control(actor, result.get("route") or "none", cmd, json.dumps(args), result)
         if background:
-            task = asyncio.get_running_loop().create_task(self._watch(cmd, fut, self.last, rowid, dict(result)))
+            task = asyncio.get_running_loop().create_task(self._watch(cmd, fut, last, rowid, dict(result)))
         elif result.get("confirmed") is False and not result.get("reply"):
             task = asyncio.get_running_loop().create_task(self._watch_late(cmd, rowid, dict(result), result, {}))
         else:

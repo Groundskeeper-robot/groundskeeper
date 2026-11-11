@@ -30,6 +30,7 @@ DEMO=1 PANEL_AUTH=off DATA_DIR=./demo-data python -m app      # run with a synth
 ```
 
 The UI needs `web/vendor/` (MapLibre, three.js; git-ignored): see `CONTRIBUTING.md` → Set up. Tests don't need it.
+The Agora Web SDK is vendored there too, for the robot cameras.
 
 ## Rules for AI agents
 
@@ -76,6 +77,7 @@ These come on top of the rules below, which apply to everyone.
 | `app/imagery/`, `catalog/` | Aerial imagery: protocols, catalog data (one JSON file per source) |
 | `app/demo.py`, `app/demo_robot.py` | Demo mode: synthetic history and a simulated robot |
 | `web/` | Plain JS, no build step: `app.js` (shell, Live, Runs), `studio.js`, `settings.js`, `ops.js`, `imagery.js`, `help.js`, `robot3d.js` |
+| `web/cameras.js` | Live's Cameras tile: the robot's own cameras |
 | `docs/user/` | In-app Help pages (served by the panel) |
 | `docs/dev/` | Design (`design.md`, cited from code as §N), protocol, map writes, robot states, UI rules |
 | `tests/` | pytest; fakes for the robot, HTTP and stores; all synthetic. `tests/test_guards.py` checks the rules below |

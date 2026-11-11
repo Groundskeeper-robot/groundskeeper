@@ -17,6 +17,7 @@ import json
 import logging
 import math
 import statistics
+import threading
 import time
 from pathlib import Path
 
@@ -56,6 +57,19 @@ SESSION_SKIP_REPLIES = {"get_device_msg", "get_map", "get_plan_feedback", "read_
                         "read_low_cfd_config", "get_wifi_list", "get_connect_wifi_name"}
 SESSION_MAX_ENTRIES = 3000
 SESSION_MAX_BYTES = 200_000     # per message
+# The panel's own sends of these two are matched to their echoes one for one (Recorder.own_echo), not by a time window:
+# the Cameras tile sends a keep-awake every 4 s, so any window longer than that would hide the phone app's own beats.
+COUNTED_OWN = frozenset({"set_working_state", "smart_vision_control"})
+OWN_ECHO_S = 5            # an echo of our own send is seen within this long of it (the other commands)
+# How long a credit for an echo of COUNTED_OWN lasts before it counts as unmatched. Not measured yet: the panel logs
+# what it sees (Recorder.own_echo_stats), and these err towards "the phone app" until it is.
+OWN_ECHO_COUNTED_S = 1.5
+OWN_TRUST_LATENCY_S = 0.3   # only a match this quick can be ours; a slower one is the app's
+# Trusted only while EVERY one of the last OWN_TRUST_WINDOW credits was matched quickly: one miss withdraws it. With the
+# panel's beats jittered (control.KEEP_AWAKE_JITTER_S), the app's beats cannot keep landing just after each of ours.
+OWN_TRUST_WINDOW = 10
+OWN_FRESH_S = 15          # no send of these for this long: the next one starts afresh (trust is earned again)
+OWN_LOG_EVERY = 50        # log what the matching has seen every this many credits (for measuring the above)
 # Commands that mean a person (phone app, another client) is steering the robot: a guard gives up its pause.
 PEOPLE_COMMANDS = {"start_plan", "pause", "resume", "stop", "cmd_recharge", "cmd_vel"}
 # While doing one of these the robot should be getting somewhere; standing still for minutes means it is stuck
@@ -177,6 +191,7 @@ class Recorder:
         self._area_lock = asyncio.Lock()
         self._preview_lock = asyncio.Lock()
         self._sent: dict[str, float] = {}
+        self._own_lock = threading.Lock()         # own_echo is called from the cloud thread and the event loop
 
         self.tempest: TempestListener | None = None      # made by apply_weather()
         self.conditions: dict | None = None
@@ -231,9 +246,119 @@ class Recorder:
                 self._finish_wifi_survey(rid)
 
     # -- plumbing ----------------------------------------------------------------------------------------------
-    def _from_thread(self, topic: str, data, ts: float) -> None:
+    def _own(self) -> dict:
+        """The matching state of COUNTED_OWN (created on first use: some tests build a bare Recorder). `beats`: our
+        send times not yet matched, per command. `hist`: how each of our recent credits ended (True = matched quickly,
+        False = expired unmatched), counted separately from the messages, so the app's beats cannot stand in for them.
+        `lat`: the delays of recent quick matches, for measuring."""
+        fresh = {"beats": {}, "hist": deque(maxlen=OWN_TRUST_WINDOW), "lat": deque(maxlen=50),
+                 "slow": deque(maxlen=50), "trusted": False, "note": None, "was_lost": False, "last": 0.0, "n": 0}
+        return self.__dict__.setdefault("_own_state", fresh)
+
+    def _own_judge(self, st: dict) -> None:
+        """Trusted only while every one of the last OWN_TRUST_WINDOW credits was matched quickly."""
+        now = len(st["hist"]) == OWN_TRUST_WINDOW and all(st["hist"])
+        if st["trusted"] and not now:
+            st["trusted"], st["note"], st["was_lost"] = False, "lost", True
+        elif now and not st["trusted"]:
+            st["trusted"] = True
+            if st["was_lost"]:
+                st["was_lost"], st["note"] = False, "back"
+
+    def _own_expire(self, st: dict, name: str, before: float) -> None:
+        """Credits older than `before` were never matched by an echo: each one counts against the matching."""
+        q = st["beats"].setdefault(name, deque(maxlen=16))
+        while q and q[0] < before:
+            q.popleft()
+            st["hist"].append(False)
+        self._own_judge(st)
+
+    def own_echo_stats(self) -> dict:
+        """What the matching has seen lately (logged when trust changes; for measuring the constants above)."""
+        st = self.__dict__.get("_own_state")
+        if not st:
+            return {"trusted": False, "recent": [], "latency_ms": None}
+        with self.__dict__.setdefault("_own_lock", threading.Lock()):
+            lat, slow = sorted(st["lat"]), sorted(st["slow"])
+            hist = list(st["hist"])
+
+        def ms(xs):
+            return None if not xs else {"n": len(xs), "median": round(statistics.median(xs) * 1000),
+                                        "max": round(xs[-1] * 1000)}
+        return {"trusted": st["trusted"], "recent": hist, "latency_ms": ms(lat), "slow_ms": ms(slow)}
+
+    def _own_flush(self) -> None:
+        """Say once that the matching was given up, or came back. Called on the event loop (never from the cloud thread:
+        the store is not for it)."""
+        st = self.__dict__.get("_own_state")
+        if not st or not st["note"]:
+            return
+        with self.__dict__.setdefault("_own_lock", threading.Lock()):
+            note, st["note"] = st["note"], None
+        log.info("own-echo matching %s: %s", note, self.own_echo_stats())
+        if note == "lost":
+            self.store.event("cloud_echo_missing", "the panel's own commands are not all echoed back quickly, so the "
+                             "panel's keep-awake and camera-on count as the phone app's while the cameras are open")
+        elif note == "back":
+            self.store.event("cloud_echo_seen", "the panel's own commands are echoed back again, so they no longer "
+                             "count as the phone app's")
+
+    def mark_sent(self, cmd: str) -> None:
+        """The panel has just sent `cmd` (RobotLink calls this after every send): its echo is ours."""
+        now = time.time()
+        self._sent[cmd] = now
+        if cmd in COUNTED_OWN:
+            with self.__dict__.setdefault("_own_lock", threading.Lock()):
+                st = self._own()
+                self._own_expire(st, cmd, now - OWN_ECHO_COUNTED_S)
+                if now - st["last"] > OWN_FRESH_S:
+                    # A new session: trust earned earlier says nothing about the cloud now, so it is earned again
+                    # (quietly: this is not the cloud failing).
+                    st["hist"].clear()
+                    st["trusted"] = False
+                st["last"] = now
+                st["n"] += 1
+                st["beats"].setdefault(cmd, deque(maxlen=16)).append(now)
+                periodic = st["n"] % OWN_LOG_EVERY == 0
+            if periodic:
+                log.info("own-echo matching: %s", self.own_echo_stats())
+            self._own_flush()
+
+    def own_echo(self, name: str, ts: float, data) -> bool:
+        """Is the message `name` that arrived at `ts` the echo of something this panel sent? Decided once per message
+        (ops decides for a cloud message and hands the verdict on; the recorder decides for the rest).
+
+        Most commands: sent within the last OWN_ECHO_S. The keep-awake and camera-on (COUNTED_OWN): each of our sends is
+        a credit for ONE echo, so the Yarbo app's own beats, arriving seconds after ours, still count as the app's. What
+        we send is always {"state": 1}: anything else is never ours and takes no credit.
+
+        It fails closed, towards "the phone app" (the interlock then reads "active"): a message is ours only while the
+        matching is trusted, and it is trusted only while every one of our last OWN_TRUST_WINDOW credits was matched
+        within OWN_TRUST_LATENCY_S. If the cloud stops echoing, our credits go unmatched (an app beat can take one only
+        by landing just after ours, and the panel's jitter keeps that from repeating), so trust goes at the first miss.
+        A quick match while untrusted is only a probe, and the message still counts as the app's."""
+        if name not in COUNTED_OWN:
+            return ts - self._sent.get(name, 0) < OWN_ECHO_S
+        if not isinstance(data, dict) or not (type(data.get("state")) is int and data["state"] == 1):
+            return False                          # undecodable, or not what we send: never ours, takes no credit
+        with self.__dict__.setdefault("_own_lock", threading.Lock()):
+            st = self._own()
+            self._own_expire(st, name, ts - OWN_ECHO_COUNTED_S)
+            q = st["beats"].setdefault(name, deque(maxlen=16))
+            if not (q and q[0] <= ts):            # a credit recorded after the message arrived is not its echo
+                return False
+            if ts - q[0] > OWN_TRUST_LATENCY_S:   # too slow to be an echo: the app's; the credit is left to expire
+                st["slow"].append(ts - q[0])      # (kept for measuring: a slow echo would show here)
+                return False
+            st["lat"].append(ts - q.popleft())
+            st["hist"].append(True)
+            self._own_judge(st)
+            return st["trusted"]
+
+    def _from_thread(self, topic: str, data, ts: float, ours: bool | None = None) -> None:
+        """`ours`: the verdict the caller already reached (ops, for a cloud message), so it is decided once."""
         if self.loop:
-            self.loop.call_soon_threadsafe(self.queue.put_nowait, (topic, data, ts))
+            self.loop.call_soon_threadsafe(self.queue.put_nowait, (topic, data, ts, ours))
 
     async def run(self) -> None:
         self.loop = asyncio.get_running_loop()
@@ -411,19 +536,23 @@ class Recorder:
     # -- message handling --------------------------------------------------------------------------------------
     async def _consume(self) -> None:
         while True:
-            topic, data, ts = await self.queue.get()
+            topic, data, ts, ours = await self.queue.get()
             try:
-                self._handle(topic, data, ts)
+                self._handle(topic, data, ts, ours)
             except Exception:
                 log.exception("failed to handle %s", topic)
 
-    def _handle(self, topic: str, data, ts: float) -> None:
+    def _handle(self, topic: str, data, ts: float, ours: bool | None = None) -> None:
         parts = topic.split("/", 3)
         if len(parts) < 4:
             return
         channel, name = parts[2], parts[3]
+        if channel == "app":
+            if ours is None:
+                ours = self.own_echo(name, ts, data)          # decided here, once, for the session record and below
+            self._own_flush()
         if self.session and not self.session.get("ended"):
-            self._session_record(channel, name, data, ts)
+            self._session_record(channel, name, data, ts, ours)
         if channel == "device":
             self._robot_heard(ts)
         if channel == "device" and name == "data_feedback" and isinstance(data, dict):
@@ -456,7 +585,6 @@ class Recorder:
         elif channel == "device" and name == "heart_beat" and isinstance(data, dict):
             self.heartbeat, self.heartbeat_at = data, ts
         elif channel == "app":
-            ours = ts - self._sent.get(name, 0) < 5
             if not ours and name in PEOPLE_COMMANDS:
                 self.foreign_cmd_at = ts
                 self.foreign_cmds[name] = ts     # by command: a late echo of the panel's own is told apart
@@ -526,7 +654,7 @@ class Recorder:
         return [p for p in self.poses if p["seq"] > seq]
 
     # -- "record an app edit": learn a command by doing it once in the Yarbo app ----------------------------------
-    def _session_record(self, channel: str, name: str, data, ts: float) -> None:
+    def _session_record(self, channel: str, name: str, data, ts: float, ours: bool | None = None) -> None:
         s = self.session
         if ts > s["until"]:
             return
@@ -539,7 +667,7 @@ class Recorder:
             if reply_to in SESSION_SKIP_REPLIES and ts - self._sent.get(reply_to, 0) < 5:
                 return                                  # our own read, answered
             key = f"reply/{reply_to}"
-        if channel == "app" and ts - self._sent.get(name, 0) < 5:
+        if channel == "app" and (self.own_echo(name, ts, data) if ours is None else ours):
             return                                      # our own request
         if len(s["entries"]) >= SESSION_MAX_ENTRIES:
             s["dropped"] += 1

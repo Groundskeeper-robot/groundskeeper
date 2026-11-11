@@ -26,6 +26,15 @@ ROUTE_MODES = ("auto", "local", "cloud")
 # Map, settings, plan and backup writes on the local broker are not proved yet (run commands and a setting are,
 # 2026-10-21). Until they are, writes go only through the cloud.
 LOCAL_WRITES_PROVED = False
+# The only observed path for smart_vision_control is the cloud broker (docs/dev/protocol.md, Robot video). Until a
+# send on the local broker is observed, it goes only through the cloud.
+LOCAL_VISION_PROVED = False
+# The keep-awake (set_working_state) is the same: only the cloud broker is observed, so it goes only through the cloud.
+LOCAL_KEEPAWAKE_PROVED = False
+# The two "on only" commands, and whether each is proved on the local broker (read when sending, so tests can flip it).
+CLOUD_ONLY_ON = {"smart_vision_control": lambda: LOCAL_VISION_PROVED,
+                 "set_working_state": lambda: LOCAL_KEEPAWAKE_PROVED}
+QUIET_COMMANDS = frozenset({"set_working_state"})   # not shown as the link's last command
 LOCAL_MISSES = 2              # unanswered local reads (or unseen local commands) in a row before switching
 BACKOFF_S = 300               # how long reads or commands stay on the cloud before local is tried again
 CHEAP_READS = ("get_device_msg", "read_gps_ref", "get_plan_feedback")   # quick replies: a miss means something
@@ -150,6 +159,16 @@ class RobotLink:
         from . import control
         if cmd not in control.CATALOGUE:
             raise NoRoute(f"{cmd} is not a run command")
+        if cmd in CLOUD_ONLY_ON:
+            # on only, checked again here as cmd_vel is blocked at every layer (True and 1.0 are not 1)
+            if not (list(payload) == ["state"] and type(payload["state"]) is int and payload["state"] == 1):
+                raise NoRoute(f"{cmd} is only {{\"state\": 1}}")
+            if not CLOUD_ONLY_ON[cmd]():
+                if route == "local" or self.mode() == "local":
+                    raise NoRoute(f"{cmd} goes through the Yarbo cloud only for now")
+                route = "cloud" if self.cloud_up() else None
+                if route is None:
+                    raise NoRoute(f"the Yarbo cloud is {getattr(self.cloud, 'state', 'not set up')}")
         return self._send(cmd, payload, route or self.command_route(), None if route else "commands")
 
     def write_command(self, cmd: str, payload: dict, route: str | None = None) -> str:
@@ -176,8 +195,9 @@ class RobotLink:
             if not self.cloud_up():
                 raise NoRoute(f"the Yarbo cloud is {getattr(self.cloud, 'state', 'not set up')}")
             self.cloud.publish(cmd, payload)
-        self.mark_sent(cmd)              # after it went: the robot's echo arrives later, on the event loop
-        self.last_command = {"cmd": cmd, "route": route, "at": time.time()}
+        self.mark_sent(cmd)              # after it went; an echo handled before this counts as another client's
+        if cmd not in QUIET_COMMANDS:    # a keep-awake beat every 4 s is not "the last command" (status shows that)
+            self.last_command = {"cmd": cmd, "route": route, "at": time.time()}
         if what:
             self._note(what, route)
         return route

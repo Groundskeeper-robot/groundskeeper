@@ -152,7 +152,7 @@ shows them as reported. Wi-Fi strength is not in the device message; only a scan
 
 | Command | Payload | Notes |
 |---|---|---|
-| `set_working_state` | `{"state":1}` | Keep-awake, about every 10 s while the app is open |
+| `set_working_state` | `{"state":1}` | Keep-awake while the app is open; see below the table |
 | `cmd_vel` | `{"vel":0.0,"rev":0.0}` | **Manual drive** (linear/angular velocity). The app zeroes it on opening and streams it from its joystick. Not in the SDK. **Never send it.** |
 | `cmd_roller` | `{"vel": 1000}` | A motor command sent in bursts around blade switches and on opening. Never send it |
 | `smart_vision_control` | `{"state":0}` / `{"state":1}` | Live view off/on; see [Robot video](#robot-video-agora) |
@@ -161,6 +161,11 @@ shows them as reported. Wi-Fi strength is not in the device message; only a scan
 | `cmd_recharge` | `{"cmd": 2}` | Return to dock |
 | `cmd_motor_protect` | `{"state": 15}` | Seen once after a boundary recording |
 | `correct_map` | `{}` | The app's map-drift correction. Refused with state −5 "yarbo rtk status is not 4" without a fixed RTK; never sent by the panel |
+
+`set_working_state {"state":1}` [observed]: the app sends it about every 4 s while it is open. The robot streams its
+cameras only while someone sends it: with `smart_vision_control` on and no keep-awake it publishes nothing. The app
+switches the cameras off when it goes to the background. The panel sends it only for the Cameras tile, state 1 only,
+through the controller like any command, at most 15 min per press of play (design.md §13).
 
 ## Robot video (Agora)
 
@@ -176,9 +181,14 @@ No value here is real; serials, tokens, keys and salts are synthetic or shortene
 `snowbot/{SN}/app/smart_vision_control` over the cloud broker (see the table above). The reply is "Smart vision
 control command sent: N". No stream URL, SDP or token goes over MQTT. **[observed]** that the robot publishes
 video after `{"state":1}`.
-`{"state":0}` is the app's "off". **[unconfirmed, untested]**: what `{"state":0}` does to a viewer who is watching in
-the official app at the same time, and whether it changes anything during a run besides the live view (obstacle
-detection in particular). Until those are tested, a client should send only `{"state":1}`.
+`{"state":0}` is the app's "off". **[observed]**: `{"state":0}` sent from another cloud session switched off the
+official app's live view on the owner's phone, so it cuts the view for anyone else watching. **[unconfirmed,
+untested]**: whether it changes anything during a run besides the live view (obstacle detection in particular).
+That is why a client sends only `{"state":1}`: the panel's controller refuses any other state (`control.check`,
+"Cameras on only") and leaves switching off to the robot or the app. `{"state":1}` is allowed idle or during a run,
+with the same robot-online and route checks as pause, stop and dock. Only a person at the panel can send it (not
+tokens, the MCP server, the scheduler or the guards), and only through the cloud broker, the one route observed
+(`LOCAL_VISION_PROVED` in `app/link.py`, off until a local send is observed).
 
 **Token request.** An authenticated POST to the cloud's *robot service*, a different host from the `data-api.yarbo.ai`
 used for sign-in and broker discovery (an AWS API Gateway stage; the host is not recorded in this document). The

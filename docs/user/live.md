@@ -54,6 +54,51 @@ are pink, edge passes violet.
   survey on in [Settings → Robot](#settings/robot).
 - **Problem areas:** a weak-positioning spot also says when HaLow was weak there (−77 dBm or lower) or corrections
   came late. A good link there points at the sky view instead: trees, walls, the house.
+- **Cameras:** the robot's own cameras (front, left, right, back), not the yard cameras of the follow-cam. The tile
+  is there only when [Settings → Robot → Robot video](#help/settings) is on and the video service is set. **Open**
+  switches the robot's cameras on (needs Control on) and shows one camera at a time: pick Front, Left, Right or
+  Back. The state beside the title is *Connecting*, *Waiting for the robot*, *Live* or an error with **Try again**.
+  An error says which step failed and a short reason, such as "Joining failed: OperationError".
+  - **Control is off** (hover the note for this): the panel cannot switch the cameras on, so it plays only if they
+    are already on, for example from the Yarbo app.
+  - **Asleep, or cameras off** (and **Cameras off, or asleep** when the video stops): the robot may be asleep or its
+    cameras off. Open the Yarbo app, or switch Control on to wake them.
+  - The video comes from Agora's network to your browser and plays only while the tile is open: **Close**, another
+    page, a hidden tab or a closed page stop it. The panel never switches the cameras off, because that would cut the
+    Yarbo app's view too; the robot does that itself.
+  - The panel asks Agora's SDK not to send usage statistics or upload logs, and switches off its remote
+    configuration (which could turn those back on). A network check while video played saw the browser talk only
+    to Agora's gateway, edge and media servers. Agora's servers see the panel's address (the `Origin` and
+    `Referer` of the SDK's requests) and your browser's address. The SDK also keeps a few items of its own in this
+    browser's storage; the panel clears them when the SDK has loaded and when the tile leaves the channel.
+  - While the tile is open your browser also asks the panel for a **keep-awake** every 4 seconds, the same
+    `set_working_state` the Yarbo app sends while it is open: the robot publishes video only while someone does.
+    Each request makes the panel send one, only for a signed-in person, only with Robot video and Control on, so
+    closing the tile (or the tab) stops it (a beat already on its way can still arrive just after Close).
+  - One press of **Open** keeps the robot awake for at most **15 minutes**. Then, or if the robot goes offline, the
+    tile stops and says "Stopped. Open to watch again." Picking a camera or **Try again** counts as a press too.
+  - The Events list notes when the keep-awake starts and stops, not each beat. The Yarbo app switches the cameras off
+    when it goes to the background, so opening the app and then leaving it stops the panel's video until you
+    **Close** and **Open** the tile again.
+  - The video library needs `*.agora.io` and `*.sd-rtn.com` allowed in ad blockers and privacy extensions; if one
+    blocks them, the tile shows an error.
+  - The stream's secret is longer than Agora's Web SDK can wrap, so the panel writes it into the SDK's join
+    message and access-point request itself, on the SDK's own connections to Agora only, unwrapped inside TLS to
+    Agora, whose servers decrypt the stream for your browser anyway. A stopgap until Agora fixes their SDK
+    (AgoraIO/agora-rtc-web#15).
+  - The demo shows a placeholder: "No cameras in the demo".
+  - It has played the back camera during a run while the Yarbo app was also open. **Known limitations**, from one
+    robot so far:
+    - Waking a docked, sleeping robot is not shown to work: with the Yarbo app closed, no video arrived within about
+      35 seconds. Opening the Yarbo app once, or a running plan, may be needed first.
+    - Only the back camera has been seen. The front camera may depend on the head (mower, snow blower, leaf blower);
+      left and right are untried.
+    - The Yarbo app going to the background switches the cameras off; **Close** and **Open** the tile again.
+    - Ad blockers must allow `*.agora.io` and `*.sd-rtn.com`.
+    - The secret swap is a stopgap: Agora Web SDK 4.24.9 can wrap at most 62 bytes and the robot's secret is 64
+      ([AgoraIO/agora-rtc-web#15](https://github.com/AgoraIO/agora-rtc-web/issues/15)).
+    - Not yet looked at on a phone.
+    - Tried with one robot and one viewer at a time.
 - **Control card:** pick a plan and see its areas. Only the buttons that make sense in the robot's state are on.
   Needs control switched on ([Safety](#help/safety)). Hover a button that is off to see why; on a phone or a narrow
   window a line under the buttons says it instead.

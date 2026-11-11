@@ -575,8 +575,13 @@ class Store:
     def update_control_result(self, rowid: int, result: dict) -> None:
         self.db.execute("UPDATE control_log SET result = ? WHERE rowid = ?", (json.dumps(result), rowid))
 
-    def control_log(self, limit: int = 100) -> list[dict]:
-        rows = [dict(r) for r in self.db.execute("SELECT * FROM control_log ORDER BY ts DESC LIMIT ?", (limit,))]
+    def control_log(self, limit: int = 100, beats: bool = True) -> list[dict]:
+        """`beats=False` leaves out the keep-awake beats that went (one every 4 s while the Cameras tile is open), so
+        they cannot push everything else out of a page of the log; refused beats stay."""
+        where = "" if beats else ("WHERE NOT (cmd = 'set_working_state' AND json_valid(result) "
+                                  "AND json_extract(result, '$.sent') = 1) ")
+        rows = [dict(r) for r in self.db.execute(f"SELECT * FROM control_log {where}ORDER BY ts DESC LIMIT ?",
+                                                 (limit,))]
         for r in rows:
             r["result"] = json.loads(r["result"])
         return rows
