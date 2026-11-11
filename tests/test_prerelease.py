@@ -2,6 +2,7 @@
 never publish over a release."""
 import importlib
 import json
+import os
 import re
 from pathlib import Path
 
@@ -61,7 +62,8 @@ def test_every_version_label_in_the_ui_shows_the_channel():
     assert "`Groundskeeper ${versionLabel(idx)}`" in help_js            # Help's front page
     assert "versionLabel(a)" in settings_js                             # Settings -> This panel
     node = shutil.which("node")
-    if not node:
+    if not node:     # optional on a contributor's machine, as for check.py's syntax check; never quietly in CI
+        assert not os.environ.get("CI"), "node is missing in CI: the front-end tests must run there"
         pytest.skip("node is not installed")
     script = fn + """
 console.log(JSON.stringify([
