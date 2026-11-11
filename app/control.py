@@ -130,10 +130,12 @@ def check(cmd: str, args: dict, ctx: dict, cfg: dict, actor: str) -> list[dict]:
         # online checks are all it needs. The one extra rule is that "on" is the only thing that can be asked for.
         # An absent state means on; any other value (0, 2, "1", true, 1.0) fails closed.
         add("People only", actor == "user",
-            "a person at the panel" if actor == "user" else f"{actor} may not switch the cameras on: the video is for people")
+            "a person at the panel" if actor == "user"
+            else f"{actor} may not switch the cameras on: the video is for people")
         s = args.get("state", 1)
         add("Cameras on only", type(s) is int and s == 1,
-            "switching on" if type(s) is int and s == 1 else f"state {s!r} refused: the panel only switches the cameras on")
+            "switching on" if type(s) is int and s == 1
+            else f"state {s!r} refused: the panel only switches the cameras on")
     if cmd != "start_plan":
         return out
     plan_ids = {p.get("id") for p in ctx["plans"]}
