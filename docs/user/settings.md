@@ -121,7 +121,7 @@ the robot shows which way each goes).
 
 ### Robot video
 
-Settings → Robot → Yarbo cloud → **Robot video** is **off** on a new install. When you switch it on (the panel asks you
+Settings → Robot → **Robot video** is **off** on a new install. When you switch it on (the panel asks you
 to confirm), a signed-in person can ask the panel for the join details of one of the robot's cameras. **Your browser
 then connects to Agora's real-time network to play the stream**; the video never passes through the panel. It uses the
 Yarbo cloud sign-in above, so that must be connected. Only a person signed in to the panel can switch it on or ask
@@ -137,6 +137,6 @@ the browser anyway), because it is longer than
 Agora's Web SDK can wrap; a stopgap pending an Agora fix (AgoraIO/agora-rtc-web#15). Allow `*.agora.io` and `*.sd-rtn.com` in ad
 blockers, or the tile cannot connect.
 The panel asks the SDK not to send Agora usage statistics or upload logs, and switches off its remote configuration;
-a network capture to confirm this is pending. Agora still sees your browser's address, the panel's address
-(the `Origin` and `Referer` of the SDK's requests) and the camera's channel name, which carries the robot's serial
-number.
+a network check while video played saw only Agora's gateway, edge and media servers. Agora still sees your
+browser's address, the panel's address (the `Origin` and `Referer` of the SDK's requests) and the camera's
+channel name, which carries the robot's serial number.

@@ -10,10 +10,10 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 - **A Cameras tile on Live** shows the robot's own cameras (front, left, right, back), one at a time, while the tile
   is open. It switches the cameras on (Control on, never off), plays the stream with Agora's SDK from this panel
   (the panel asks the SDK not to send usage statistics or upload logs, and switches off its remote configuration; a
-  network capture to confirm this is pending; Agora's servers see the panel's address) and leaves the channel
-  when closed, on another page or a hidden tab. Shown
-  only with Robot video on and the service address set; the demo shows a placeholder. An error says which step
-  failed and a short reason, never the token, key, channel or App ID.
+  network check saw only Agora's gateway, edge and media servers; Agora's servers see the panel's address) and
+  leaves the channel when closed, on another page or a hidden tab. Shown only with Robot video on and the service
+  address set; the demo shows a placeholder. An error says which step failed and a short reason, never the token,
+  key, channel or App ID.
 - **The Cameras tile keeps the robot awake and plays on a real robot**. The robot publishes video only while
   someone sends the keep-awake the Yarbo app sends while open (`set_working_state {"state":1}`), so while the tile is
   open the browser asks `POST /api/video/keepalive` every 4 seconds and the panel sends one fixed beat per accepted
@@ -31,10 +31,10 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 - **Cameras: known limitations in Help** (Live → Cameras). It has played the back camera during a run on one robot;
   waking a docked, sleeping robot, the front, left and right cameras, a phone and more than one viewer are not yet
   shown to work.
-- **Robot video setting** (Settings → Robot → Yarbo cloud, off by default): lets a signed-in person ask for a robot
+- **Robot video setting** (Settings → Robot, off by default): lets a signed-in person ask for a robot
   camera's join details (`POST /api/video/token`); the viewer's browser then connects to Agora. People only: API tokens
-  and AI assistants are refused, and the stream key is never logged. Needs `YARBO_ROBOT_SERVICE_URL` (environment only); the Live tile
-  that plays it is the Cameras tile.
+  and AI assistants are refused, and the stream key is never logged. Needs `YARBO_ROBOT_SERVICE_URL` (environment
+  only); the Live tile that plays it is the Cameras tile.
 - **The controller can switch the robot's cameras on** (`smart_vision_control {"state":1}`): the first step of
   the camera view. It goes through the same interlocks as other run commands (control on, robot online, a route),
   is marked as the panel's own so it is not taken for the phone app, and nothing can send "off" (state 0 is

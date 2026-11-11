@@ -42,7 +42,8 @@ class CloudTransport:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._lock = threading.Lock()
-        self._refresh_lock = threading.Lock()   # one refresh (and its save) at a time: the worker and video reads share it
+        # one refresh (and its save) at a time: the worker and video reads share it
+        self._refresh_lock = threading.Lock()
 
     # -- session ---------------------------------------------------------------------------------------------
     def _sdk(self):
@@ -137,28 +138,29 @@ class CloudTransport:
             return None
         return getattr(c, "token", None) or None
 
-    def _refresh(self, stale_jwt: str | None = None) -> bool:
-        """Refresh the session. If `stale_jwt` is given and the session no longer holds it, another caller has
-        already refreshed: use that and do nothing."""
+    def refresh_session(self, stale_jwt: str | None = None) -> str:
+        """Refresh the session and say how it went: "ok", "expired" (sign in again) or "unreachable" (network
+        trouble: the session is kept). If `stale_jwt` is given and the session no longer holds it, another caller
+        has already refreshed: that is "ok" and nothing is done."""
         from yarbo_robot_sdk.exceptions import TokenExpiredError
         with self._refresh_lock:
             if stale_jwt is not None and self.session_jwt() not in (None, stale_jwt):
-                return True
-            return self._refresh_locked(TokenExpiredError)
+                return "ok"
+            try:
+                self._sdk()._auth.refresh()
+                self._save()
+                self._last_refresh = time.time()
+                return "ok"
+            except TokenExpiredError as exc:
+                self.state, self.error = "needs login", f"session expired: {exc}"
+                log.warning("Yarbo cloud session expired; sign in again in Settings")
+                return "expired"
+            except Exception as exc:
+                self.error = f"refresh failed: {exc}"
+                return "unreachable"
 
-    def _refresh_locked(self, TokenExpiredError) -> bool:
-        try:
-            self._sdk()._auth.refresh()
-            self._save()
-            self._last_refresh = time.time()
-            return True
-        except TokenExpiredError as exc:
-            self.state, self.error = "needs login", f"session expired: {exc}"
-            log.warning("Yarbo cloud session expired; sign in again in Settings")
-            return False
-        except Exception as exc:
-            self.error = f"refresh failed: {exc}"
-            return True  # network trouble: keep the session and retry later
+    def _refresh(self) -> bool:
+        return self.refresh_session() != "expired"   # network trouble: keep the session and retry later
 
     def _run(self, stop: threading.Event) -> None:
         delay = 5

@@ -155,7 +155,7 @@ shows them as reported. Wi-Fi strength is not in the device message; only a scan
 | `set_working_state` | `{"state":1}` | Keep-awake, every few seconds (4 s on a real robot, 2026-11-10) while the app is open. The robot streams its cameras only while someone sends it: with `smart_vision_control` on and no keep-awake it publishes nothing. The panel sends it for the Cameras tile only (`POST /api/video/keepalive`, one beat per request, state 1 only; not in the control catalogue). The app switches the cameras off when it goes to the background |
 | `cmd_vel` | `{"vel":0.0,"rev":0.0}` | **Manual drive** (linear/angular velocity). The app zeroes it on opening and streams it from its joystick. Not in the SDK. **Never send it.** |
 | `cmd_roller` | `{"vel": 1000}` | A motor command sent in bursts around blade switches and on opening. Never send it |
-| `smart_vision_control` | `{"state":0}` / `{"state":1}` | Live view off/on. Reply: "Smart vision control command sent: N". No stream URL, SDP or token on MQTT. See [Robot video](#robot-video-agora) |
+| `smart_vision_control` | `{"state":0}` / `{"state":1}` | Live view off/on; see [Robot video](#robot-video-agora) |
 | `mower_head_sensor_switch` | `{"cmd": 0}` or `{"state": -99}` | A status query on opening; reply state 33, "status query feedback" |
 | `wireless_charging_cmd` | `{"cmd": 0}` | Sent by the app on opening and closing |
 | `cmd_recharge` | `{"cmd": 2}` | Return to dock |
@@ -172,16 +172,18 @@ check, with no capture to link) or **[unconfirmed]**. Nothing here is **[capture
 robot behaviour comes from a capture of the official app, so a capture is still wanted for the observed lines.
 No value here is real; serials, tokens, keys and salts are synthetic or shortened.
 
-**Switching the view on.** The app publishes `smart_vision_control {"state":1}` on `snowbot/{SN}/app/smart_vision_control`
-over the cloud broker (see the table above). **[observed]** that the robot publishes video after `{"state":1}`.
-`{"state":0}` is the app's "off". **[observed, real robot, 2026-11-10, firmware V3.14.41]**: `{"state":0}` sent from
-another cloud session switched off the official app's live view on the owner's phone, so it cuts the view for anyone
-else watching. **[unconfirmed, untested]**: whether it changes anything during a run besides the live view (obstacle
-detection in particular). That is why a client sends only `{"state":1}`: the panel's controller refuses any other
-state (`control.check`, "Cameras on only") and leaves switching off to the robot or the app. `{"state":1}` is allowed
-idle or during a run, with the same robot-online and route checks as pause, stop and dock. Only a person at the panel
-can send it (not tokens, the MCP server, the scheduler or the guards), and only through the cloud broker, the one
-route observed (`LOCAL_VISION_PROVED` in `app/link.py`, off until a local send is observed).
+**Switching the view on.** The app publishes `smart_vision_control {"state":1}` on
+`snowbot/{SN}/app/smart_vision_control` over the cloud broker (see the table above). The reply is "Smart vision
+control command sent: N". No stream URL, SDP or token goes over MQTT. **[observed]** that the robot publishes
+video after `{"state":1}`.
+`{"state":0}` is the app's "off". **[observed]**: `{"state":0}` sent from another cloud session switched off the
+official app's live view on the owner's phone, so it cuts the view for anyone else watching. **[unconfirmed,
+untested]**: whether it changes anything during a run besides the live view (obstacle detection in particular).
+That is why a client sends only `{"state":1}`: the panel's controller refuses any other state (`control.check`,
+"Cameras on only") and leaves switching off to the robot or the app. `{"state":1}` is allowed idle or during a run,
+with the same robot-online and route checks as pause, stop and dock. Only a person at the panel can send it (not
+tokens, the MCP server, the scheduler or the guards), and only through the cloud broker, the one route observed
+(`LOCAL_VISION_PROVED` in `app/link.py`, off until a local send is observed).
 
 **Token request.** An authenticated POST to the cloud's *robot service*, a different host from the `data-api.yarbo.ai`
 used for sign-in and broker discovery (an AWS API Gateway stage; the host is not recorded in this document). The
@@ -209,7 +211,7 @@ Authorization: Bearer <jwt>
 - The token is minted for the `uid` in the request, so the viewer must join with exactly that `uid`.
 - **Lifetime is not known** **[unconfirmed]**: the recorder fetches once per session and has not seen one expire.
 - **Auth failures** **[observed]**: HTTP 401, and HTTP 200 with a body `code` of `A0230` (seen when every session was
-  invalidated at once on 2026-10-25). A client should refresh its sign-in once and retry once.
+  invalidated at once). A client should refresh its sign-in once and retry once.
 
 **Channels and uid.**
 

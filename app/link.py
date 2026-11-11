@@ -26,8 +26,8 @@ ROUTE_MODES = ("auto", "local", "cloud")
 # Map, settings, plan and backup writes on the local broker are not proved yet (run commands and a setting are,
 # 2026-10-21). Until they are, writes go only through the cloud.
 LOCAL_WRITES_PROVED = False
-# The only observed path for smart_vision_control is the cloud broker (docs/dev/protocol.md, Robot video). Until a send on
-# the local broker is observed, it goes only through the cloud.
+# The only observed path for smart_vision_control is the cloud broker (docs/dev/protocol.md, Robot video). Until a
+# send on the local broker is observed, it goes only through the cloud.
 LOCAL_VISION_PROVED = False
 # The keep-awake (set_working_state) is the same: only the cloud broker is observed, so it goes only through the cloud.
 LOCAL_KEEPAWAKE_PROVED = False

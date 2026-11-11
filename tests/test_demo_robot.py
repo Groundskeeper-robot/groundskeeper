@@ -182,6 +182,14 @@ def test_demo_mode_never_builds_a_local_transport(tmp_path, monkeypatch):
         r.transport.stop()
 
 
+def test_demo_never_gets_the_robot_service_address(monkeypatch):
+    monkeypatch.setenv("YARBO_ROBOT_SERVICE_URL", "https://robot-service.invalid")
+    monkeypatch.setenv("DEMO", "1")
+    assert config.load().robot_service_url is None
+    monkeypatch.delenv("DEMO")
+    assert config.load().robot_service_url == "https://robot-service.invalid"     # the control: it is read outside demo
+
+
 def test_demo_config_drops_the_real_robot_and_integrations(tmp_path, monkeypatch):
     for k, v in {"DEMO": "1", "YARBO_HOST": "192.0.2.10", "YARBO_SN": "YB0000DEMO0009", "HA_URL": "http://ha.local",
                  "HA_TOKEN": "x", "FRIGATE_URL": "http://frigate.local", "TEMPEST_PORT": "50222"}.items():

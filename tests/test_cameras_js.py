@@ -16,7 +16,8 @@ needs_node = pytest.mark.skipif(not shutil.which("node"), reason="node is not in
 
 
 def run_flow() -> list:
-    out = subprocess.run([shutil.which("node"), str(ROOT / "tests" / "cameras_flow.cjs"), str(ROOT / "web" / "cameras.js")],
+    flow, page = ROOT / "tests" / "cameras_flow.cjs", ROOT / "web" / "cameras.js"
+    out = subprocess.run([shutil.which("node"), str(flow), str(page)],
                          capture_output=True, encoding="utf-8", timeout=60, check=True).stdout
     return json.loads(out)
 
@@ -128,7 +129,7 @@ def test_a_failed_join_says_which_step_failed_and_why_without_secrets():
     seg = segment(calls, "join-sdk-code")                               # an SDK error shows its code, never its message
     assert ["phase", "error", "Joining failed: INVALID_OPERATION"] in seg
     assert "007tok" not in json.dumps([c for c in seg if c[0] == "phase"])
-    seg = segment(calls, "join-abort-error")                            # a numeric DOMException code is not an Agora code
+    seg = segment(calls, "join-abort-error")                  # a numeric DOMException code is not an Agora code
     assert ["phase", "error", "Joining failed: AbortError"] in seg
     long = next(c for c in segment(calls, "join-long") if c[0] == "phase")
     assert long[2].startswith("Joining failed: xxx") and len(long[2]) <= 100
@@ -179,7 +180,8 @@ def test_only_the_robots_video_is_played():
 def test_the_robot_stopping_its_video_goes_back_to_waiting_and_a_republish_plays_again():
     calls = run_flow()
     phases = [c[1:] for c in segment(calls, "unpublished") if c[0] == "phase"]
-    assert phases == [["playing", ""], ["playing", ""], ["playing", ""], ["waiting", "The robot stopped sending video."]]
+    assert phases == [["playing", ""], ["playing", ""], ["playing", ""],
+                      ["waiting", "The robot stopped sending video."]]
     again = segment(calls, "republished")
     assert ["subscribe", 1, "video"] in again and ["phase", "playing", ""] in again
 
@@ -232,7 +234,8 @@ def test_closing_while_waiting_on_a_leave_a_token_or_the_script_goes_no_further(
 @needs_node
 def test_a_lost_connection_leaves_and_says_so_but_our_own_leave_is_not_an_error():
     calls = run_flow()
-    assert [c[1:] for c in segment(calls, "own-leave") if c[0] == "phase"] == [["waiting", "Waiting for the robot's video…"]]
+    own = [c[1:] for c in segment(calls, "own-leave") if c[0] == "phase"]
+    assert own == [["waiting", "Waiting for the robot's video…"]]
     lost = segment(calls, "connection-lost")
     assert "leave" in [c[0] for c in lost] and ["phase", "error", "The connection was lost."] in lost
 

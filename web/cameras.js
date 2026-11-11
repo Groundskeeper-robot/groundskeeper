@@ -32,7 +32,7 @@ const CAM_SETTINGS_MS = 20000;                     // how long a read of the vid
 const CAM_SDK_TIMEOUT_MS = 20000;                  // a script load that hangs gives up, so the next try loads again
 const CAM_BEAT_MS = 4000;                          // the official app keeps the robot awake about this often while open
 const CAM_JOIN_TIMEOUT_MS = 30000;                 // a join that never settles gives up, so the swap cannot linger
-const CAM_CONTROL_OFF_HINT = "Control is off, so the panel cannot switch the cameras on or keep the robot awake. They play if the robot already has them on.";
+const CAM_CONTROL_OFF_HINT = "Control is off.";                // short on screen; CAM_HELP says the rest
 // STOPGAP (AgoraIO/agora-rtc-web#15). The Web SDK wraps the stream's secret with a built-in 1024-bit RSA key, which holds at most 62 bytes;
 // the robot's secret is 64, so join() throws OperationError. This placeholder (NOT a secret) is what the SDK is given;
 // camerasJoin writes the real secret into the join message in its place. Remove both once Agora lifts the limit.
@@ -50,8 +50,17 @@ const CAM_SDK_OFF = [
 ];
 
 const cams = { open: false, camera: savedCamera(), phase: "closed", message: "", hint: "", client: null, ticket: 0,
-               slowTimer: null, beatTimer: null, controlOff: false, leaving: Promise.resolve(), settings: null, settingsAt: 0, card: null, stage: null, sdk: null,
-               subscribed: 0 };
+               slowTimer: null, beatTimer: null, controlOff: false, leaving: Promise.resolve(), settings: null,
+               settingsAt: 0, card: null, stage: null, sdk: null, subscribed: 0 };
+
+// The hints on screen are short; what each one means is its tooltip (and docs/user/live.md).
+const CAM_HELP = {
+  "Control is off.": "The panel cannot switch the cameras on or keep the robot awake while Control is off. They play " +
+                     "if the robot already has them on.",
+  "Asleep, or cameras off.": "The robot may be asleep, or its cameras are off: open the Yarbo app, or switch Control " +
+                             "on to wake them.",
+  "Cameras off, or asleep.": "Its cameras may have switched off, or the robot went to sleep.",
+};
 
 function savedCamera() {
   try {
@@ -66,7 +75,10 @@ function savedCamera() {
 async function camerasAvailable(s) {
   if (s.demo) return true;
   if (!cams.settings || Date.now() - cams.settingsAt > CAM_SETTINGS_MS) {
-    try { cams.settings = await getJSON("/api/settings"); cams.settingsAt = Date.now(); } catch { /* keep the last answer */ }
+    try {
+      cams.settings = await getJSON("/api/settings");
+      cams.settingsAt = Date.now();
+    } catch { /* keep the last answer */ }
   }
   const d = cams.settings;
   return !!(d && d.robot_video_enabled && d.robot_video_configured);
@@ -97,24 +109,31 @@ function camerasDraw() {
   fill(cams.card,
     h("div", { class: "row gap", style: "justify-content:space-between" },
       h("p", { class: "label", style: "margin:0" }, "Cameras ",
-        h("span", { class: "tip", tabindex: "0", title: "The robot's own cameras, not the yard cameras. They come through Yarbo's cloud and Agora's network, one at a time, and only while this is open." }, "ⓘ")),
+        h("span", { class: "tip", tabindex: "0", title: "The robot's own cameras, not the yard cameras. They come " +
+          "through Yarbo's cloud and Agora's network, one at a time, and only while this is open." }, "ⓘ")),
       cams.demo ? h("span", { class: "small muted" }, "Demo")
                 : h("span", { class: "small", style: `color:${colour}` }, dot(colour), " ", label)),
-    cams.demo ? h("p", { class: "muted small", style: "margin:6px 0 0" }, "The demo robot has no cameras. A real robot shows its video here.")
+    cams.demo ? h("p", { class: "muted small", style: "margin:6px 0 0",
+                         title: "The demo robot has no cameras. A real robot shows its video here." },
+                  "No cameras in the demo")
     : cams.open ? [
       h("div", { class: "camchips", role: "group", "aria-label": "Robot camera" },
         CAM_CHOICES.map(([k, name]) => h("button", { type: "button", class: `btn slim${cams.camera === k ? " on" : ""}`,
           "aria-pressed": String(cams.camera === k), title: `The robot's ${name.toLowerCase()} camera`,
           onclick: () => camerasPick(k) }, name)),
-        h("button", { type: "button", class: "btn slim", title: "Stop the video and leave the channel", onclick: () => camerasStop() }, "Close")),
+        h("button", { type: "button", class: "btn slim", title: "Stop the video and leave the channel",
+          onclick: () => camerasStop() }, "Close")),
       cams.stage,
-      cams.message ? h("p", { class: "small", style: `margin:6px 0 0;color:${colour}`, role: "status" }, cams.message) : null,
-      cams.hint ? h("p", { class: "muted small", style: "margin:4px 0 0" }, cams.hint) : null,
-      cams.phase === "error" ? h("button", { type: "button", class: "btn slim", style: "margin-top:6px", onclick: () => camerasStart({ on: true }) }, "Try again") : null]
+      cams.message ? h("p", { class: "small", style: `margin:6px 0 0;color:${colour}`, role: "status" },
+                       cams.message) : null,
+      cams.hint ? h("p", { class: "muted small", style: "margin:4px 0 0", title: CAM_HELP[cams.hint] || null },
+                    cams.hint) : null,
+      cams.phase === "error" ? h("button", { type: "button", class: "btn slim", style: "margin-top:6px",
+                                             onclick: () => camerasStart({ on: true }) }, "Try again") : null]
     : [
       h("div", { class: "row gap", style: "margin-top:6px" },
-        h("button", { type: "button", class: "btn slim", title: "Switch the robot's cameras on and show one here. Needs Control on.",
-          onclick: () => camerasOpen() }, "Open")),
+        h("button", { type: "button", class: "btn slim", onclick: () => camerasOpen(),
+          title: "Switch the robot's cameras on and show one here. Needs Control on." }, "Open")),
       cams.message ? h("p", { class: "muted small", style: "margin:6px 0 0", role: "status" }, cams.message) : null]);
 }
 
@@ -310,7 +329,8 @@ async function camerasJoinSwapped(client, args, secret) {
 const camerasBytes = (b64) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 
 // A short, safe reason for the screen, with the step that failed: our own errors say what they mean; an SDK error is
-// shown by its (string) code only, not a DOMException's legacy number; an error with no message (a DOMException from the browser's crypto, say) by its name.
+// shown by its (string) code only, not a DOMException's legacy number; an error with no message (a DOMException from
+// the browser's crypto, say) by its name.
 // Never the token, key, salt, channel or App ID, and never more than CAM_WHY_MAX characters.
 const CAM_WHY_MAX = 100;
 function camerasWhy(e, step) {
@@ -341,7 +361,9 @@ async function camerasStart({ on }) {
     step = "Loading the video library";
     const AgoraRTC = await camerasLoadSdk();      // only after the panel has given a token
     if (!live()) return;
-    if (AgoraRTC.checkSystemRequirements && !AgoraRTC.checkSystemRequirements()) throw new Error("This browser cannot play the robot's video.");
+    if (AgoraRTC.checkSystemRequirements && !AgoraRTC.checkSystemRequirements()) {
+      throw new Error("This browser cannot play the robot's video.");
+    }
     step = "Setting up";
     camerasQuietSdk(AgoraRTC);
     const client = AgoraRTC.createClient({ mode: "live", codec: "h264" });
@@ -359,7 +381,7 @@ async function camerasStart({ on }) {
         hint || (cams.controlOff ? CAM_CONTROL_OFF_HINT : "The cameras may be off, or the robot asleep."));
       cams.slowTimer = setTimeout(() => {
         if (live() && cams.phase === "waiting") {
-          camerasSet("waiting", "No video from the robot yet.", "It may be asleep, or its cameras are off: open the Yarbo app, or switch Control on to wake them.");
+          camerasSet("waiting", "No video from the robot yet.", "Asleep, or cameras off.");
         }
       }, CAM_SLOW_MS);
     }
@@ -408,14 +430,16 @@ function camerasListen(client, ticket) {
     if (live() && Number(user.uid) === CAM_ROBOT_UID && mediaType === "video") {   // not the robot's audio stopping
       cams.subscribed = 0;                        // a later user-published subscribes again
       if (cams.stage) cams.stage.replaceChildren();
-      camerasSet("waiting", "The robot stopped sending video.", "Its cameras may have switched off, or it went to sleep.");
+      camerasSet("waiting", "The robot stopped sending video.", "Cameras off, or asleep.");
     }
   });
   // A new token needs a new viewer uid, which only a new request gives, so renewing is a quick rejoin.
   const renew = () => { if (live()) camerasStart({ on: false }); };
   client.on("token-privilege-will-expire", renew);
   client.on("token-privilege-did-expire", renew);
-  client.on("crypt-error", () => { if (live()) { camerasLeave(); camerasSet("error", "Could not decrypt the stream."); } });
+  client.on("crypt-error", () => {
+    if (live()) { camerasLeave(); camerasSet("error", "Could not decrypt the stream."); }
+  });
   client.on("connection-state-change", (cur, _prev, reason) => {
     if (live() && cur === "DISCONNECTED" && reason !== "LEAVE") {
       camerasLeave();
@@ -436,7 +460,12 @@ async function camerasPlay(client, user, mediaType, ticket) {
 }
 
 // Video only while it can be seen: leave when the tab is hidden, when Live is left and when the page closes.
-document.addEventListener("visibilitychange", () => { if (document.hidden && cams.open) camerasStop("Stopped while the tab was hidden."); });
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && cams.open) camerasStop("Stopped while the tab was hidden.");
+});
 window.addEventListener("pagehide", () => { if (cams.open) camerasStop(); });
-// After the shell's own hashchange handler has set state.view (a timer, not a microtask: which listener runs first is not fixed).
-window.addEventListener("hashchange", () => setTimeout(() => { if (cams.open && state.view !== "live") camerasStop(); }, 0));
+// After the shell's own hashchange handler has set state.view (a timer, not a microtask: which listener runs first
+// is not fixed).
+window.addEventListener("hashchange", () => {
+  setTimeout(() => { if (cams.open && state.view !== "live") camerasStop(); }, 0);
+});
