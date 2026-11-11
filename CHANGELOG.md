@@ -23,6 +23,15 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   samples the robot moves smoothly, so a replay, and Follow in 3D, can be watched at a real pace. The 3D map's 1×–3×
   menu is now labelled Height: it draws the ground taller, it is not a speed.
 
+### Fixed
+
+- **Copy buttons on a panel opened at `http://`** (Settings → Access, AI assistant): they did nothing, because the
+  browser has no clipboard API there. They now fall back to the older copy command, and a new token wraps on a phone
+  and selects with one tap.
+- **The phone header**: the robot's state ("docked, charging") is no longer cut short with large text, and some
+  Android browsers no longer leave an empty band above the title. An installed app still keeps clear of the status
+  bar.
+
 ## 0.19.6 — 2026-11-09
 
 ### Added
