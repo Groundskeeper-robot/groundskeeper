@@ -79,23 +79,25 @@ class CloudTransport:
     def login(self, email: str, password: str) -> None:
         """Blocking; call from a worker thread. The password is not kept anywhere."""
         self.stop()
-        self._client = None
-        c = self._sdk()
-        c.login(email, password)
-        self.username = email.lower()
-        self._save()
+        with self._refresh_lock:        # a refresh in flight must not save over (or after) the new session
+            self._client = None
+            c = self._sdk()
+            c.login(email, password)
+            self.username = email.lower()
+            self._save()
         self.error = ""
         self.start()
 
     def logout(self) -> None:
         self.stop()
-        self._client = None
-        self.username = None
-        self.state, self.error = "signed out", ""
-        try:
-            self.path.unlink()
-        except FileNotFoundError:
-            pass
+        with self._refresh_lock:        # a refresh in flight must not write the file back after we remove it
+            self._client = None
+            self.username = None
+            self.state, self.error = "signed out", ""
+            try:
+                self.path.unlink()
+            except FileNotFoundError:
+                pass
 
     # -- connection ------------------------------------------------------------------------------------------
     def start(self) -> None:
@@ -146,8 +148,13 @@ class CloudTransport:
         with self._refresh_lock:
             if stale_jwt is not None and self.session_jwt() not in (None, stale_jwt):
                 return "ok"
+            client = self._client
+            if client is None:          # signed out while we waited for the lock: nothing to refresh or save
+                return "expired"
             try:
-                self._sdk()._auth.refresh()
+                client._auth.refresh()
+                if self._client is not client:      # signed out or replaced meanwhile: do not write the file back
+                    return "expired"
                 self._save()
                 self._last_refresh = time.time()
                 return "ok"

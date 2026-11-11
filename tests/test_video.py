@@ -231,3 +231,31 @@ def test_refresh_session_tells_a_network_failure_from_an_expired_session(tmp_pat
     assert make(TokenExpiredError("old")).refresh_session() == "expired"
     assert make(ConnectionError("down"))._refresh() is True        # the worker keeps its session and retries later
     assert make(TokenExpiredError("old"))._refresh() is False
+
+
+def test_logout_waits_for_a_refresh_in_flight_so_the_session_file_stays_gone(tmp_path):
+    import threading
+    from app.cloud import CloudTransport
+    inside, release = threading.Event(), threading.Event()
+
+    class Auth:
+        def refresh(self):
+            inside.set()
+            release.wait(5)
+
+    class Client:
+        token, refresh_token, _auth = "jwt.session", "r", Auth()
+    cloud = CloudTransport(str(tmp_path), SN, lambda *a: None)
+    cloud._client, cloud.username = Client(), "a@example.com"
+    cloud._save()
+    refresher = threading.Thread(target=cloud.refresh_session)
+    refresher.start()
+    assert inside.wait(5)                                   # the refresh holds the lock, about to save
+    logger_out = threading.Thread(target=cloud.logout)
+    logger_out.start()
+    logger_out.join(0.3)                                    # without the lock it would already have unlinked
+    release.set()
+    refresher.join(5)
+    logger_out.join(5)
+    assert not refresher.is_alive() and not logger_out.is_alive()
+    assert not cloud.path.exists() and cloud._client is None
