@@ -18,6 +18,7 @@ reviews:
   auto_review:
     enabled: true
     auto_incremental_review: true   # again on each push
+    auto_pause_after_reviewed_commits: 0   # never pause: the default stops after 5 reviewed commits
     drafts: false                   # a draft waits until it is marked ready for review
     # If it gets noisy, review only PRs a maintainer tags:
     # labels: ["coderabbit"]
