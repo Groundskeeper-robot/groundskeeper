@@ -1632,8 +1632,8 @@ async def put_setting(request: Request, key: str, value: Any = Body(None)):
 async def video_token(request: Request, body: dict = Body(...)):
     """Join details for one robot camera: Agora App ID, channel, token, the viewer's uid, and the stream's key and salt.
     People only: an API token is refused here and in the sign-in middleware (not in TOKEN_WRITES), and the MCP server
-    has no route to it. Off until robot_video_enabled is on. Nothing is logged or recorded as an event except that a
-    token was fetched (never the token, key, salt, channel or address) (§13)."""
+    has no route to it. Off until robot_video_enabled is on. The only log line says a token was fetched for a camera
+    (never the token, key, salt, channel, uid or address); no event is recorded (§13)."""
     _person(request)
     r = rec(request)
     if not r.store.setting("robot_video_enabled", SETTINGS_DEFAULTS["robot_video_enabled"]):
