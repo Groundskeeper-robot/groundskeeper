@@ -133,7 +133,7 @@ exponentially from 5 s to 5 min. Sign-in is interactive and the password is neve
 `DATA_DIR` with owner-only permissions.
 
 ### 5.4 Keep-awake
-The phone app sends `set_working_state {"state":1}` every few seconds (about 4 s, seen 2026-11-10) while it is open. Local reads are answered
+The phone app sends `set_working_state {"state":1}` about every 4 s while it is open. Local reads are answered
 while the robot is docked and idle without it, so the panel does not send it, with one exception: the robot streams
 its cameras only while someone sends it, so the Cameras tile asks for one every 4 s while it is open (§13).
 
@@ -428,9 +428,7 @@ Known limitations:
 3. **The official app switches the cameras off when it goes to the background**, which stops the panel's video until
    the tile is reopened.
 4. **Ad blockers** must allow `*.agora.io` and `*.sd-rtn.com`.
-5. **The secret swap is a stopgap.** Agora Web SDK 4.24.9 caps the encryption secret at 62 bytes (RSA wrap) and the
-   robot's is 64, so the tile sends the secret unwrapped inside TLS to Agora, whose servers decrypt for the viewer in
-   the normal path too (step 5 below;
+5. **The secret swap is a stopgap** (step 6 below;
    [AgoraIO/agora-rtc-web#15](https://github.com/AgoraIO/agora-rtc-web/issues/15)).
 6. **Phone width** not yet checked on a real phone.
 7. **One robot and one viewer at a time** is all that has been tried.
@@ -461,38 +459,48 @@ The panel does not get into the robot, and no video passes through the panel. It
    version and a checksummed Dockerfile download, like MapLibre and three.js. Nothing loads from a CDN at runtime, and
    the script is fetched only when the setting is on and someone opens the viewer.
 3. **Keeping it awake.** The robot streams only while someone sends the keep-awake the official app sends while it
-   is open, `set_working_state {"state":1}` (`protocol.md`). While the tile is open (connecting, waiting or playing) the
-   browser asks `POST /api/video/keepalive` at once and then every 4 s; each accepted request makes
-   `Controller.keep_awake` send exactly one beat through `RobotLink.keep_awake_beat` (cloud only, like camera-on,
-   until `LOCAL_KEEPAWAKE_PROVED`). The server never schedules or repeats, so closing the tab stops the beats; the
-   timer belongs to the tile's start (ticket) and `camerasLeave()` clears it. Guards: a person's session (`_person`, not
-   in `TOKEN_WRITES`, not in the MCP `ROUTES`), `robot_video_enabled` and Control on, at most one beat per
-   `KEEP_AWAKE_MIN_S` (3 s) for all viewers together (a quiet `{"sent": false, "limited": true}`), a fixed payload
-   (nothing in the request reaches the robot), never state 0. It is deliberately not in `CATALOGUE`, so
-   `/api/control/send`, the MCP server, the scheduler and the guards cannot send it; it is in `RUN_NEUTRAL`. Audit:
-   one event when the beats start (the first after a gap over `KEEP_AWAKE_GAP_S`, 15 s) and one when they stop (noticed
-   by the 5 s guard loop, or by the next beat), never one per beat. The panel's own `set_working_state` and
-   `smart_vision_control` are matched to their echoes one for one (`Recorder.own_echo`, `COUNTED_OWN`): a time window
-   of 5 s would hide the phone app's own beats, as the panel beats every 4 s. The official app switches the cameras off
-   when it goes to the background, so the panel's video stops until the tile is reopened. A beat already in flight can
-   still arrive just after Close.
+   is open, `set_working_state {"state":1}` (`protocol.md`). It is a catalogue command like camera-on: each beat goes
+   through `Controller.send` and `control.check` (robot online, a route, an audit row per beat), with a fixed payload
+   (`payload_for`), cloud only until `LOCAL_KEEPAWAKE_PROVED` (`RobotLink.command`), in `RUN_NEUTRAL` and not in
+   `SAFE_TO_REPEAT`. Its own checks: people only, state 1 only, Robot video on, and **within the time limit**.
+   - While the tile is open the browser asks `POST /api/video/keepalive` at once and then every 4 s, and each accepted
+     request is one beat (`Controller.keep_awake`). The server never schedules or repeats, so closing the tab stops
+     them; the timer belongs to the tile's start (ticket) and `camerasLeave()` clears it.
+   - **The time limit.** A person pressing Open, a camera or Try again sends `{"start": true}` with the first beat,
+     which opens a window of `KEEP_AWAKE_MAX_S` (15 min). The window is the server's own record, put into the check's
+     context by `Controller.send`, never taken from the request; a token renewal is not a press. Outside a window every
+     beat is refused, so `/api/control/send` alone cannot keep the robot awake and a forgotten wall display stops after
+     15 min. A refusal for the time limit, the robot going offline or losing its route ends the window (`ended`): the
+     tile closes and says so, and a person presses Open again. A run does not end it (the robot is awake for the run
+     anyway, and the viewer may need the beats). With Control off nothing goes out and no audit row is written per
+     beat, and the window ends only when its time is up.
+   - At most one beat per `KEEP_AWAKE_MIN_S` (3 s) for all viewers together, dropped quietly before `send` (a quiet
+     `{"sent": false, "limited": true}`), so several tabs cannot fill the audit log with refusals.
+   - Each beat waits a random 0 to `KEEP_AWAKE_JITTER_S` (1 s) first, so the phone app's beats cannot stay in step with
+     the panel's (below).
+   - Events: one when the beats start (the first after a gap over `KEEP_AWAKE_GAP_S`, 15 s) and one when they stop
+     (noticed by the 5 s guard loop, by the next beat, or when the window ends), never one per beat.
 
-   **Echo assumption, and the safe fallback.** Matching our own beat to its echo assumes the cloud delivers the
-   panel's own publishes back. On one robot it does (2026-11); the fallback below stays in case that
-   changes. The matching is trusted only after `OWN_TRUST_AFTER` (3) quick
-   echoes in a row (within `OWN_TRUST_LATENCY_S`, 0.5 s), and trust is withdrawn when `OWN_UNMATCHED_MAX` (3) credits in
-   a row expire unmatched. Until trusted (including right after a start) every `set_working_state` and
-   `smart_vision_control` counts as possibly the phone app's, which blocks automatic starts while the cameras are open:
-   the safe direction. Giving up is one event ("the cloud is not echoing..."), regaining it another. A credit lasts
-   `OWN_ECHO_COUNTED_S` (1.5 s; to be measured on a real robot). A send that the cloud client refuses (paho's return
-   code) raises, so its credit is undone. The verdict is decided once per message (ops, for the cloud) and carried to
-   the recorder with the message, so two messages with the same timestamp are decided separately.
-   Only a match within `OWN_TRUST_LATENCY_S` is ever ours: a slower one is taken for the app's and the credit expires
-   unmatched, so the app's beats can neither earn trust nor keep it alive. Known gap: with no echo at all, an app beat
-   that lands as quickly as an echo for several beats in a row (the two beats drift into phase) cannot be told apart
-   and can briefly earn trust; a slower beat is taken for the app's and restarts the run of quick echoes, but only
-   three expired credits in a row withdraw trust. With a cloud that echoes,
-   as seen so far, this case does not arise.
+   **Telling the panel's beats from the app's, failing closed.** The phone-app interlock (`phone_app_quiet_s`) counts
+   the app's `set_working_state` on the cloud, so the panel's own must not count. A time window cannot tell them apart
+   (the panel beats every 4 s), so each of the panel's sends of `set_working_state` and `smart_vision_control`
+   (`COUNTED_OWN`) is a credit for one echo (`Recorder.own_echo`). That assumes the cloud delivers the panel's own
+   publishes back, which was seen on one robot, so the matching fails towards "the phone app":
+   - A message is the panel's only while the matching is **trusted**, and it is trusted only while **every one** of the
+     panel's last `OWN_TRUST_WINDOW` (10) credits was matched within `OWN_TRUST_LATENCY_S` (0.3 s). The credits'
+     outcomes are counted on their own (`hist`), separately from the messages. One credit that expires unmatched
+     (after `OWN_ECHO_COUNTED_S`, 1.5 s) withdraws trust until a full window of quick echoes earns it back. Until then,
+     including right after a start, every such message counts as the app's, which blocks automatic starts while the
+     cameras are open: the safe direction. Losing and regaining trust are one event each.
+   - A slower match is never the panel's: it is the app's, and the credit is left to expire.
+   - If the cloud stops echoing, an app beat can take a credit only by landing within 0.3 s after one of the panel's.
+     With the panel's beats jittered by up to 1 s, that happens for roughly one beat in four at worst and cannot
+     repeat ten times in a row, so trust goes within a few beats (`tests/test_video_keepalive.py` runs this with the
+     app at every phase). Without the jitter, an app beat in step with the panel's could keep trust alive.
+   - The constants are not measured yet. The panel logs the echo delays it sees when trust changes
+     (`Recorder.own_echo_stats`), to set them from a real robot.
+   - The verdict is decided once per message (ops, for the cloud) and carried to the recorder with the message, so two
+     messages with the same timestamp are decided separately.
 4. **Switching on.** The Cameras panel sends `smart_vision_control {"state":1}` when it opens, through
    `control.CATALOGUE` and `control.check`, marked as the panel's own send so `app/ops.py` does not mistake its echo
    for the phone app (`PHONE_APP_COMMANDS`). It is its own PR for separate review. **Switching off is not decided:**
@@ -509,15 +517,8 @@ The panel does not get into the robot, and no video passes through the panel. It
    Agora hosts), and a random `INSTALL_ID`, all before creating the client (never `enableLogUpload`). The SDK's own
    `websdk_ng_*` localStorage items (device id, cached settings, preload cache) are cleared when it has loaded and on
    leaving. A load of the SDK script that hangs gives up after 20 s so the next try loads it again. It joins as
-   an audience member with `aes-128-gcm2`, the key and the base64-decoded salt, and plays uid 1. **Stopgap (AgoraIO/agora-rtc-web#15):** the
-   Web SDK RSA-OAEP-wraps the secret with a built-in 1024-bit key, which holds at most 62 bytes, and the robot's secret
-   is 64, so `join()` throws. The tile gives `setEncryptionConfig` a constant placeholder (not a secret) and wraps
-   `WebSocket.prototype.send` and `XMLHttpRequest.prototype.send` to write the real secret into any SDK message that
-   carries the secret field (and drop `aes_encrypt`). The wrapper lives as long as the client, because when the SDK's
-   signalling reconnects it clears its join response and sends `join_v3` again from the same stored placeholder secret
-   (the lighter `rejoin_v3` carries no secret); `camerasLeave()` removes it, a new one replaces any old one, and joins
-   run one at a time. A join frame with no secret field fails visibly ("video library changed"). The secret goes unwrapped inside TLS to
-   Agora, whose servers decrypt the stream for the viewer anyway. The vendored SDK is not modified. Retired once Agora's SDK takes a 64-byte secret. It leaves the channel
+   an audience member with `aes-128-gcm2`, the base64-decoded salt and, in place of the key, a placeholder that the
+   secret swap replaces (step 6), and plays uid 1. It leaves the channel
    on close, camera change, leaving Live, a hidden tab and page close. A token's expiry event rejoins with a fresh token
    (the route picks the viewer uid, so a token cannot be renewed in place). No CSP is set: `connect-src` cannot admit
    `*.agora.io` and block `statscollector*.agora.io`, so an allowlist of exact gateway hosts needs a network capture.
@@ -525,6 +526,19 @@ The panel does not get into the robot, and no video passes through the panel. It
    the robot's own; a rename of that layout is raised with the maintainers first. A `no-referrer` policy was
    considered to hide the panel's address from Agora and rejected: a browser then sends `Origin: null` on the panel's
    own POSTs, which `auth.same_origin` refuses.
+6. **The secret swap (a stopgap).** The robot's stream secret is 64 bytes. Agora's Web SDK 4.24.9 always wraps the
+   secret with a built-in 1024-bit RSA-OAEP key before it joins, which holds at most 62 bytes, and has no option to
+   skip that (read from the vendored bundle: `ENCRYPT_AES` only adds a flag to the message), so `join()` throws. There
+   is no supported way, and without the secret there is no video. So the tile gives the SDK a placeholder and writes
+   the real secret into the SDK's join message and access-point request in its place
+   ([AgoraIO/agora-rtc-web#15](https://github.com/AgoraIO/agora-rtc-web/issues/15)). It is scoped to the SDK's own
+   connections: while a client lives, the global `WebSocket` and `XMLHttpRequest` are subclasses that rewrite only
+   sockets and requests to Agora's hosts (`*.agora.io`, `*.sd-rtn.com`, over `wss`/`https`), and only a JSON message
+   with the secret field; no prototype is patched, and every other connection is the browser's own. It stays for the
+   client's life because the SDK sends its join again when its signalling reconnects; leaving removes it. The trade-off:
+   the secret travels unwrapped inside TLS to Agora, whose servers decrypt the stream for the viewer anyway, and the
+   swap breaks if the SDK changes its join message (the join then fails visibly, "video library changed"). Remove it
+   once Agora lifts the limit.
 
 Rules:
 - **People only.** The token route is a POST (not a safe method, so API tokens are refused by default and it is

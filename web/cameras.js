@@ -9,16 +9,18 @@
    Rules this file keeps (tests/test_cameras_js.py checks the ones a test can):
    - It never switches the cameras off: state 0 would also cut the official app's view (docs/dev/protocol.md).
    - While the tile is open (connecting, waiting, playing) it asks the panel for one keep-awake beat every 4 s
-     (POST /api/video/keepalive). The robot streams only while someone keeps it awake, as the official app does. The timer
-     belongs to the start's ticket and camerasLeave() clears it, so every way of stopping stops the beats; the panel
-     itself never repeats a beat, so a closed tab stops them too.
+     (POST /api/video/keepalive). The robot streams only while someone keeps it awake, as the official app does. The
+     timer belongs to the start's ticket and camerasLeave() clears it, so every way of stopping stops the beats; the
+     panel itself never repeats a beat, so a closed tab stops them too. A press of play opens a window of at most
+     15 min on the panel; when the panel ends it, the tile closes.
    - Video runs only while the tile is open and the tab is showing Live. Closing it, changing camera, leaving Live,
      hiding the tab and closing the page all leave the channel.
    - The token, key and salt live in local variables of one function call. They are not kept on `cams`, in the DOM, in
      storage or the URL, and nothing here writes to the console. The stream's secret is longer than Agora's Web SDK
-     can wrap (see camerasSwapInstall), so for the client's lifetime it is written into the SDK's join messages in its place. (The SDK keeps a few `websdk_ng_*` items of its own
-     in this panel's localStorage: a device id, a cache of its settings and of a preload. This file clears them when
-     the SDK has loaded and when the channel is left; none of them holds the token, key or salt.)
+     can wrap (see camerasSwapInstall), so for the client's lifetime it is written into the SDK's join messages to
+     Agora in its place. (The SDK keeps a few `websdk_ng_*` items of its own in this panel's localStorage: a device
+     id, a cache of its settings and of a preload. This file clears them when the SDK has loaded and when the channel
+     is left; none of them holds the token, key or salt.)
    - Agora's SDK is told, before any client exists, not to send usage statistics, not to upload logs, not to fetch
      remote configuration (which could switch the two back on mid-session), not to preload the access point or
      preconnect, and to use a random device id. See camerasQuietSdk. */
@@ -33,9 +35,11 @@ const CAM_SDK_TIMEOUT_MS = 20000;                  // a script load that hangs g
 const CAM_BEAT_MS = 4000;                          // the official app keeps the robot awake about this often while open
 const CAM_JOIN_TIMEOUT_MS = 30000;                 // a join that never settles gives up, so the swap cannot linger
 const CAM_CONTROL_OFF_HINT = "Control is off.";                // short on screen; CAM_HELP says the rest
-// STOPGAP (AgoraIO/agora-rtc-web#15). The Web SDK wraps the stream's secret with a built-in 1024-bit RSA key, which holds at most 62 bytes;
-// the robot's secret is 64, so join() throws OperationError. This placeholder (NOT a secret) is what the SDK is given;
-// camerasJoin writes the real secret into the join message in its place. Remove both once Agora lifts the limit.
+const CAM_ENDED = "Stopped. Open to watch again.";             // the panel's time limit, or the robot went offline
+// STOPGAP (AgoraIO/agora-rtc-web#15). The Web SDK wraps the stream's secret with a built-in 1024-bit RSA key, which
+// holds at most 62 bytes; the robot's secret is 64, so join() throws OperationError. This placeholder (NOT a secret)
+// is what the SDK is given; camerasJoin writes the real secret into the join message in its place. Remove both once
+// Agora lifts the limit.
 const CAM_PLACEHOLDER_SECRET = "groundskeeper-placeholder";
 const CAM_SDK_STORAGE = "websdk_ng_";              // the prefix of what the SDK itself keeps in localStorage
 // Switched off for the SDK (4.24.9, read from the vendored bundle). Each is written with the third argument true: the
@@ -222,15 +226,24 @@ function camerasQuietSdk(AgoraRTC) {
 }
 
 // One keep-awake beat now and one every CAM_BEAT_MS while this start is live. The panel sends exactly one command per
-// accepted request and never repeats, so what stops this stops the beats. A beat that fails shows nothing (it must not
-// break playback); only "Control is off" is said, as the existing hint.
-function camerasBeats(ticket) {
+// accepted request and never repeats, so what stops this stops the beats. `fresh`: a person pressed Open, a camera or
+// Try again, so the first beat asks the panel for a new window (it keeps the robot awake at most 15 min per press; a
+// token renewal is not a press). When the panel ends the window (time up, robot offline) the tile closes and says so.
+// A beat that fails otherwise shows nothing (it must not break playback); only "Control is off" is said, as a hint.
+function camerasBeats(ticket, fresh) {
   const live = () => ticket === cams.ticket && cams.open;
+  let first = fresh;
   const beat = async () => {
     if (!live()) return;
+    const body = first ? { start: true } : {};
+    first = false;
     try {
-      const r = await postJSON("/api/video/keepalive", {});
+      const r = await postJSON("/api/video/keepalive", body);
       if (!live()) return;
+      if (r && r.ended) {
+        camerasStop(CAM_ENDED);
+        return;
+      }
       cams.controlOff = !!(r && r.control_off);       // the panel's word on it, which may be newer than the last status
       if (cams.controlOff && cams.phase !== "error" && cams.hint !== CAM_CONTROL_OFF_HINT) {
         cams.hint = CAM_CONTROL_OFF_HINT;
@@ -254,45 +267,76 @@ function camerasSwapBody(body, secret) {
   let out = body.replace(/,\s*"(?:aes_encrypt|aesEncrypt)"\s*:\s*(?:true|false)/g, "")
     .replace(/"(?:aes_encrypt|aesEncrypt)"\s*:\s*(?:true|false)\s*,?/g, "");
   let n = 0;
-  out = out.replace(/"(aes_secret|aesSecret)"\s*:\s*"(?:[^"\\]|\\.)*"/g, (_m, key) => { n++; return `"${key}":${JSON.stringify(secret)}`; });
+  out = out.replace(/"(aes_secret|aesSecret)"\s*:\s*"(?:[^"\\]|\\.)*"/g, (_m, key) => {
+    n++;
+    return `"${key}":${JSON.stringify(secret)}`;
+  });
   return n ? { body: out, swapped: true } : { body, swapped: false };
 }
 
-// STOPGAP (AgoraIO/agora-rtc-web#15): joins with the real stream secret although the Web SDK cannot wrap one this long. The SDK was given a
-// placeholder (CAM_PLACEHOLDER_SECRET), wraps that, and puts it in its join message (a WebSocket text frame, and the
-// access-point request on XMLHttpRequest). WebSocket.prototype.send and XMLHttpRequest.prototype.send are wrapped to put
-// the real secret in any message that carries the secret field. The wrapper lives as long as the client does, not only
-// for join(): when the SDK's signalling reconnects it clears its join response and sends join_v3 again, built from the
-// same stored (placeholder) secret, and asks the access point again (agora.js 4.24.9: Signal websocket RECONNECTING sets
-// joinResponse to undefined, join() then sends RF.JOIN; getRejoinMessage, used by the lighter rejoin_v3, carries no
-// secret). camerasLeave() removes it, and installing a new one removes any old one first, so there is never more than one
-// wrapper and a left client's secret is never swapped into another start's frames. The connection is wss/TLS, to Agora's
-// servers, which decrypt the stream for the viewer anyway. The secret lives only in this closure. Fails (visibly) when
-// the join frame had no secret field: the library has changed and the stream would not decrypt.
+// STOPGAP (AgoraIO/agora-rtc-web#15). There is no supported way to give the Web SDK this secret: 4.24.9 always wraps
+// it with a built-in 1024-bit RSA-OAEP key (at most 62 bytes) before join, with no option to skip that, and the robot's
+// secret is 64 bytes, so join() throws. So the SDK is given a placeholder (CAM_PLACEHOLDER_SECRET), wraps that, and the
+// real secret is written into its join message in its place, on the SDK's own connections only:
+// - Only sockets and requests to Agora's hosts (CAM_AGORA_HOSTS, over wss/https) are touched. While a client lives,
+//   the global WebSocket and XMLHttpRequest are subclasses whose instances for any other host are the browser's
+//   own, unchanged; the prototypes are never patched, so the panel's own requests never pass through this.
+// - In those, only a JSON message with the secret field is rewritten (camerasSwapBody), and nothing else in it.
+// - It lives as long as the client, not only for join(): when the SDK's signalling reconnects it sends join_v3 again,
+//   built from the same stored placeholder, and asks the access point again. camerasLeave() removes it, and installing
+//   a new one removes any old one first, so a left client's secret never goes into another start's messages.
+// The connection is TLS to Agora's servers, which decrypt the stream for the viewer anyway. The secret lives only in
+// this closure. A join whose WebSocket frames had no secret field fails visibly: the library has changed.
+const CAM_AGORA_HOSTS = [".agora.io", ".sd-rtn.com"];
+function camerasAgoraUrl(url) {
+  try {
+    const u = new URL(String(url), location.href);
+    return (u.protocol === "wss:" || u.protocol === "https:") && CAM_AGORA_HOSTS.some((d) => u.hostname.endsWith(d));
+  } catch {
+    return false;
+  }
+}
+
 let camSwapRemove = null;
 function camerasSwapInstall(secret) {
   if (camSwapRemove) camSwapRemove();
-  const wsSend = WebSocket.prototype.send;
-  const xhrSend = XMLHttpRequest.prototype.send;
+  const WS = globalThis.WebSocket;
+  const XHR = globalThis.XMLHttpRequest;
   let active = true;
   let frames = 0;
   // Only a WebSocket frame counts as the join having carried the secret: an access-point request that still has the
   // field must not hide a join frame that no longer does.
-  const wsWrap = function (data) {
-    if (!active) return wsSend.call(this, data);
-    const r = camerasSwapBody(data, secret);
-    if (r.swapped) frames++;
-    return wsSend.call(this, r.body);
-  };
-  const xhrWrap = function (data) { return xhrSend.call(this, active ? camerasSwapBody(data, secret).body : data); };
+  class AgoraSocket extends WS {
+    constructor(url, protocols) {
+      super(url, protocols);
+      if (!camerasAgoraUrl(url)) return;          // anyone else's socket stays the browser's own
+      const send = this.send;
+      this.send = (data) => {
+        if (!active) return send.call(this, data);
+        const r = camerasSwapBody(data, secret);
+        if (r.swapped) frames++;
+        return send.call(this, r.body);
+      };
+    }
+  }
+  class AgoraRequest extends XHR {
+    #agora = false;
+    open(method, url, ...rest) {
+      this.#agora = camerasAgoraUrl(url);
+      return super.open(method, url, ...rest);
+    }
+    send(data) {
+      return super.send(active && this.#agora ? camerasSwapBody(data, secret).body : data);
+    }
+  }
   const remove = () => {
-    active = false;                                 // a wrapper someone else wrapped over stays harmless
-    if (WebSocket.prototype.send === wsWrap) WebSocket.prototype.send = wsSend;
-    if (XMLHttpRequest.prototype.send === xhrWrap) XMLHttpRequest.prototype.send = xhrSend;
+    active = false;                                 // instances made meanwhile go back to plain sends
+    if (globalThis.WebSocket === AgoraSocket) globalThis.WebSocket = WS;
+    if (globalThis.XMLHttpRequest === AgoraRequest) globalThis.XMLHttpRequest = XHR;
     if (camSwapRemove === remove) camSwapRemove = null;
   };
-  WebSocket.prototype.send = wsWrap;
-  XMLHttpRequest.prototype.send = xhrWrap;
+  globalThis.WebSocket = AgoraSocket;
+  globalThis.XMLHttpRequest = AgoraRequest;
   camSwapRemove = remove;
   return { frames: () => frames };
 }
@@ -313,7 +357,9 @@ async function camerasJoinSwapped(client, args, secret) {
   let timer;
   try {
     await Promise.race([client.join(...args),
-      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("The join timed out.")), CAM_JOIN_TIMEOUT_MS); })]);
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error("The join timed out.")), CAM_JOIN_TIMEOUT_MS);
+      })]);
   } catch (e) {
     if (camSwapRemove) camSwapRemove();             // no client to keep it for
     throw e;
@@ -342,7 +388,7 @@ function camerasWhy(e, step) {
   return text.length > CAM_WHY_MAX ? `${text.slice(0, CAM_WHY_MAX - 1)}…` : text;
 }
 
-async function camerasStart({ on }) {
+async function camerasStart({ on, fresh = true }) {
   camerasLeave();
   const ticket = cams.ticket;
   const live = () => ticket === cams.ticket && cams.open;
@@ -353,7 +399,7 @@ async function camerasStart({ on }) {
   try {
     await cams.leaving;                           // never two live clients: wait out any leave still in flight
     if (!live()) return;
-    camerasBeats(ticket);                         // keep the robot awake from now on: it streams only while someone does
+    camerasBeats(ticket, fresh);                  // keep the robot awake from now on: it streams only while kept so
     if (on) hint = await camerasSwitchOn();
     if (!live()) return;
     const join = await postJSON("/api/video/token", { camera });
@@ -370,7 +416,8 @@ async function camerasStart({ on }) {
     cams.client = client;
     await client.setClientRole("audience");
     if (!live()) return;
-    client.setEncryptionConfig("aes-128-gcm2", CAM_PLACEHOLDER_SECRET, camerasBytes(join.salt));   // the real one: see camerasJoin
+    // The placeholder, not the key: camerasJoin puts the real one in (see camerasSwapInstall).
+    client.setEncryptionConfig("aes-128-gcm2", CAM_PLACEHOLDER_SECRET, camerasBytes(join.salt));
     camerasListen(client, ticket);
     step = "Joining";
     await camerasJoin(client, [join.app_id, join.channel, join.token, join.uid], join.key, live);
@@ -434,7 +481,7 @@ function camerasListen(client, ticket) {
     }
   });
   // A new token needs a new viewer uid, which only a new request gives, so renewing is a quick rejoin.
-  const renew = () => { if (live()) camerasStart({ on: false }); };
+  const renew = () => { if (live()) camerasStart({ on: false, fresh: false }); };    // not a press: same window
   client.on("token-privilege-will-expire", renew);
   client.on("token-privilege-did-expire", renew);
   client.on("crypt-error", () => {

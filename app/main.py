@@ -1666,18 +1666,24 @@ async def video_token(request: Request, body: dict = Body(...)):
 async def video_keepalive(request: Request):
     """One keep-awake beat for the Cameras tile (§13). The robot streams its cameras only while someone sends the
     keep-awake the official app sends (`set_working_state {"state":1}`, docs/dev/protocol.md), and a tile that is open
-    asks for one every 4 s: this sends exactly one per accepted request and never schedules or repeats, so closing the
-    tile stops them. People only (a person's session; not in TOKEN_WRITES, not in the MCP `ROUTES`), only while
-    Robot video and Control are on, at most one every few seconds whoever asks (a quiet `sent: false, limited:
-    true`), and the payload is fixed: nothing in the request reaches the robot. It is not in the control catalogue, so
-    /api/control/send cannot send it. The start and the stop of the beats are each one event, never one per beat."""
+    asks for one every 4 s: this sends one per accepted request and never schedules or repeats, so closing the tile
+    stops them. Each beat goes through Controller.send and control.check like any command (an audit row each).
+    `{"start": true}` means a person pressed play: it opens a window of control.KEEP_AWAKE_MAX_S, and outside one
+    every beat is refused (`ended: true`: the tile stops and asks for play again). People only (a person's session;
+    not in TOKEN_WRITES, not in the MCP `ROUTES`), only while Robot video and Control are on, at most one every few
+    seconds whoever asks (a quiet `sent: false, limited: true`); nothing else in the request reaches the robot."""
     _person(request)
     r = rec(request)
     if not r.store.setting("robot_video_enabled", SETTINGS_DEFAULTS["robot_video_enabled"]):
         raise HTTPException(403, "robot video is off (Settings → Robot)")
-    out = await ops(request).controller.keep_awake(actor=_actor(request))
-    return JSONResponse({k: out[k] for k in ("sent", "limited", "control_off", "refused", "error") if k in out},
-                        headers={"Cache-Control": "no-store"})
+    try:
+        body = await request.json()
+    except Exception:
+        body = None                       # no body, or not JSON: an ordinary beat
+    start = isinstance(body, dict) and body.get("start") is True
+    out = await ops(request).controller.keep_awake(actor=_actor(request), start=start)
+    keys = ("sent", "limited", "control_off", "ended", "refused", "error")
+    return JSONResponse({k: out[k] for k in keys if k in out}, headers={"Cache-Control": "no-store"})
 
 
 # -- phase 2: cloud session -----------------------------------------------------------------------------------------

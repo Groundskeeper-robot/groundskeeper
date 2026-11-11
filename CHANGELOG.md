@@ -15,19 +15,21 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   address set; the demo shows a placeholder. An error says which step failed and a short reason, never the token,
   key, channel or App ID.
 - **The Cameras tile keeps the robot awake and plays on a real robot**. The robot publishes video only while
-  someone sends the keep-awake the Yarbo app sends while open (`set_working_state {"state":1}`), so while the tile is
-  open the browser asks `POST /api/video/keepalive` every 4 seconds and the panel sends one fixed beat per accepted
-  request (people only; needs Robot video and Control on; at most one every 3 s for everyone together; never state 0;
-  not in the control catalogue, so `/api/control/send` cannot send it). Events note when it starts and stops, not
-  each beat. The panel's own keep-awake and camera-on are matched to their echoes one for one, so they are not
-  taken for the phone app, while the real app's beats still are. This assumes the cloud echoes the panel's own
-  commands back, as it did on one robot: until echoes have been seen (and after three credits in a row go unmatched) the
-  panel's keep-awake and camera-on count as possibly the phone app's while the cameras are open, so automatic starts
-  stay blocked (the safe direction); an event says when that happens. The stream's 64-character secret is longer than
-  Agora's Web SDK can wrap, so the tile now writes it into the join message itself, for as long as the client lives (so a reconnect works too)
-  (a stopgap until AgoraIO/agora-rtc-web#15: it travels unwrapped inside TLS to Agora, whose servers decrypt the stream for your browser anyway).
-  Allow `*.agora.io` and `*.sd-rtn.com` in ad blockers. The Yarbo app switches the cameras off when it goes to the
-  background, which stops the panel's video until the tile is reopened.
+  someone sends the keep-awake the Yarbo app sends while open (`set_working_state {"state":1}`). While the tile is
+  open the browser asks `POST /api/video/keepalive` every 4 seconds, and each beat goes through the controller and its
+  checks like any command (robot online, a route, people only, Robot video and Control on, never state 0, an audit row
+  each). One press of Open keeps the robot awake for at most 15 minutes; then, or when the robot goes offline, the
+  tile stops and asks for Open again. At most one beat every 3 s for everyone together. Events note when the beats
+  start and stop.
+- **The panel's own keep-awake is not taken for the phone app, and when in doubt it is.** Each of the panel's sends
+  is matched to its echo, and the matching counts only while every one of the last 10 came back within 0.3 s; one
+  miss and the panel's beats count as the phone app's again, so automatic starts stay blocked while the cameras are
+  open. The panel's beats are jittered so the app's cannot stay in step with them.
+- **The stream's secret is written into Agora's join message by the tile** (a stopgap, AgoraIO/agora-rtc-web#15):
+  it is longer than Agora's Web SDK can wrap. Only the SDK's own connections to `*.agora.io` and `*.sd-rtn.com` are
+  touched; it travels unwrapped inside TLS to Agora, whose servers decrypt the stream for your browser anyway. Allow
+  those hosts in ad blockers. The Yarbo app switches the cameras off when it goes to the background, which stops the
+  panel's video until the tile is reopened.
 - **Cameras: known limitations in Help** (Live → Cameras). It has played the back camera during a run on one robot;
   waking a docked, sleeping robot, the front, left and right cameras, a phone and more than one viewer are not yet
   shown to work.

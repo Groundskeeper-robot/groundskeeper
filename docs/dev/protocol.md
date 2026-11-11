@@ -152,10 +152,15 @@ shows them as reported. Wi-Fi strength is not in the device message; only a scan
 
 | Command | Payload | Notes |
 |---|---|---|
-| `set_working_state` | `{"state":1}` | Keep-awake, every few seconds (4 s on a real robot, 2026-11-10) while the app is open. The robot streams its cameras only while someone sends it: with `smart_vision_control` on and no keep-awake it publishes nothing. The panel sends it for the Cameras tile only (`POST /api/video/keepalive`, one beat per request, state 1 only; not in the control catalogue). The app switches the cameras off when it goes to the background |
+| `set_working_state` | `{"state":1}` | Keep-awake while the app is open; see below the table |
 | `cmd_vel` | `{"vel":0.0,"rev":0.0}` | **Manual drive** (linear/angular velocity). The app zeroes it on opening and streams it from its joystick. Not in the SDK. **Never send it.** |
 | `cmd_roller` | `{"vel": 1000}` | A motor command sent in bursts around blade switches and on opening. Never send it |
 | `smart_vision_control` | `{"state":0}` / `{"state":1}` | Live view off/on; see [Robot video](#robot-video-agora) |
+
+`set_working_state {"state":1}` [observed]: the app sends it about every 4 s while it is open. The robot streams its
+cameras only while someone sends it: with `smart_vision_control` on and no keep-awake it publishes nothing. The app
+switches the cameras off when it goes to the background. The panel sends it only for the Cameras tile, state 1 only,
+through the controller like any command, at most 15 min per press of play (design.md §13).
 | `mower_head_sensor_switch` | `{"cmd": 0}` or `{"state": -99}` | A status query on opening; reply state 33, "status query feedback" |
 | `wireless_charging_cmd` | `{"cmd": 0}` | Sent by the app on opening and closing |
 | `cmd_recharge` | `{"cmd": 2}` | Return to dock |
