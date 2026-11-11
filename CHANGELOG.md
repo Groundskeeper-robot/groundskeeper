@@ -37,6 +37,11 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   Android browsers no longer leave an empty band above the title. An installed app still keeps clear of the status
   bar.
 
+### Fixed
+
+- **Cloud-only: a serial saved in Settings → Robot reaches the cloud connection at once** (#91). With no robot address
+  set, the card kept saying "waiting for the robot's serial" until the panel restarted.
+
 ## 0.19.6 — 2026-11-09
 
 ### Added
