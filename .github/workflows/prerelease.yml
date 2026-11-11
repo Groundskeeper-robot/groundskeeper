@@ -3,10 +3,12 @@ name: Pre-release images
 # Images for testing what is on main before a release, in their own package so nothing here can touch a release:
 #   ghcr.io/<owner>/groundskeeper-dev:edge             every merge to main
 #   ghcr.io/<owner>/groundskeeper-dev:nightly          once a night, when main changed since the last nightly
-#   ghcr.io/<owner>/groundskeeper-dev:nightly-YYYYMMDD that night's, kept until the clean-up removes it
+#   ghcr.io/<owner>/groundskeeper-dev:nightly-YYYYMMDD that night's
 #   ghcr.io/<owner>/groundskeeper-dev:sha-<commit>     the exact commit
 # Releases stay in ghcr.io/<owner>/groundskeeper (release.yml); this workflow never writes :latest or a version tag.
 # The panel shows the channel next to its version (PANEL_CHANNEL). Run it by hand for a nightly now.
+# Nothing is pruned automatically: storage for a public package is free, and an age- or count-based clean-up can
+# split a multi-arch build (keep its tagged index, delete one of its platform images). Prune by hand if ever needed.
 on:
   push:
     branches: [main]
@@ -109,16 +111,3 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Old pre-release images go; only this package is ever pruned. A multi-arch build is several package versions (the
-  # index, one image per platform, attestations), so 150 versions keeps roughly the last 25-30 builds, which covers
-  # two weeks of nightlies with room for the edge builds between them.
-  clean-up:
-    needs: image
-    if: github.event_name != 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/delete-package-versions@v5
-        with:
-          package-name: groundskeeper-dev
-          package-type: container
-          min-versions-to-keep: 150
