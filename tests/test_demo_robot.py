@@ -187,6 +187,7 @@ def test_demo_never_gets_the_robot_service_address(monkeypatch):
     monkeypatch.setenv("DEMO", "1")
     assert config.load().robot_service_url is None
     monkeypatch.delenv("DEMO")
+    monkeypatch.delenv("DEMO_SEED", raising=False)
     assert config.load().robot_service_url == "https://robot-service.invalid"     # the control: it is read outside demo
 
 
