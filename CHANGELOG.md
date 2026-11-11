@@ -42,6 +42,11 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   is marked as the panel's own so it is not taken for the phone app, and nothing can send "off" (state 0 is
   refused). Only a signed-in person can send it (not an API token, an assistant, the scheduler or a guard), and
   only through the cloud. The Cameras tile on Live sends it when opened.
+- **"Metrics only" API tokens** (Settings → Access, or `"scope": "metrics"` on `POST /api/auth/tokens`). Such a token
+  can read `/api/metrics` and is refused (403) on every other locked path (`/api/`, `/tiles/`, `/imagery/`), so a
+  scrape token that leaks gives away nothing about the yard. Existing tokens stay full, and the box is off by
+  default. Metrics tokens are kept apart from the full ones, so rolling back to an older image cannot turn one into
+  a full token. The metrics endpoint itself comes next.
 - **Installable with pip or uv** (`pyproject.toml`): another Python tool can depend on Groundskeeper's `app` package,
   and `uv sync` sets up a checkout. The Docker image and `requirements*.txt` are unchanged, and a test keeps the two
   dependency lists the same. Running the panel itself still needs a checkout or the container.
