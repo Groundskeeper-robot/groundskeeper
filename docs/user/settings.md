@@ -61,6 +61,8 @@ someone else on your network cannot claim the panel before you do. Sessions last
   run apps there that you don't trust, give the panel its own hostname.
 - `/health` stays open for Docker and uptime checks. It reports the version, whether the robot is reachable and
   whether it is busy mowing.
+- **Version** ([This panel](#settings/panel) → Running): a pre-release image says which it is, for example
+  `0.19.7 · nightly · 1a756d0` (the version, the channel, the commit). A release shows only the version and commit.
 - **Proxy that signs people in itself?** `PANEL_AUTH=off` turns the panel's own sign-in off. Never
   do this when anyone else on the network can reach the panel: it would let them start the robot.
   If the proxy is there for single sign-on, use the panel's own OpenID Connect sign-in instead (below).

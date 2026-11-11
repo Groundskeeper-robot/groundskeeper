@@ -35,6 +35,9 @@ RUN chmod -R a+rX /app                          # readable by PUID whatever the 
 # The git commit this image was built from (CI and scripts/deploy.sh pass it); shown next to the version.
 ARG PANEL_BUILD=
 ENV PANEL_BUILD=$PANEL_BUILD
+# "edge" or "nightly" on a pre-release image (.github/workflows/prerelease.yml), empty on a release; shown beside it.
+ARG PANEL_CHANNEL=
+ENV PANEL_CHANNEL=$PANEL_CHANNEL
 
 # The panel runs as PUID:PGID (default 1000:1000), not root; the entrypoint hands /data to that user once.
 ENV DATA_DIR=/data PORT=8425 PUID=1000 PGID=1000

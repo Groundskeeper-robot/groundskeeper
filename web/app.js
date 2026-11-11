@@ -901,6 +901,9 @@ function farNote(far) {
     h("b", null, "Left out, far from the yard: "), what, ". ", h("a", { href: "#studio" }, "Map Studio"));
 }
 
+// "0.19.7 · nightly · 1a756d0": the version, the pre-release channel if this is one, and the build (GET /api/about).
+const versionLabel = (v) => [v.version, v.channel, v.build].filter(Boolean).join(" · ");
+
 const copyToast = async (text) =>
   toast(await copyText(text) ? "Copied." : "Copy did not work here: select it by hand.");
 
