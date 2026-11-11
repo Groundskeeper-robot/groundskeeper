@@ -121,7 +121,7 @@ the robot shows which way each goes).
 
 ### Robot video
 
-Settings → Robot → Yarbo cloud → **Robot video** is **off** on a new install. When you switch it on (the panel asks you
+Settings → Robot → **Robot video** is **off** on a new install. When you switch it on (the panel asks you
 to confirm), a signed-in person can ask the panel for the join details of one of the robot's cameras. **Your browser
 then connects to Agora's real-time network to play the stream**; the video never passes through the panel. It uses the
 Yarbo cloud sign-in above, so that must be connected. Only a person signed in to the panel can switch it on or ask

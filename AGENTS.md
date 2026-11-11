@@ -29,7 +29,8 @@ python -m pytest -q tests/test_auth.py                        # one test file
 DEMO=1 PANEL_AUTH=off DATA_DIR=./demo-data python -m app      # run with a synthetic robot on :8425
 ```
 
-The UI needs `web/vendor/` (MapLibre, three.js, the Agora Web SDK; git-ignored): see `CONTRIBUTING.md` → Set up. Tests don't need it.
+The UI needs `web/vendor/` (MapLibre, three.js; git-ignored): see `CONTRIBUTING.md` → Set up. Tests don't need it.
+The Agora Web SDK is vendored there too, for the robot cameras.
 
 ## Rules for AI agents
 

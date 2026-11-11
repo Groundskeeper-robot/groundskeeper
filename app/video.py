@@ -39,7 +39,7 @@ class VideoTokenError(Exception):
 @dataclass(frozen=True)
 class VideoToken:
     camera: str
-    uid: int
+    uid: int = field(repr=False)           # the viewer's uid is kept out of repr too (design §13: never in a log)
     channel: str = field(repr=False)
     app_id: str = field(repr=False)
     token: str = field(repr=False)
@@ -102,8 +102,11 @@ async def fetch(cloud, http, base_url: str, camera: str, uid: int) -> VideoToken
         if resp.status_code == 401 or code in AUTH_CODES:
             if attempt == 1:
                 log.info("video token: session refused, refreshing once")
-                if not await asyncio.to_thread(cloud._refresh, jwt):
+                outcome = await asyncio.to_thread(cloud.refresh_session, jwt)
+                if outcome == "expired":
                     raise VideoTokenError("Yarbo cloud session expired; sign in again", auth=True)
+                if outcome == "unreachable":     # a network problem, not a refused session: say so (502, not 409)
+                    raise VideoTokenError("could not reach the Yarbo cloud to refresh the session")
                 continue
             log.warning("video token: refused after a refresh")
             raise VideoTokenError("Yarbo cloud refused the session", auth=True)

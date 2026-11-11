@@ -14,10 +14,10 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   when closed, on another page or a hidden tab. Shown
   only with Robot video on and the service address set; the demo shows a placeholder. An error says which step
   failed and a short reason, never the token, key, channel or App ID.
-- **Robot video setting** (Settings → Robot → Yarbo cloud, off by default): lets a signed-in person ask for a robot
+- **Robot video setting** (Settings → Robot, off by default): lets a signed-in person ask for a robot
   camera's join details (`POST /api/video/token`); the viewer's browser then connects to Agora. People only: API tokens
-  and AI assistants are refused, and the stream key is never logged. Needs `YARBO_ROBOT_SERVICE_URL` (environment only); the Live tile
-  that plays it is the Cameras tile.
+  and AI assistants are refused, and the stream key is never logged. Needs `YARBO_ROBOT_SERVICE_URL` (environment
+  only); the Live tile that plays it is the Cameras tile.
 - **The controller can switch the robot's cameras on** (`smart_vision_control {"state":1}`): the first step of
   the camera view. It goes through the same interlocks as other run commands (control on, robot online, a route),
   is marked as the panel's own so it is not taken for the phone app, and nothing can send "off" (state 0 is
