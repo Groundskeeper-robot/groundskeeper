@@ -6,6 +6,9 @@
 * A failed refresh means "needs login": reconnecting stops, and the panel says so. It never connects with an
   expired JWT (the SDK swallows that failure; this module does not).
 * Reconnects back off from 5 s to 5 min.
+* With no serial known (the robot's local broker is closed, nothing set in Settings → Robot), the account's own robot
+  list (the SDK's get_devices(), an account lookup that sends the robot nothing) fills it: one robot is used, several
+  are offered in Settings → Robot. While it waits the status says so, and the log says so once.
 
 The SDK is used for its config, auth and per-robot broker routing; the MQTT connection is our own paho client, so
 the reconnect/refresh behaviour above is ours too.
@@ -26,10 +29,14 @@ log = logging.getLogger(__name__)
 
 
 class CloudTransport:
-    def __init__(self, data_dir: str, sn: str, on_message: Callable[[str, object, float], None]):
+    def __init__(self, data_dir: str, sn: str, on_message: Callable[[str, object, float], None],
+                 on_sn: Callable[[str], None] | None = None):
         self.path = Path(data_dir) / "cloud_session.json"
         self.sn = sn
         self._on_message = on_message
+        self.on_sn = on_sn           # told (on the worker thread) when the account's only robot gave the serial
+        self.devices: list[dict] = []    # the account's robots, while there are several and none is chosen
+        self._devices_at = 0.0
         self.state = "signed out"
         self.username: str | None = None
         self.broker: str | None = None
@@ -79,13 +86,14 @@ class CloudTransport:
     def login(self, email: str, password: str) -> None:
         """Blocking; call from a worker thread. The password is not kept anywhere."""
         self.stop()
+        self._join()                    # start() would return early while the old worker is still winding down
         with self._refresh_lock:        # a refresh in flight must not save over (or after) the new session
             self._client = None
             c = self._sdk()
             c.login(email, password)
             self.username = email.lower()
             self._save()
-        self.error = ""
+        self.error, self.devices, self._devices_at = "", [], 0.0     # another account may have other robots
         self.start()
 
     def logout(self) -> None:
@@ -93,6 +101,7 @@ class CloudTransport:
         with self._refresh_lock:        # a refresh in flight must not write the file back after we remove it
             self._client = None
             self.username = None
+            self.devices = []
             self.state, self.error = "signed out", ""
             try:
                 self.path.unlink()
@@ -115,11 +124,15 @@ class CloudTransport:
         """Drop the connection and connect again (after the robot's serial changed). Blocks while the old worker
         finishes, so call it off the event loop."""
         self.stop()
-        t = self._thread
-        if t and t.is_alive():
-            t.join(25)
+        self._join()
         self.state = "reconnecting"
         self.start()
+
+    def _join(self) -> None:
+        """Wait for the old worker to finish (it may sit up to 20 s in _connect_once)."""
+        t = self._thread
+        if t and t.is_alive() and t is not threading.current_thread():
+            t.join(25)
 
     def _close_client(self) -> None:
         with self._lock:
@@ -150,6 +163,7 @@ class CloudTransport:
                 return "ok"
             client = self._client
             if client is None:          # signed out while we waited for the lock: nothing to refresh or save
+                self.state, self.error = "needs login", "no Yarbo session: sign in again in Settings → Robot"
                 return "expired"
             try:
                 client._auth.refresh()
@@ -169,14 +183,51 @@ class CloudTransport:
     def _refresh(self) -> bool:
         return self.refresh_session() != "expired"   # network trouble: keep the session and retry later
 
+    def _find_sn(self) -> str | None:
+        """Ask the account which robots it has (an account lookup; nothing is sent to a robot). One robot: its
+        serial. Several: none, and Settings → Robot offers them. Asked again after 10 minutes, so a robot added to
+        the account turns up."""
+        client = self._client
+        if client is None or time.time() - self._devices_at < 600:
+            return None
+        self._devices_at = time.time()
+        try:
+            found = client.get_devices()
+        except Exception as exc:
+            self._devices_at -= 540         # a failed lookup is tried again after a minute, not ten
+            log.warning("could not list the robots on the Yarbo account: %s", type(exc).__name__)
+            return None
+        robots = [d for d in found if getattr(d, "sn", "")]
+        if len(robots) == 1:
+            self.devices = []
+            return robots[0].sn
+        self.devices = [{"sn": d.sn, "name": getattr(d, "name", "") or "", "model": getattr(d, "model", "") or ""}
+                        for d in robots]
+        if robots:
+            log.info("the Yarbo account has %d robots: choose one in Settings → Robot", len(robots))
+        return None
+
     def _run(self, stop: threading.Event) -> None:
         delay = 5
+        waiting_said = False
         while not stop.is_set():
             self.state = "connecting"
             if not self.sn:
+                sn = self._find_sn()
+                if sn and not stop.is_set():
+                    self.sn = sn
+                    log.info("Yarbo cloud: using the account's only robot")
+                    if self.on_sn:
+                        self.on_sn(sn)
+                    continue
                 self.error = "waiting for the robot's serial (Settings → Robot)"
+                if not waiting_said:
+                    log.warning("Yarbo cloud is waiting for the robot's serial (Settings → Robot)")
+                    waiting_said = True
                 stop.wait(10)
                 continue
+            if self.error.startswith("waiting for the robot's serial"):
+                self.error = ""
             if not self._refresh():
                 return
             try:
@@ -269,4 +320,5 @@ class CloudTransport:
 
     def status(self) -> dict:
         return {"state": self.state, "username": self.username, "broker": self.broker, "error": self.error,
-                "commands_sent": self.published}
+                "commands_sent": self.published,
+                "devices": list(self.devices) if not self.sn else []}

@@ -130,6 +130,12 @@ logged; only the session is kept on the server. It is optional: the panel reads 
 network, and uses the cloud only as a fallback when the robot can't be reached there (Settings → Robot → Route to
 the robot shows which way each goes).
 
+The cloud needs the robot's serial. It is read from the robot on your network; when that is closed, the panel asks
+your Yarbo account which robots it has and uses the only one (several: the card lists them, press **Use this** on
+yours). A serial found either way is saved under Advanced: port and serial, so a restart still knows the robot. While
+none is known the card says **waiting for the robot's serial**; type it under Advanced, or set Route to the robot to
+**Yarbo cloud only** and sign in.
+
 ### Robot video
 
 Settings → Robot → **Robot video** is **off** on a new install. When you switch it on (the panel asks you

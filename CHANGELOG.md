@@ -66,8 +66,17 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   samples the robot moves smoothly, so a replay, and Follow in 3D, can be watched at a real pace. The 3D map's 1×–3×
   menu is now labelled Height: it draws the ground taller, it is not a speed.
 
+- **Robots reached only through the Yarbo cloud** (the robot's local broker refuses connections, as after some
+  firmware updates): with no serial known, the panel reads it from your Yarbo account's robot list (one robot: used;
+  several: Settings → Robot lists them to choose from). A serial found on the robot or the account is now saved, so
+  a restart while local access is closed still knows the robot.
+
 ### Fixed
 
+- **Yarbo cloud stuck on "connecting".** While it has no serial it now says "waiting for the robot's serial
+  (Settings → Robot)", in Settings and once in the log. A session that disappears shows "needs login" with a reason
+  instead of "connecting", and signing in again while the old connection was still winding down no longer leaves the
+  cloud with no connection at all.
 - **A stray shape far from the yard no longer moves the yard.** The panel worked out where the yard is from the outline
   of every shape on the robot's map, so one far away (for example a charging point with an empty location) made the map
   open zoomed out to half the world and imagery sources say they do not cover the yard. Shapes more than 2 km from the

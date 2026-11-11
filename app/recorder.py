@@ -915,6 +915,7 @@ class Recorder:
                     log.warning(self.robot_error)
                     return self.local_status()
             self._applied = (host, port)
+            self.keep_sn(sn)
             if sn != self.sn:
                 self.sn = sn
                 if self.on_sn:
@@ -924,6 +925,28 @@ class Recorder:
             self.robot_error = ""
             self.store.event("recorder_started", f"robot {sn} at {host}:{port}")
             return self.local_status()
+
+    def keep_sn(self, sn: str) -> None:
+        """Keep a serial found on the robot's heart_beat or from the Yarbo account where a configured one is kept
+        (Settings → Robot), so a restart while the local broker is closed still knows the robot. A serial already set
+        (in Settings or the environment) is left alone."""
+        if not sn or self.cfg.yarbo_sn or not hasattr(self.cfg, "set"):
+            return
+        if self.cfg.stored("robot", "sn") is False:      # switched off in Settings: the person's choice stands
+            return
+        try:
+            if self.cfg.set("robot", {"sn": sn}):
+                self.store.event("settings_changed", "robot: sn (found by the panel)")    # names only, never values
+        except ValueError as exc:
+            log.warning("could not keep the robot's serial: %s", exc)
+
+    def use_found_sn(self, sn: str) -> None:
+        """The cloud found the serial on the account (one robot there): keep it and follow it."""
+        self.keep_sn(sn)
+        if sn != self.sn:
+            self.sn = sn
+            if self.on_sn:
+                self.on_sn(sn)
 
     def _apply_demo_robot(self) -> dict:
         """DEMO=1: the made-up robot (app/demo_robot.py) instead of any broker. It carries on the mow the demo history
