@@ -1,6 +1,7 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
-# CodeRabbit for Groundskeeper. It reviews only when asked: a maintainer comments `@coderabbitai review` (or
-# `@coderabbitai full review`) on the PR. Its comments are advice; AGENTS.md is the authority, a maintainer decides.
+# CodeRabbit for Groundskeeper. It reviews each PR when it is opened or marked ready, and again on each push;
+# drafts wait. Ask again with `@coderabbitai review` (or `@coderabbitai full review`).
+# Its comments are advice; AGENTS.md is the authority, a maintainer decides.
 language: "en-US"
 tone_instructions: >-
   Be brief. Only the changes in this PR. No style nits scripts/check.py already covers. Rank safety, privacy and
@@ -15,10 +16,11 @@ reviews:
   collapse_walkthrough: true
   sequence_diagrams: false
   auto_review:
-    enabled: false                  # manual: comment `@coderabbitai review` when the PR is ready for it
-    # To review automatically but only PRs a maintainer tags, set enabled: true and uncomment:
+    enabled: true
+    auto_incremental_review: true   # again on each push
+    drafts: false                   # a draft waits until it is marked ready for review
+    # If it gets noisy, review only PRs a maintainer tags:
     # labels: ["coderabbit"]
-    drafts: false
   path_filters:
     - "!web/vendor/**"
     - "!docs/screenshots/**"

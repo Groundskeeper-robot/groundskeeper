@@ -81,8 +81,8 @@ and Microsoft Edge or Chrome:
 4. Run `scripts/check.py` and fill in the PR template, including the safety checklist.
 5. CI must pass. A maintainer reviews every PR. Anything that sends a command to the robot, changes an interlock,
    touches sign-in or sends location data off the machine gets a second, closer look.
-6. A maintainer may also ask [CodeRabbit](https://coderabbit.ai) for an automated review (`@coderabbitai review`;
-   set up in `.coderabbit.yaml`). It checks the PR against `AGENTS.md`. Its comments are suggestions: fix what is
+6. [CodeRabbit](https://coderabbit.ai) reviews each PR once it is ready for review, and again on each push
+   (`.coderabbit.yaml`; drafts wait). It checks the PR against `AGENTS.md`. Its comments are suggestions: fix what is
    right, reply where it is wrong, and leave the decision to the maintainer. Never weaken a check because it asked.
 
 ## Working with an AI assistant
