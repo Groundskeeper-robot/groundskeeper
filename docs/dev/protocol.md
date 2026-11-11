@@ -155,7 +155,7 @@ shows them as reported. Wi-Fi strength is not in the device message; only a scan
 | `set_working_state` | `{"state":1}` | Keep-awake, about every 10 s while the app is open |
 | `cmd_vel` | `{"vel":0.0,"rev":0.0}` | **Manual drive** (linear/angular velocity). The app zeroes it on opening and streams it from its joystick. Not in the SDK. **Never send it.** |
 | `cmd_roller` | `{"vel": 1000}` | A motor command sent in bursts around blade switches and on opening. Never send it |
-| `smart_vision_control` | `{"state":0}` / `{"state":1}` | Live view off/on. Reply: "Smart vision control command sent: N". No stream URL, SDP or token on MQTT. See [Robot video](#robot-video-agora) |
+| `smart_vision_control` | `{"state":0}` / `{"state":1}` | Live view off/on; see [Robot video](#robot-video-agora) |
 | `mower_head_sensor_switch` | `{"cmd": 0}` or `{"state": -99}` | A status query on opening; reply state 33, "status query feedback" |
 | `wireless_charging_cmd` | `{"cmd": 0}` | Sent by the app on opening and closing |
 | `cmd_recharge` | `{"cmd": 2}` | Return to dock |
@@ -172,8 +172,10 @@ check, with no capture to link) or **[unconfirmed]**. Nothing here is **[capture
 robot behaviour comes from a capture of the official app, so a capture is still wanted for the observed lines.
 No value here is real; serials, tokens, keys and salts are synthetic or shortened.
 
-**Switching the view on.** The app publishes `smart_vision_control {"state":1}` on `snowbot/{SN}/app/smart_vision_control`
-over the cloud broker (see the table above). **[observed]** that the robot publishes video after `{"state":1}`.
+**Switching the view on.** The app publishes `smart_vision_control {"state":1}` on
+`snowbot/{SN}/app/smart_vision_control` over the cloud broker (see the table above). The reply is "Smart vision
+control command sent: N". No stream URL, SDP or token goes over MQTT. **[observed]** that the robot publishes
+video after `{"state":1}`.
 `{"state":0}` is the app's "off". **[unconfirmed, untested]**: what `{"state":0}` does to a viewer who is watching in
 the official app at the same time, and whether it changes anything during a run besides the live view (obstacle
 detection in particular). Until those are tested, a client should send only `{"state":1}`.
@@ -204,7 +206,7 @@ Authorization: Bearer <jwt>
 - The token is minted for the `uid` in the request, so the viewer must join with exactly that `uid`.
 - **Lifetime is not known** **[unconfirmed]**: the recorder fetches once per session and has not seen one expire.
 - **Auth failures** **[observed]**: HTTP 401, and HTTP 200 with a body `code` of `A0230` (seen when every session was
-  invalidated at once on 2026-10-25). A client should refresh its sign-in once and retry once.
+  invalidated at once). A client should refresh its sign-in once and retry once.
 
 **Channels and uid.**
 
