@@ -195,7 +195,7 @@ class RobotLink:
             if not self.cloud_up():
                 raise NoRoute(f"the Yarbo cloud is {getattr(self.cloud, 'state', 'not set up')}")
             self.cloud.publish(cmd, payload)
-        self.mark_sent(cmd)              # after it went: the robot's echo arrives later, on the event loop
+        self.mark_sent(cmd)              # after it went; an echo handled before this counts as another client's
         if cmd not in QUIET_COMMANDS:    # a keep-awake beat every 4 s is not "the last command" (status shows that)
             self.last_command = {"cmd": cmd, "route": route, "at": time.time()}
         if what:

@@ -216,17 +216,16 @@ def test_each_beat_gets_the_online_and_route_interlocks_and_an_audit_row(t):
     assert row["actor"] == "user" and row["route"] == "cloud"
 
 
-def test_the_general_command_route_needs_a_window_a_person_opened(t):
+def test_only_the_tile_keeps_it_awake_not_the_general_command_route(t):
     ready(t)
     send = lambda args: t.c.post("/api/control/send", json={"cmd": KA, "args": args, "confirm": True}).json()  # noqa
-    r = send({})
-    assert r["sent"] is False and "Within the time limit" in r["refused"]   # nobody pressed play
+    assert send({})["sent"] is False                                   # nobody pressed play
     assert play(t).json()["sent"] is True
-    t.clock[0] += 5
-    assert send({"state": 0})["sent"] is False                         # never state 0
-    t.clock[0] += 5
-    assert send({})["sent"] is True                                    # a person, inside the window: as the tile
-    assert all(p == {"state": 1} for _, p in t.cloud.sent) and len(t.cloud.sent) == 2
+    for args in ({}, {"state": 1}, {"state": 0}):                      # even inside a window a person opened
+        t.clock[0] += 5
+        r = send(args)
+        assert r["sent"] is False and "Within the time limit" in r["refused"]
+    assert len(t.cloud.sent) == 1                                      # only the tile's beat: rate limit and jitter
 
 
 def test_a_token_or_an_assistant_cannot_send_it_through_the_general_route(t):
@@ -454,6 +453,7 @@ def _recorder(tmp_path, trusted=True):
         st = r._own()
         st["hist"].extend([True] * recorder.OWN_TRUST_WINDOW)
         st["trusted"] = True
+        st["last"] = float("inf")               # mid-session: the next send is not a fresh start
     return r
 
 
@@ -625,7 +625,9 @@ def test_a_fresh_start_is_untrusted_so_every_beat_counts_as_the_apps(tmp_path, c
     r = _recorder(tmp_path, trusted=False)
     o = _ops(r)
     r.app_stream_at = 0.0
-    counted = [_round(o, r, clocked, echo_after=None, app_after=1.0) for _ in range(15)]
+    # The app lands as quickly as an echo, every time: until a full window of such matches, each counts as the app's.
+    # (Held in step for a whole window it would pass for ours; the panel's jitter is what stops that, tested below.)
+    counted = [_round(o, r, clocked, echo_after=None, app_after=0.1) for _ in range(recorder.OWN_TRUST_WINDOW - 1)]
     assert all(counted) and o.phone_app_active(60) is True
 
 
@@ -730,3 +732,86 @@ def test_the_stats_record_what_was_seen(tmp_path, clocked):
 def test_the_matching_constants_err_towards_the_app():
     assert recorder.OWN_TRUST_LATENCY_S <= 0.3 and recorder.OWN_TRUST_WINDOW >= 10
     assert recorder.OWN_ECHO_COUNTED_S < recorder.OWN_ECHO_S
+
+
+# -- the independent review's findings ------------------------------------------------------------------------------
+def test_a_beat_reads_the_light_context_and_never_waits_on_frigate_or_home_assistant(t):
+    ready(t)
+
+    async def slow_context(args):
+        raise AssertionError("a beat must not build the full context (Frigate, Home Assistant)")
+
+    t.controller._context = slow_context
+    t.controller.light_context = lambda: {"snapshot_age_s": 3, "route_state": "connected"}
+    assert play(t).json()["sent"] is True
+    t.controller.light_context = lambda: {"snapshot_age_s": 600, "route_state": "connected"}
+    t.clock[0] += 4
+    assert beat(t).json()["ended"] is True                             # its checks still see the robot go offline
+
+
+def test_the_ops_beat_context_has_what_the_checks_read_and_no_awaits():
+    import inspect
+    assert not inspect.iscoroutinefunction(ops_mod.Ops.beat_context)
+    o = ops_mod.Ops.__new__(ops_mod.Ops)
+    o.rec = SimpleNamespace(snapshot_at=None)
+    o.link = SimpleNamespace(state="connected")
+    assert o.beat_context() == {"snapshot_age_s": None, "route_state": "connected"}
+
+
+def test_the_events_log_leaves_out_the_beats_that_went_but_keeps_refusals(t):
+    ready(t)
+    assert play(t).json()["sent"] is True
+    for _ in range(5):
+        t.clock[0] += 4
+        beat(t)
+    t.ctx.update(snapshot_age_s=600)
+    t.clock[0] += 4
+    beat(t)                                                            # refused: robot offline
+    asyncio.run(t.controller.send("pause", {}, actor="user", wait=False))
+    shown = t.c.get("/api/control/log?limit=300").json()["log"]
+    assert [r["cmd"] for r in shown].count(KA) == 1 and any(r["cmd"] == "pause" for r in shown)
+    assert len([r for r in t.c.get("/api/control/log?beats=true").json()["log"] if r["cmd"] == KA]) == 7
+
+
+def test_the_window_ends_when_the_beats_stop(t):
+    ready(t)
+    assert play(t).json()["sent"] is True
+    t.clock[0] += control.KEEP_AWAKE_GAP_S + 1
+    t.controller.keep_awake_tick()
+    assert t.controller._awake_since is None
+    t.clock[0] += 1
+    assert beat(t).json()["sent"] is False                             # a tab that comes back needs a press
+
+
+def test_a_failed_route_ends_the_window(t):
+    ready(t)
+    assert play(t).json()["sent"] is True
+
+    class NoCloud(FakeLink):
+        def command(self, cmd, payload, route=None):
+            raise NoRoute("the Yarbo cloud is signed out")
+
+    t.controller.link = NoCloud(t.cloud)
+    t.clock[0] += 4
+    r = beat(t).json()
+    assert r["sent"] is False and r["ended"] is True
+
+
+def test_a_slow_echo_is_kept_for_measuring_and_the_stats_say_so(tmp_path, clocked):
+    r = _recorder(tmp_path, trusted=False)
+    o = _ops(r)
+    _round(o, r, clocked, echo_after=0.6)
+    s = r.own_echo_stats()
+    assert s["latency_ms"] is None and s["slow_ms"]["median"] == 600
+
+
+def test_trust_is_earned_again_after_a_gap_in_the_panels_sends(tmp_path, clocked):
+    r = _recorder(tmp_path)
+    o = _ops(r)
+    r._own()["last"] = clocked[0]
+    _round(o, r, clocked, echo_after=0.05)
+    assert r._own()["trusted"] is True
+    clocked[0] += recorder.OWN_FRESH_S + 1                             # the tile was closed for a while
+    r.mark_sent(KA)
+    assert r._own()["trusted"] is False and r._own()["hist"] == __import__("collections").deque()
+    assert [e for e in r.store.events(20) if e["kind"] == "cloud_echo_missing"] == []   # not a cloud failure

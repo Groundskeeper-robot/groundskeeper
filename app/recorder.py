@@ -68,6 +68,8 @@ OWN_TRUST_LATENCY_S = 0.3   # only a match this quick can be ours; a slower one 
 # Trusted only while EVERY one of the last OWN_TRUST_WINDOW credits was matched quickly: one miss withdraws it. With the
 # panel's beats jittered (control.KEEP_AWAKE_JITTER_S), the app's beats cannot keep landing just after each of ours.
 OWN_TRUST_WINDOW = 10
+OWN_FRESH_S = 15          # no send of these for this long: the next one starts afresh (trust is earned again)
+OWN_LOG_EVERY = 50        # log what the matching has seen every this many credits (for measuring the above)
 # Commands that mean a person (phone app, another client) is steering the robot: a guard gives up its pause.
 PEOPLE_COMMANDS = {"start_plan", "pause", "resume", "stop", "cmd_recharge", "cmd_vel"}
 # While doing one of these the robot should be getting somewhere; standing still for minutes means it is stuck
@@ -250,7 +252,7 @@ class Recorder:
         False = expired unmatched), counted separately from the messages, so the app's beats cannot stand in for them.
         `lat`: the delays of recent quick matches, for measuring."""
         fresh = {"beats": {}, "hist": deque(maxlen=OWN_TRUST_WINDOW), "lat": deque(maxlen=50),
-                 "trusted": False, "note": None, "was_lost": False}
+                 "slow": deque(maxlen=50), "trusted": False, "note": None, "was_lost": False, "last": 0.0, "n": 0}
         return self.__dict__.setdefault("_own_state", fresh)
 
     def _own_judge(self, st: dict) -> None:
@@ -277,11 +279,13 @@ class Recorder:
         if not st:
             return {"trusted": False, "recent": [], "latency_ms": None}
         with self.__dict__.setdefault("_own_lock", threading.Lock()):
-            lat = sorted(st["lat"])
+            lat, slow = sorted(st["lat"]), sorted(st["slow"])
             hist = list(st["hist"])
-        ms = None if not lat else {"n": len(lat), "median": round(statistics.median(lat) * 1000),
-                                   "max": round(lat[-1] * 1000)}
-        return {"trusted": st["trusted"], "recent": hist, "latency_ms": ms}
+
+        def ms(xs):
+            return None if not xs else {"n": len(xs), "median": round(statistics.median(xs) * 1000),
+                                        "max": round(xs[-1] * 1000)}
+        return {"trusted": st["trusted"], "recent": hist, "latency_ms": ms(lat), "slow_ms": ms(slow)}
 
     def _own_flush(self) -> None:
         """Say once that the matching was given up, or came back. Called on the event loop (never from the cloud thread:
@@ -307,7 +311,17 @@ class Recorder:
             with self.__dict__.setdefault("_own_lock", threading.Lock()):
                 st = self._own()
                 self._own_expire(st, cmd, now - OWN_ECHO_COUNTED_S)
+                if now - st["last"] > OWN_FRESH_S:
+                    # A new session: trust earned earlier says nothing about the cloud now, so it is earned again
+                    # (quietly: this is not the cloud failing).
+                    st["hist"].clear()
+                    st["trusted"] = False
+                st["last"] = now
+                st["n"] += 1
                 st["beats"].setdefault(cmd, deque(maxlen=16)).append(now)
+                periodic = st["n"] % OWN_LOG_EVERY == 0
+            if periodic:
+                log.info("own-echo matching: %s", self.own_echo_stats())
             self._own_flush()
 
     def own_echo(self, name: str, ts: float, data) -> bool:
@@ -334,6 +348,7 @@ class Recorder:
             if not (q and q[0] <= ts):            # a credit recorded after the message arrived is not its echo
                 return False
             if ts - q[0] > OWN_TRUST_LATENCY_S:   # too slow to be an echo: the app's; the credit is left to expire
+                st["slow"].append(ts - q[0])      # (kept for measuring: a slow echo would show here)
                 return False
             st["lat"].append(ts - q.popleft())
             st["hist"].append(True)

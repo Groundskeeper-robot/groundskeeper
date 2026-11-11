@@ -1740,8 +1740,10 @@ async def control_send(request: Request, body: dict = Body(...)):
 
 
 @app.get("/api/control/log")
-async def control_log(request: Request, limit: int = 100):
-    return {"log": rec(request).store.control_log(limit)}
+async def control_log(request: Request, limit: int = 100, beats: bool = False):
+    """The audit log, newest first. The Cameras tile's keep-awake beats that went are left out unless `beats=true`
+    (the Events list notes when they start and stop)."""
+    return {"log": rec(request).store.control_log(limit, beats=beats)}
 
 
 # -- phase 2: schedule ------------------------------------------------------------------------------------------------

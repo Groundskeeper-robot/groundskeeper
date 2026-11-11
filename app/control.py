@@ -13,6 +13,7 @@ The robot sends no reply to run commands (seen 2026-10-05: nothing for start_pla
 command is confirmed by the robot's state changing the way the command should change it (CONFIRM below).
 """
 import asyncio
+import contextvars
 import json
 import logging
 import random
@@ -46,6 +47,9 @@ KEEP_AWAKE_MAX_S = 15 * 60    # one press of play keeps the robot awake at most 
 KEEP_AWAKE_JITTER_S = 1.0     # each beat waits a random 0..this first, so the app's beats cannot stay in step (§13)
 # A refusal on one of these ends the window: the robot went offline or out of reach, or the time is up.
 KEEP_AWAKE_ENDS_ON = ("Robot online", "Route to the robot", "Within the time limit")
+# Set only while Controller.keep_awake is sending (per task): a keep-awake from anywhere else (/api/control/send, say)
+# has no window, so it is refused, and every beat gets the rate limit and the jitter.
+_IN_BEAT = contextvars.ContextVar("keep_awake_beat", default=False)
 
 GATE_DEFAULTS = {
     "min_battery_pct": 30,
@@ -162,7 +166,7 @@ def check(cmd: str, args: dict, ctx: dict, cfg: dict, actor: str) -> list[dict]:
             "on" if ctx.get("robot_video") is True else "robot video is off (Settings → Robot)")
         a = ctx.get("awake_for_s")
         add("Within the time limit", a is not None and a < KEEP_AWAKE_MAX_S,
-            "not started from the Cameras tile" if a is None else
+            "only the Cameras tile keeps it awake, after a press of play" if a is None else
             f"{a / 60:.0f} of {KEEP_AWAKE_MAX_S // 60} min" if a < KEEP_AWAKE_MAX_S else
             f"{KEEP_AWAKE_MAX_S // 60} min are up: press Open on the Cameras tile to keep watching")
     if cmd != "start_plan":
@@ -264,6 +268,9 @@ class Controller:
         self._beat_at = None              # monotonic time of the last keep-awake attempt (the rate limit), any viewer
         self._beat_ok_at = None           # monotonic time of the last one that went out; None = none since it stopped
         self._awake_since = None          # monotonic start of the keep-awake window a person opened; None = none
+        # () -> {"snapshot_age_s", "route_state"}: all a beat's checks need, without the yard or presence lookups (set
+        # by Ops; None = the full context). A beat every 4 s must not hold the lock across Frigate's timeouts.
+        self.light_context = None
 
     async def _watch(self, cmd: str, fut: asyncio.Future, last: dict, rowid: int, logged: dict) -> None:
         """Confirm a background command; the audit row gets the outcome, the status stream gets `last`."""
@@ -356,9 +363,14 @@ class Controller:
                 self._awake_since, out["ended"] = None, True
             return out
         await asyncio.sleep(random.uniform(0, KEEP_AWAKE_JITTER_S))
-        out = await self.send(KEEP_AWAKE, {}, actor=actor, wait=False)
+        token = _IN_BEAT.set(True)
+        try:
+            out = await self.send(KEEP_AWAKE, {}, actor=actor, wait=False)
+        finally:
+            _IN_BEAT.reset(token)
         failed = {c["name"] for c in out.get("checks") or [] if c["hard"] and c["ok"] is not True}
-        if not out.get("sent") and failed & set(KEEP_AWAKE_ENDS_ON):
+        # No route at all (the cloud signed out, say) ends it too: nothing can go out until a person tries again.
+        if not out.get("sent") and (failed & set(KEEP_AWAKE_ENDS_ON) or out.get("error")):
             capped = "Within the time limit" in failed and self._awake_since is not None
             self._awake_since = None
             out["ended"] = True
@@ -370,14 +382,16 @@ class Controller:
             out["control_off"] = True
         if out.get("sent"):
             if self._beat_ok_at is not None and now - self._beat_ok_at > KEEP_AWAKE_GAP_S:
-                self._beat_stopped(self._beat_ok_at)        # the stop was not noticed in time: say it now, then start
+                self._beat_stopped(self._beat_ok_at, end_window=False)   # noticed late: say it now (this press stands)
             if self._beat_ok_at is None:
                 self.store.event("keep_awake_started", "the robot is being kept awake for the Cameras tile")
             self._beat_ok_at = time.monotonic()
         return out
 
-    def _beat_stopped(self, last_at: float) -> None:
+    def _beat_stopped(self, last_at: float, end_window: bool = True) -> None:
         self._beat_ok_at = None
+        if end_window:
+            self._awake_since = None      # the window ends with the beats: a later beat needs a new press
         self.store.event("keep_awake_stopped", f"the Cameras tile stopped keeping the robot awake "
                                                f"(last beat {time.monotonic() - last_at:.0f} s ago)")
 
@@ -428,9 +442,12 @@ class Controller:
                     raise Refused(f"missing {', '.join(missing)}")
                 if not self.enabled():
                     raise Refused("control is switched off (Settings → Safety)")
-                ctx = await self._context(args)
+                if cmd == KEEP_AWAKE and self.light_context is not None:
+                    ctx = dict(self.light_context())
+                else:
+                    ctx = await self._context(args)
                 if cmd == KEEP_AWAKE:           # the window is the server's own record, never the request's
-                    since = self._awake_since
+                    since = self._awake_since if _IN_BEAT.get() else None
                     ctx["awake_for_s"] = None if since is None else time.monotonic() - since
                     ctx["robot_video"] = bool(self.store.setting("robot_video_enabled", False))
                 checks = check(cmd, args, ctx, gates(self.store), actor)

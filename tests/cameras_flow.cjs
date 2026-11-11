@@ -351,6 +351,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   calls.push(["after-ended", sandbox.cams.open, sandbox.cams.phase, sandbox.cams.message, intervals.size]);
   const endedBeats = beats; await fire(); calls.push(["beats-after-ended", beats - endedBeats]);
   knobs.beatReply = { sent: true };
+  // 17e. A start beat that fails keeps asking for the window; a beat still in flight is not asked again on top.
+  knobs.beatFail = true; mark("beat-start-fails"); sandbox.camerasOpen(); await settle();
+  knobs.beatFail = false; await fire();
+  let relSlow; knobs.beatGate = new Promise((r) => { relSlow = r; });
+  mark("beat-in-flight"); await fire(); await fire(); await fire();
+  knobs.beatGate = null; relSlow(); await settle();
+  sandbox.camerasStop(); await settle();
   // 17d. A token renewal is not a press of play: its first beat does not ask for a new window.
   sandbox.camerasOpen(); await settle();
   mark("beat-renew"); client.handlers["token-privilege-will-expire"](); await settle();

@@ -301,6 +301,19 @@ def test_a_token_renewal_does_not_open_a_new_window():
 
 
 @needs_node
+def test_a_start_beat_that_fails_asks_for_the_window_again():
+    seg = segment(run_flow(), "beat-start-fails", beats=True)
+    assert [c for c in seg if c[0] == "beat"] == [["beat", '{"start":true}'], ["beat", '{"start":true}']]
+
+
+@needs_node
+def test_a_beat_in_flight_is_not_asked_again_on_top():
+    seg = segment(run_flow(), "beat-in-flight", beats=True)
+    held = [c[0] for c in seg][:[c[0] for c in seg].index("clear-interval")]   # until the tile is closed
+    assert held.count("beat") == 1
+
+
+@needs_node
 def test_when_the_panel_ends_the_window_the_tile_closes_says_so_and_beats_no_more():
     calls = run_flow()
     assert next(c for c in calls if c[0] == "after-ended") == ["after-ended", False, "closed",

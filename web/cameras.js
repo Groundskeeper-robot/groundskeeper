@@ -233,12 +233,15 @@ function camerasQuietSdk(AgoraRTC) {
 function camerasBeats(ticket, fresh) {
   const live = () => ticket === cams.ticket && cams.open;
   let first = fresh;
+  let inFlight = false;
   const beat = async () => {
     if (!live()) return;
+    if (inFlight) return;                         // one at a time: a slow panel is not asked again on top
+    inFlight = true;
     const body = first ? { start: true } : {};
-    first = false;
     try {
       const r = await postJSON("/api/video/keepalive", body);
+      first = false;                              // answered: the window is open (or the answer says why not)
       if (!live()) return;
       if (r && r.ended) {
         camerasStop(CAM_ENDED);
@@ -252,7 +255,7 @@ function camerasBeats(ticket, fresh) {
         cams.hint = "";                               // Control came back on: only this hint goes, not an unrelated one
         camerasDraw();
       }
-    } catch { /* quiet: the next beat tries again */ }
+    } catch { /* quiet: the next beat tries again */ } finally { inFlight = false; }
   };
   clearInterval(cams.beatTimer);
   cams.beatTimer = setInterval(beat, CAM_BEAT_MS);

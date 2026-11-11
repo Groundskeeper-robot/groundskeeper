@@ -63,6 +63,7 @@ class Ops:
         self.notifier = Notifier(self.store, cfg.ha_url, cfg.ha_token)
         rec.on_sn = self.robot_changed
         self.controller = Controller(self.store, self.link, self.context, self.expect_reply, lambda: self.rec.t)
+        self.controller.light_context = self.beat_context
         # Another client's command, other than the one being watched (whose late echo may look like someone else's).
         self.controller.others_at = lambda cmd: max(
             (t for name, t in (getattr(self.rec, "foreign_cmds", None) or {}).items() if name != cmd), default=0.0)
@@ -224,6 +225,13 @@ class Ops:
         if active is None:
             return "the robot's plan state is unknown; nothing was sent"
         return None
+
+    def beat_context(self) -> dict:
+        """What a keep-awake beat's checks read (control.check): no awaits, so a beat never holds the controller's
+        lock across a Frigate or Home Assistant timeout."""
+        r = self.rec
+        return {"snapshot_age_s": round(time.time() - r.snapshot_at, 1) if r.snapshot_at else None,
+                "route_state": self.link.state}
 
     async def context(self, args: dict) -> dict:
         r = self.rec

@@ -462,15 +462,21 @@ The panel does not get into the robot, and no video passes through the panel. It
    is open, `set_working_state {"state":1}` (`protocol.md`). It is a catalogue command like camera-on: each beat goes
    through `Controller.send` and `control.check` (robot online, a route, an audit row per beat), with a fixed payload
    (`payload_for`), cloud only until `LOCAL_KEEPAWAKE_PROVED` (`RobotLink.command`), in `RUN_NEUTRAL` and not in
-   `SAFE_TO_REPEAT`. Its own checks: people only, state 1 only, Robot video on, and **within the time limit**.
+   `SAFE_TO_REPEAT`. Its own checks: people only, state 1 only, Robot video on, and **within the time limit**. A beat's
+   checks read a light context (`Ops.beat_context`: the snapshot's age and the route, no awaits), so a beat every 4 s
+   never holds the controller's lock across a Frigate or Home Assistant timeout. The audit rows of beats that went are
+   left out of the log the Events page reads (`/api/control/log?beats=true` shows them), so they cannot push a Pause
+   off the page; refused beats stay.
    - While the tile is open the browser asks `POST /api/video/keepalive` at once and then every 4 s, and each accepted
      request is one beat (`Controller.keep_awake`). The server never schedules or repeats, so closing the tab stops
      them; the timer belongs to the tile's start (ticket) and `camerasLeave()` clears it.
    - **The time limit.** A person pressing Open, a camera or Try again sends `{"start": true}` with the first beat,
      which opens a window of `KEEP_AWAKE_MAX_S` (15 min). The window is the server's own record, put into the check's
-     context by `Controller.send`, never taken from the request; a token renewal is not a press. Outside a window every
-     beat is refused, so `/api/control/send` alone cannot keep the robot awake and a forgotten wall display stops after
-     15 min. A refusal for the time limit, the robot going offline or losing its route ends the window (`ended`): the
+     context by `Controller.send` only for a beat from `Controller.keep_awake` (a context variable), never taken from
+     the request; a token renewal is not a press. Outside a window every beat is refused, `/api/control/send` can never
+     keep the robot awake (it gets no window, nor skips the rate limit and the jitter), and a forgotten wall display
+     stops after 15 min. The window is one for the panel: any person's press opens it again. A refusal for the time
+     limit, the robot going offline or losing its route, no route at all, or the beats stopping ends the window: the
      tile closes and says so, and a person presses Open again. A run does not end it (the robot is awake for the run
      anyway, and the viewer may need the beats). With Control off nothing goes out and no audit row is written per
      beat, and the window ends only when its time is up.
@@ -497,8 +503,10 @@ The panel does not get into the robot, and no video passes through the panel. It
      With the panel's beats jittered by up to 1 s, that happens for roughly one beat in four at worst and cannot
      repeat ten times in a row, so trust goes within a few beats (`tests/test_video_keepalive.py` runs this with the
      app at every phase). Without the jitter, an app beat in step with the panel's could keep trust alive.
-   - The constants are not measured yet. The panel logs the echo delays it sees when trust changes
-     (`Recorder.own_echo_stats`), to set them from a real robot.
+   - Trust is per session: after `OWN_FRESH_S` (15 s) with no such send, the next one starts afresh and trust is
+     earned again (quietly; that is not the cloud failing).
+   - The constants are not measured yet. The panel logs what it sees (quick matches and slower candidates, in ms) when
+     trust changes and every `OWN_LOG_EVERY` sends (`Recorder.own_echo_stats`), to set them from a real robot.
    - The verdict is decided once per message (ops, for the cloud) and carried to the recorder with the message, so two
      messages with the same timestamp are decided separately.
 4. **Switching on.** The Cameras panel sends `smart_vision_control {"state":1}` when it opens, through
