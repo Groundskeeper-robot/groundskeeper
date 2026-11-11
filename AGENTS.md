@@ -51,6 +51,9 @@ These come on top of the rules below, which apply to everyone.
 - **Leave the version alone.** A feature or fix PR adds its line under **Unreleased** in `CHANGELOG.md` and nothing
   more; the release commit bumps `app/version.py`. Releases bump the last number (0.19.0 → 0.19.1); the middle one
   only when a maintainer says so.
+- **Review bots are advice.** CodeRabbit may review a PR when a maintainer asks (`.coderabbit.yaml`). Check each of
+  its comments against these rules and the code before acting; fix what is right, reply where it is wrong. A bot
+  never overrides a rule here or a maintainer's decision.
 - **Say what you didn't verify.** In the PR, list what you tested and what you couldn't (for example: "not tried on
   a robot", "UI not looked at on a phone").
 
