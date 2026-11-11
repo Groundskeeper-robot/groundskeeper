@@ -25,6 +25,11 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ### Fixed
 
+- **A stray shape far from the yard no longer moves the yard.** The panel worked out where the yard is from the outline
+  of every shape on the robot's map, so one far away (for example a charging point with an empty location) made the map
+  open zoomed out to half the world and imagery sources say they do not cover the yard. Shapes more than 2 km from the
+  robot's map origin are now left out of the view, the imagery and the terrain, and named in Settings → Map imagery, on
+  Live and in Map Studio. See Help → Map imagery.
 - **Copy buttons on a panel opened at `http://`** (Settings → Access, AI assistant): they did nothing, because the
   browser has no clipboard API there. They now fall back to the older copy command, and a new token wraps on a phone
   and selects with one tap.

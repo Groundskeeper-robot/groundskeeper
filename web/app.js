@@ -359,6 +359,8 @@ async function loadZones() {
     return;
   }
   state.mapData = data;
+  const nfar = (data.far || []).length;
+  if (nfar) toast(`${nfar} map shape${nfar > 1 ? "s" : ""} far from the yard left out of the view: see Map Studio.`);
   const map = state.map;
   map.addSource("zones", { type: "geojson", data: data.geojson });
   const kind = (k) => ["==", ["get", "kind"], k];
@@ -885,6 +887,20 @@ async function copyText(text) {
   ta.remove();
   return ok;
 }
+/* Map shapes far from the rest of the yard (geo.yard_bounds) are left out of the map's view, the imagery and the
+   terrain. Say which, so the stray can be fixed or deleted in the Yarbo app. */
+const FAR_KIND = { areas: "area", nogozones: "no-go zone", novisionzones: "no-vision zone", elec_fence: "fence",
+                   pathways: "pathway", sidewalks: "sidewalk", deadends: "dead end", charging: "charging point",
+                   snowpiles: "snow pile" };
+function farNote(far) {
+  if (!far || !far.length) return null;
+  const what = far.map((f) => `${f.name || FAR_KIND[f.kind] || f.kind} (${f.km.toLocaleString()} km away)`).join(", ");
+  const why = "A shape on the robot's map far from the rest of your yard is left out of the map's view and of where "
+    + "imagery is fetched. Fix or delete it in the Yarbo app; Map Studio lists it.";
+  return h("p", { class: "small", style: `color:${AMBER}`, title: why },
+    h("b", null, "Left out, far from the yard: "), what, ". ", h("a", { href: "#studio" }, "Map Studio"));
+}
+
 const copyToast = async (text) =>
   toast(await copyText(text) ? "Copied." : "Copy did not work here: select it by hand.");
 

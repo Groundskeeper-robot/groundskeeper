@@ -225,6 +225,7 @@ function drawPicker(el, d) {
       h("span", { class: "row gap" },
         h("button", { type: "button", class: "btn slim pri", onclick: () => openBrowse(d) }, "Browse the catalog"),
         h("button", { type: "button", class: "btn slim pri", onclick: (e) => act(e.target, "Fetching…", () => postJSON("/api/imagery/refresh"), "Imagery fetched again.") }, "Fetch again"))),
+    farNote(d.far),
     modeBox(d),
     (d.problems || []).length ? h("p", { class: "small", style: `color:${CORAL}` }, `Skipped catalog entries: ${d.problems.join(" · ")}`) : null,
     resScale(),
