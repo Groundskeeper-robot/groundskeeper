@@ -220,7 +220,8 @@ class Auth:
 
     def _new_id(self) -> str:
         """A token id no row in either store has, so revoking one can never remove the other kind."""
-        taken = {t.get("id") for key in TOKEN_STORES for t in self._rows(key) if isinstance(t, dict)}
+        taken = {t.get("id") for key in TOKEN_STORES for t in self._rows(key)
+                 if isinstance(t, dict) and isinstance(t.get("id"), str)}      # an unhashable id must not raise
         while True:
             token_id = secrets.token_hex(4)
             if token_id not in taken:

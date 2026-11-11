@@ -450,6 +450,15 @@ def test_a_row_that_is_not_a_dict_is_skipped_not_a_500(client, junk):
     assert client.auth.token_scope(f"Bearer {metrics['token']}") is None
 
 
+@pytest.mark.parametrize("bad_id", [[], {}, 7, None])
+def test_a_row_with_an_unhashable_id_does_not_break_creating_a_token(client, bad_id):
+    signed_in(client)
+    for key in ("api_tokens", "api_tokens_metrics"):
+        client.store.set_setting(key, [{"id": bad_id, "name": "odd"}] + (client.store.setting(key) or []))
+    assert client.c.post("/api/auth/tokens", json={"name": "new"}).status_code == 200
+    assert client.c.post("/api/auth/tokens", json={"name": "new2", "scope": "metrics"}).status_code == 200
+
+
 def test_creating_a_metrics_token_says_so_in_the_event_log(client):
     _scoped(client, "metrics", "prom")
     _scoped(client, None, "ha")
