@@ -105,6 +105,13 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ### Fixed
 
+- **Keyboard focus stays put when Live refreshes** (#141). Live redraws its cards every few seconds and the Cameras
+  tile redraws on each change, which dropped focus to the page. Focus now stays on the same control (a camera chip,
+  Close) or, when it goes away, moves to the one that replaces it (Open to Close, Close to Open).
+- **An armed emergency button never keeps keyboard focus** (#141). With focus kept across refreshes, Pause, Resume,
+  Stop or Return to dock would stay focused for its whole 4 s armed window, and a stray Space or Enter would have sent
+  it. Every tap now drops focus from the card, the armed button never gets it back, and a second tap within 0.6 s is
+  ignored as a bounce, a held key or a double-click.
 - **A snow blower's area can no longer be given mower settings** (#128). Map Studio's area settings are the mower's
   record, so on an area labelled only for another head (a driveway labelled Snow Blower) they show read-only and a
   save is refused, as it is when the area's labels cannot be read. Unlabelled areas stay editable.
