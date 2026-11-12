@@ -456,10 +456,11 @@ The panel does not get into the robot, and no video passes through the panel. It
    `POST /api/video/token {camera}`: it needs a person's session (`_person`; an API token is refused, it is not in
    `TOKEN_WRITES`), answers 403 while `robot_video_enabled` is off (the default; only a person can switch it on),
    is not in the MCP `ROUTES`, sends `Cache-Control: no-store`, and logs and records nothing that contains the token,
-   key or salt. The robot service's address is not in this repository: `app/video.py` has no default and the panel
-   reads it only from `YARBO_ROBOT_SERVICE_URL`. It is never a Settings field: the route sends the Yarbo session JWT
-   to that address, so a signed-in person who could set it could collect the JWT. Unset, the route answers 503
-   "not configured".
+   key or salt. The robot service's address is built in (`video.DEFAULT_SERVICE_URL`, the one the official app
+   uses), so nobody has to find an address and paste it: a wrong one would be handed the Yarbo session.
+   `YARBO_ROBOT_SERVICE_URL` (environment) replaces it if Yarbo moves the service. It is never a Settings field: the
+   route sends the Yarbo session JWT to that address, so a signed-in person who could set it could collect the JWT.
+   The demo has no address, and there the route answers 503 "not configured".
 2. **Playback.** The browser plays the stream with Agora's Web SDK, **vendored** under `web/vendor/` with a pinned
    version and a checksummed Dockerfile download, like MapLibre and three.js. Nothing loads from a CDN at runtime, and
    the script is fetched only when the setting is on and someone opens the viewer.

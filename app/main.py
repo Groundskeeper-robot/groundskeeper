@@ -1301,7 +1301,7 @@ async def settings(request: Request):
     out["conditions"] = rec(request).conditions_config().to_dict()
     out["gates"] = control.gates(store)
     out["integrations"] = request.app.state.cfg.describe()
-    # Only whether it is set, never the address: the route sends the Yarbo session there, so it is environment-only.
+    # Only whether it is set, never the address: the route sends the Yarbo session there, so Settings cannot change it.
     out["robot_video_configured"] = bool(request.app.state.cfg.robot_service_url)
     out["mcp"] = mcp_server.token_status(store)
     from . import weather as weather_mod
@@ -1662,9 +1662,9 @@ async def video_token(request: Request, body: dict = Body(...)):
     camera = body.get("camera")
     if not isinstance(camera, str) or camera not in video_mod.CAMERAS:
         raise HTTPException(400, f"camera: one of {', '.join(video_mod.CAMERAS)}")
-    base = request.app.state.cfg.robot_service_url      # environment only (§13)
+    base = request.app.state.cfg.robot_service_url      # built in, or the environment's (§13)
     if not base:
-        raise HTTPException(503, "robot video is not configured: set YARBO_ROBOT_SERVICE_URL")
+        raise HTTPException(503, "robot video is not configured: no video service address (the demo has none)")
     if not str(base).lower().startswith("https://"):      # an http value from the environment is refused too
         raise HTTPException(503, "robot video is not configured: the service address must start with https://")
     uid = secrets.randbelow(2**31 - 2) + 2              # chosen here: never 0, never the robot's 1

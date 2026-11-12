@@ -8,8 +8,8 @@ encryption key and salt, which with the token give a live, decryptable view of t
 * nothing here logs them (or the JWT, or the robot-service address): a log line is an outcome and a camera name;
 * a failure's message is a fixed phrase and, at most, the service's short error code, never its free text.
 
-The wire format is in docs/dev/protocol.md, "Robot video (Agora)". The robot-service address is not recorded in this
-repository: the caller passes it in (nothing here has a default).
+The wire format is in docs/dev/protocol.md, "Robot video (Agora)". The caller passes the robot-service address in:
+`DEFAULT_SERVICE_URL` below unless the environment names another (`app/config.py`).
 """
 import asyncio
 import base64
@@ -21,6 +21,9 @@ from dataclasses import dataclass, field
 
 log = logging.getLogger(__name__)
 
+# The address the official app uses (protocol.md). Built in so nobody has to find one and paste it: the session JWT
+# goes to it. `YARBO_ROBOT_SERVICE_URL` (environment only, never Settings) replaces it if Yarbo moves the service.
+DEFAULT_SERVICE_URL = "https://4zx17x5q7l.execute-api.us-east-1.amazonaws.com/Stage"
 PATH = "/yarbo/robot-service/robot/commonUser/getAgoraToken"
 CAMERAS = {"front": "middle", "left": "left", "right": "right", "back": "back"}   # shown name -> channel name
 OK_CODE = "00000"

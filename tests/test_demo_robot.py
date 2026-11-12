@@ -191,6 +191,20 @@ def test_demo_never_gets_the_robot_service_address(monkeypatch):
     assert config.load().robot_service_url == "https://robot-service.invalid"     # the control: it is read outside demo
 
 
+def test_the_robot_service_address_is_built_in_and_the_environment_replaces_it(monkeypatch):
+    from app import video
+    for name in ("DEMO", "DEMO_SEED", "YARBO_ROBOT_SERVICE_URL"):
+        monkeypatch.delenv(name, raising=False)
+    assert video.DEFAULT_SERVICE_URL.startswith("https://") and not video.DEFAULT_SERVICE_URL.endswith("/")
+    assert config.load().robot_service_url == video.DEFAULT_SERVICE_URL
+    monkeypatch.setenv("YARBO_ROBOT_SERVICE_URL", "  ")                 # blank is unset, not "off"
+    assert config.load().robot_service_url == video.DEFAULT_SERVICE_URL
+    monkeypatch.setenv("YARBO_ROBOT_SERVICE_URL", "https://robot-service.invalid")
+    assert config.load().robot_service_url == "https://robot-service.invalid"
+    monkeypatch.setenv("DEMO", "1")
+    assert config.load().robot_service_url is None
+
+
 def test_demo_config_drops_the_real_robot_and_integrations(tmp_path, monkeypatch):
     for k, v in {"DEMO": "1", "YARBO_HOST": "192.0.2.10", "HA_URL": "http://ha.local",
                  "HA_TOKEN": "x", "FRIGATE_URL": "http://frigate.local", "TEMPEST_PORT": "50222"}.items():
