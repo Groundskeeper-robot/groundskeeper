@@ -26,8 +26,9 @@ sensor is on the mower module, so with the snow blower attached the panel's rain
   skip a rule that protects people. Settings → Run rules says which rules are mower-only.
 - The head is read from the robot's latest report each time a check or guard runs, so a head change takes effect at
   the next check.
-- A head-specific editor or write is offered only for areas labelled for the head it was captured with: the mower
-  area settings editor is read-only on an area not labelled Lawn Mower (#128).
+- A head-specific editor or write is not offered for an area labelled only for other heads: the mower area settings
+  editor is read-only on an area whose labels leave out Lawn Mower, and when the labels cannot be read. An area with
+  no labels (new areas, the demo) stays editable (#128).
 - **Snow rules of their own** (snowfall, a temperature floor, a minimum battery for the cold) are not part of this
   decision. They come with their own ADR once their weather inputs are chosen.
 
