@@ -89,6 +89,10 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ### Fixed
 
+- **The Cameras tile plays over plain http.** Opened at the panel's LAN address (`http://<server>:8427`), it
+  stopped at "Loading the video library failed: This browser cannot play the robot's video.": browsers hide the
+  camera and microphone API on a page that is not https, and the video library's check asked for it though the
+  tile only watches. The check now leaves devices out.
 - **Home Assistant's link sensor** (`sensor.yarbo_panel_local_link`, and `local_link` in the summary the HA integration
   reads) is "connected" only while the robot itself has answered lately, as `/health`'s `robot_connected` is, not
   whenever the Yarbo cloud session is up. A robot switched off or out of range now shows "down".
