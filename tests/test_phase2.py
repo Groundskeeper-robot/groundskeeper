@@ -21,8 +21,7 @@ class FakeCloud:
 def good_ctx(**over):
     ctx = {"snapshot_age_s": 5, "route_state": "connected", "plans": [{"id": 1, "name": "Mow All"}], "error_code": 0,
            "battery": 90, "running": False, "yard": {"ok": True, "detail": "clear", "events": []},
-           "phone_app_active": False, "conditions": "Dry", "presence": True, "writing": False,
-           "cloud_route": True}
+           "phone_app_active": False, "conditions": "Dry", "presence": True, "writing": False}
     ctx.update(over)
     return ctx
 
@@ -101,7 +100,6 @@ def test_every_catalogue_command_is_confirmed_by_state_or_run_neutral():
     assert set(control.CATALOGUE) == set(control.CONFIRM) | control.RUN_NEUTRAL
     assert control.KEEP_AWAKE in control.RUN_NEUTRAL and control.KEEP_AWAKE in control.CATALOGUE
     assert not set(control.CONFIRM) & control.RUN_NEUTRAL
-    assert not control.RUN_NEUTRAL & set(control.SAFE_TO_REPEAT)
     assert not control.RUN_NEUTRAL & recorder.PEOPLE_COMMANDS
 
 
@@ -372,7 +370,7 @@ def test_the_robots_own_schedules_are_read_from_either_reply_shape():
 
 def test_the_panel_never_writes_robot_schedules():
     from app import mapwrite
-    from app.transport_local import READ_ONLY_COMMANDS
+    from app.commands import READ_ONLY_COMMANDS
     assert "read_schedules" in READ_ONLY_COMMANDS
     assert not {"save_schedule", "enable_schedule", "del_schedule"} & (set(mapwrite.WRITE_COMMANDS) | set(control.CATALOGUE))
 
@@ -556,30 +554,10 @@ def test_the_writer_asks_the_plan_state_again_before_it_sends(tmp_path, monkeypa
 
 
 def test_a_saved_serial_reaches_the_cloud_client_with_no_robot_address(tmp_path, monkeypatch):
-    """Cloud-only: no local broker address, so apply_robot must still hand the kept serial to Ops."""
+    """apply_robot hands the kept serial to Ops, which tells the cloud client."""
     from app.runtime import FOUND_SN
     o = _ops(tmp_path, monkeypatch)
     o.rec.store.set_setting(FOUND_SN, {"sn": "YB0000DEMO0001", "from": "account"})
-    assert not o.cfg.yarbo_host and o.cloud.sn is None
+    assert o.cloud.sn is None
     run(o.rec.apply_robot())
     assert o.rec.sn == "YB0000DEMO0001" and o.cloud.sn == "YB0000DEMO0001"
-
-
-@pytest.mark.parametrize("cmd", ["smart_vision_control", "set_working_state"])
-def test_the_cloud_only_commands_preview_as_blocked_without_the_cloud_route(tmp_path, cmd):
-    """Only the local broker is up: command() would refuse the send, so the preview must not say it would go."""
-    for ctx in ({"cloud_route": False}, {"cloud_route": None}, {"cloud_route": 1}):
-        store, cloud, c = make_controller(tmp_path, ctx=good_ctx(**ctx), enabled=True)
-        out = run(c.preview(cmd, {}))
-        assert out["would_send"] is False
-        assert any(k["name"] == "Cloud route" and k["ok"] is not True and k["hard"] for k in out["checks"])
-    gone = good_ctx()
-    del gone["cloud_route"]                                         # an unknown route fails closed too
-    store, cloud, c = make_controller(tmp_path, ctx=gone, enabled=True)
-    assert any(k["name"] == "Cloud route" and k["ok"] is False for k in run(c.preview(cmd, {}))["checks"])
-
-
-def test_the_cloud_route_check_does_not_touch_other_commands(tmp_path):
-    store, cloud, c = make_controller(tmp_path, ctx=good_ctx(cloud_route=False), enabled=True)
-    assert "Cloud route" not in [k["name"] for k in run(c.preview("pause", {}))["checks"]]
-

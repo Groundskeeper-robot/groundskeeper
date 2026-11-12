@@ -60,7 +60,8 @@ recorded, and guarded.
 | Map / plan / schedule writes | Not used | Yes, as captured from the app (`map-writes.md`) |
 | Camera video | No | Yes, not on MQTT: the switch is, the stream is Agora's (§13) |
 
-Details and ACLs are in [`protocol.md`](protocol.md).
+Details and ACLs are in [`protocol.md`](protocol.md). Firmware V3.14.4x closes the local broker (connection refused
+on 1883; #91), so the panel uses only the cloud; the local column is what earlier firmware showed.
 
 A known failure mode of the cloud route: the SDK can swallow a failed token refresh and keep reconnecting with a
 stale session, which the broker answers with "Not authorized". §5.3 designs around it.
@@ -80,12 +81,12 @@ stale session, which the broker answers with "Not authorized". §5.3 designs aro
 
 ```
                          ┌──────────────────────── panel host (Docker) ─────────────────────────┐
-  Yarbo robot            │  core (Python 3.12, FastAPI + asyncio)                               │
-  <robot-ip>  ◀──MQTT────┤   transport_local.py (read-only) · cloud.py (yarbo-data-sdk)         │
+                         │  core (Python 3.12, FastAPI + asyncio)                               │
+                         │   link.py → cloud.py (yarbo-data-sdk) · commands.py (allow-lists)    │
                          │   recorder.py · runs.py · mapstudio.py · mapwrite.py · scheduler.py  │
   Yarbo cloud ◀──TLS─────┤   control.py (+interlocks) · conditions.py · frigate.py · ha.py      │
    EMQX + data-api       │   mcp_server.py · imagery/ · elevation.py · store.py                 │
-                         │  SQLite in DATA_DIR: telemetry · runs · map/plan versions · captures │
+   └─ Yarbo robot        │  SQLite in DATA_DIR: telemetry · runs · map/plan versions · captures │
                          │                      · audit · settings                              │
                          │  web/ (plain JS, MapLibre GL, three.js for 3D), served by core       │
                          └──────────────────────────────────────────────────────────────────────┘
@@ -116,38 +117,41 @@ which says nothing about which dead end it is; such an answer is trusted only wh
 
 | Class | Route | Why |
 |---|---|---|
-| Telemetry, reads | local | Fast, no account needed |
-| Control (run commands) | local, the cloud as a fallback | Proved locally 2026-10-21 (§10.2); `app/link.py` |
-| Writes (map/plan/schedule) | cloud only for now | Local writes not proved yet (`link.LOCAL_WRITES_PROVED`) |
-| Capture | both at once | The app talks to the cloud; other local clients talk to the robot |
+| Telemetry, reads | cloud | The only route since firmware V3.14.4x closed the local broker (#91) |
+| Control (run commands) | cloud | `app/link.py`; sent once, never repeated or rerouted |
+| Writes (map/plan/schedule) | cloud | As captured from the app (`map-writes.md`) |
+| Capture | cloud | The app talks to the cloud; the panel listens to its own robot there |
 
-The local client's `request()` publishes only the `READ_ONLY_COMMANDS` allow-list (plus named compute-only requests
-such as the route preview) and raises before the network is touched for anything else. Its `command()` takes only
-the run commands and captured writes, never `cmd_vel`, and only `app/link.py` calls it. Reads also fall back to the
-cloud: after two unanswered local reads in a row they go through the cloud for 5 minutes. Transport health shows as chips in the top bar and as a Home Assistant sensor.
+`app.link.RobotLink` is the one doorway to `CloudTransport.publish`. Its `read()` takes only the `READ_ONLY_COMMANDS`
+allow-list in `app/commands.py` (plus named compute-only requests such as the route preview) and raises before the
+network is touched for anything else. Its `command()` takes only the run commands (called only by `Controller.send`)
+and `write_command()` only the captured writes (called only by `MapWriter`); `cmd_vel` is refused everywhere.
+Transport health shows as the Cloud chip in the top bar and as a Home Assistant sensor.
 
 ### 5.3 Cloud session
 The rotated refresh token is persisted after **every** refresh. A failed refresh means **needs sign-in**: stop
 reconnecting, raise a UI banner and a notification, and never connect with an expired JWT. Reconnects back off
 exponentially from 5 s to 5 min. Sign-in is interactive and the password is never stored; the session lives in
-`DATA_DIR` with owner-only permissions. The robot's serial is never typed in. It is read from the local
-`heart_beat` (once per broker address); with none heard, the account's robot list (SDK `get_devices()`, an account
-lookup, nothing sent to a robot) supplies it: one robot is used, several are offered in Settings → Robot. The serial
-found is kept in the `robot_sn` setting with its source, apart from the Settings values; a `heart_beat` serial always
-replaces an account one and is never replaced by one. The lookup runs under the refresh lock after a refresh, and a
-session the SDK refreshes on its own during it is saved.
+`DATA_DIR` with owner-only permissions. The robot's serial is never typed in. The account's robot list (SDK
+`get_devices()`, an account lookup, nothing sent to a robot) supplies it: one robot is used, several are offered in
+Settings → Robot. The serial found is kept in the `robot_sn` setting with its source, apart from the Settings values;
+the account replaces an older one (from the robot's `heart_beat` or typed in Settings, before firmware V3.14.4x
+closed the local broker). The lookup runs under the refresh lock after a refresh, and a session the SDK refreshes on
+its own during it is saved.
 
 ### 5.4 Keep-awake
-The phone app sends `set_working_state {"state":1}` about every 4 s while it is open. Local reads are answered
-while the robot is docked and idle without it, so the panel does not send it, with one exception: the robot streams
-its cameras only while someone sends it, so the Cameras tile asks for one every 4 s while it is open (§13).
+The phone app sends `set_working_state {"state":1}` about every 4 s while it is open. Reads were answered on the
+local broker while the robot was docked and idle without it, so the panel does not send it, with one exception: the
+robot streams its cameras only while someone sends it, so the Cameras tile asks for one every 4 s while it is open
+(§13).
 
 ### 5.5 Sharing the robot with the phone app
 The phone app keeps the robot awake (`set_working_state`) and sends its commands through the cloud broker. What
 happens when both sides command the robot at once is not fully known. The rule: **a start is refused while the phone
-app has been seen in the last 60 s** (`phone_app_quiet_s`). It is seen two ways: its keep-awake on the cloud, and,
-locally, the robot streaming `DeviceMSG` about once a second, which it does only while the app is connected (seen
-2026-10-21; the panel's own reads come back on `data_feedback`, so every `DeviceMSG` counts). A stream proves the app is open; without the cloud its absence is not yet taken as "closed" (unknown),
+app has been seen in the last 60 s** (`phone_app_quiet_s`). It is seen two ways: its keep-awake on the cloud, and the
+robot streaming `DeviceMSG` about once a second, which it does only while the app is connected (seen on the local
+broker 2026-10-21; the panel's own reads come back on `data_feedback`, so every `DeviceMSG` counts). A stream
+proves the app is open; without the cloud its absence is not yet taken as "closed" (unknown),
 and right after a route comes up the answer is unknown for the quiet window. Unknown blocks the starts nobody is
 watching (scheduler, assistant, guard resume); a start from the panel shows it. Observed so far: a pause from the app
 shows as paused at once, and a panel resume after an app pause is confirmed within a second.
@@ -347,9 +351,8 @@ Before a route is trusted for control it is proved with a harmless command:
 2. **Local control:** a harmless setting whose result the robot reports, on the local broker. Done 2026-10-21 with
    `set_sound_param` (as the app sends it): accepted, with no handshake and no cloud (`docs/dev/protocol.md` →
    Access control). Run commands work locally too (start, pause, stop and return to dock, each seen in the robot's
-   state within about 2 s, against up to a minute through the cloud on a weak link). The panel still sends them
-   through the cloud and `transport_local.py` still publishes only reads: moving commands to the local broker is a
-   design change of its own (#31 would then mostly disappear).
+   state within about 2 s, against up to a minute through the cloud on a weak link). Firmware V3.14.4x then closed
+   the local broker (#91), so the panel sends everything through the cloud.
 
 The control route follows the result; it is a code-level decision, not a setting a user can flip.
 
@@ -468,8 +471,8 @@ The panel does not get into the robot, and no video passes through the panel. It
 3. **Keeping it awake.** The robot streams only while someone sends the keep-awake the official app sends while it
    is open, `set_working_state {"state":1}` (`protocol.md`). It is a catalogue command like camera-on: each beat goes
    through `Controller.send` and `control.check` (robot online, a route, an audit row per beat), with a fixed payload
-   (`payload_for`), cloud only until `LOCAL_KEEPAWAKE_PROVED` (`RobotLink.command`), in `RUN_NEUTRAL` and not in
-   `SAFE_TO_REPEAT`. Its own checks: people only, state 1 only, Robot video on, and **within the time limit**. A beat's
+   (`payload_for`), through the cloud (`RobotLink.command`), in `RUN_NEUTRAL`, and sent once like every command.
+   Its own checks: people only, state 1 only, Robot video on, and **within the time limit**. A beat's
    checks read a light context (`Ops.beat_context`: the snapshot's age and the route, no awaits), so a beat every 4 s
    never holds the controller's lock across a Frigate or Home Assistant timeout. The audit rows of beats that went are
    left out of the log the Events page reads (`/api/control/log?beats=true` shows them), so they cannot push a Pause
@@ -652,9 +655,9 @@ the panel's write support are summarised in [`map-writes.md`](map-writes.md).
 
 ## 18. Security
 
-- **The robot's local broker is unauthenticated.** Anything on the same network can read the map and the robot's
-  live position. Put the robot on a segment where only the panel host (and Home Assistant, if it talks to the robot)
-  can reach its broker ports. The phone app uses the cloud, so such a rule does not break it.
+- **The robot's local broker was unauthenticated** on firmware before V3.14.4x, which closes it: anything on the same
+  network could read the map and the robot's live position. The panel does not use it. On older firmware, put the
+  robot on a segment nobody else can reach; the phone app uses the cloud, so such a rule does not break it.
 - **The panel:** LAN only by default. For remote access use an authenticating reverse proxy or a VPN; never a raw
   port forward.
 - **Secrets:** the Yarbo password is never stored; the cloud session is kept with owner-only permissions in
@@ -668,13 +671,13 @@ the panel's write support are summarised in [`map-writes.md`](map-writes.md).
 
 | Risk | Mitigation |
 |---|---|
-| Cloud control stops working for third-party clients | Routing is isolated in `cloud.py`; the SDK is pinned; the recorder needs only the local broker |
+| Cloud control stops working for third-party clients | Routing is isolated in `cloud.py`; the SDK is pinned; history is unaffected (no local route since #91) |
 | The phone app and the panel fight for the robot | §5.5 guard; confirmation by state change |
 | RTK gating would block every start | §10.3: the robot gates, the panel surfaces the refusal |
 | Gap detection flags RTK-float segments | §12: fixed-RTK only |
 | The panel is down, so nothing mows | §8.1: heartbeat alert, uptime monitor, phone app as fallback |
 | Frigate misses a person or pet | §11: additional to the robot's detection, never a replacement |
-| A firmware update closes the local broker | Reads degrade, history is unaffected, the firmware tracker alerts |
+| A firmware update closed the local broker (V3.14.4x, #91) | The panel is cloud only; the firmware tracker alerts on a change |
 | A firmware update renames telemetry fields | §6.3 tolerant ingestion; schema diff |
 | A bad map write | §7.4: docked only, validation, diff, read-back, undo, restore |
 | Session-expiry loops | §5.3 |
@@ -702,9 +705,9 @@ The panel was built in this order; each step works without the next.
 ## 21. Distribution
 
 - **Shape:** one Docker image (core + web), one SQLite file in a mounted `DATA_DIR`; a setup guide on first run.
-- **Setup guide:** robot address (local broker check) → Yarbo cloud sign-in (optional; only for commands and map
-  writes) → AI assistant (optional) → imagery → cameras → Home Assistant → weather → safety (recommended: control
-  off, yard must be clear, no resume after a guard pause) → notifications. Every step skippable.
+- **Setup guide:** Yarbo cloud sign-in (the robot's serial comes from the account) → AI assistant (optional) →
+  imagery → cameras → Home Assistant → weather → safety (recommended: control off, yard must be clear, no resume
+  after a guard pause) → notifications. Every step skippable.
 - **No household data in the repository:** no ids, addresses, serials or coordinates.
 - **Licence:** MIT (the Yarbo SDK is MIT). Not affiliated with Yarbo. Writes stay behind explicit opt-in and the
   safeguards above.

@@ -34,7 +34,6 @@ from .runtime import FOUND_SN, found_sn, valid_sn
 from .store import Store
 from .tempest import TempestListener
 from . import weather as weather_mod
-from .transport_local import LocalTransport, discover_sn
 
 log = logging.getLogger(__name__)
 
@@ -111,11 +110,6 @@ def waiting_for_fix(t: dict) -> bool:
     return not rpms or max(rpms) < BLADE_OFF_RPM
 
 
-def _log_failure(task: asyncio.Task) -> None:
-    if not task.cancelled() and task.exception():
-        log.warning("robot connection attempt failed: %s", task.exception())
-
-
 DEADEND_STALE_S = 60      # a timed-out dead-end settings read may still be answered this long after
 PLAN_JOIN_MAX_S = 36 * 3600   # a resume of the same plan session this long after the previous run still joins it
 FIRMWARE_SETTLE_S = 60    # a new firmware version counts once it has been reported this long without a break
@@ -123,21 +117,21 @@ FIRMWARE_SETTLE_S = 60    # a new firmware version counts once it has been repor
 
 class Recorder:
     sn: str | None = None            # the robot followed (set in __init__; a bare object made in a test has none)
+    received, last_message_at = 0, 0.0
 
     def __init__(self, cfg: Config, store: Store, imagery: Imagery, sn: str):
         self.cfg, self.store, self.imagery, self.sn = cfg, store, imagery, sn
         self.loop: asyncio.AbstractEventLoop | None = None
         self.queue: asyncio.Queue = asyncio.Queue()
-        self.transport: LocalTransport | None = None     # made by apply_robot() once there is an address
-        self.link = None             # app.link.RobotLink, set by Ops: reads fall back to the cloud through it
+        self.transport = None        # DEMO=1 only: the made-up robot (demo_robot.DemoTransport)
+        self.link = None             # app.link.RobotLink, set by Ops: every read goes through the Yarbo cloud
+        self.received = 0            # messages from the robot, and when the last one came
+        self.last_message_at = 0.0
+        self.reads_sent = 0
         self.foreign_cmds: dict[str, float] = {}   # PEOPLE_COMMANDS seen from other clients, by name
         self.app_stream_at = 0.0     # last unrequested DeviceMSG: the robot streams them only while the phone app is open
-        self.robot_error = ""                            # why there is no local connection
         self.on_sn: Callable[[str], None] | None = None  # told when the serial is found or changed (Ops follows)
         self._robot_lock = asyncio.Lock()
-        self._discover_at = 0.0
-        self._heard: tuple | None = None                 # (host, port, serial) last heard on a heart_beat
-        self._robot_task: asyncio.Task | None = None
         self._map_wake = asyncio.Event()                 # read the map now (another robot), not at the next refresh
         self._state_sn = sn              # the robot the live state belongs to (what _restore loads is the kept one's)
         self.started_at = time.time()
@@ -410,38 +404,33 @@ class Recorder:
             await asyncio.sleep(300)
 
     def can_read(self) -> bool:
-        """Some route can carry a read: the local broker, or (through the link) the cloud."""
+        """A read can go out: the Yarbo cloud is connected (or the demo robot, in tests without Ops)."""
         if self.link is not None:
             return self.link.read_route() is not None
         return bool(self.transport and self.transport.connected)
 
     def _send_read(self, cmd: str, payload: dict | None = None) -> str | None:
-        """Publish a read request the way the link says (local first, the cloud as a fallback)."""
+        """Publish a read request through the link (the Yarbo cloud)."""
         if self.link is not None:
-            return self.link.read(cmd, payload)
-        self.transport.request(cmd, payload)
-        return "local"
+            route = self.link.read(cmd, payload)
+        else:
+            self.transport.request(cmd, payload)
+            route = "demo"
+        self.reads_sent += 1         # counted once it went
+        return route
 
     async def request(self, cmd: str, timeout: float = 15, payload: dict | None = None, replies: tuple = ()):
         """Send a read request and wait for its data_feedback reply (on `cmd` or any of `replies`)."""
-        if not self.transport and not self.can_read():
-            raise ConnectionError(self.robot_error or "the robot is not set up")
+        if not self.can_read():
+            raise ConnectionError(self.robot_status()["error"] or "the robot is not set up")
         fut = self.loop.create_future()
         names = (cmd, *replies)
         for n in names:
             self._pending.setdefault(n, []).append(fut)
         self._sent[cmd] = time.time()
-        route = None
         try:
-            route = self._send_read(cmd, payload)
-            reply = await asyncio.wait_for(fut, timeout)
-            if self.link is not None:
-                self.link.note_read(cmd, route, True)
-            return reply
-        except asyncio.TimeoutError:
-            if self.link is not None:
-                self.link.note_read(cmd, route, False)
-            raise
+            self._send_read(cmd, payload)
+            return await asyncio.wait_for(fut, timeout)
         finally:
             for n in names:
                 waiters = self._pending.get(n, [])
@@ -579,7 +568,10 @@ class Recorder:
             return
         if self.sn and parts[1] != self.sn:
             return                       # another robot's (queued before a switch): never this one's state or reply
+        self.received += 1               # counted here, for the robot followed
         channel, name = parts[2], parts[3]
+        if channel == "device":
+            self.last_message_at = ts    # robot_status "heard": the robot itself, not an echo of a request on app/
         if channel == "app":
             if ours is None:
                 ours = self.own_echo(name, ts, data)          # decided here, once, for the session record and below
@@ -919,40 +911,18 @@ class Recorder:
                 self.run_stats.last_xy = last_xy
                 self._join_survey(prev["id"], merged_from)
 
-    # -- the robot connection (Settings → Robot, else the environment) -----------------------------------------
+    # -- the robot (Settings → Robot, else the environment) ---------------------------------------------------------
     async def apply_robot(self) -> dict:
-        """(Re)connect to the robot's local broker at the address in effect. The serial is never typed in: it is read
-        from heart_beat (once per broker) and kept. Safe to call again: the previous connection is dropped first."""
+        """Follow the serial the panel found before, so the cloud subscribes to that robot. With none kept yet, the
+        cloud finds it on the Yarbo account (app/cloud.py). DEMO=1 starts the made-up robot instead."""
         async with self._robot_lock:
-            host, port = self.cfg.yarbo_host, self.cfg.yarbo_port
-            old, self.transport = self.transport, None
-            if old:
-                await asyncio.to_thread(old.stop)        # joins paho's thread: not on the loop
-            self._discover_at = time.time()
             if getattr(self.cfg, "demo", False):
+                old, self.transport = self.transport, None
+                if old:
+                    await asyncio.to_thread(old.stop)    # joins the demo robot's thread: not on the loop
                 return self._apply_demo_robot()
-            if not host:
-                self._follow(found_sn(self.store).get("sn"))     # cloud-only: the cloud client still needs the serial
-                self.robot_error = "no robot address yet: set it in Settings → Robot"
-                return self.local_status()
-            heard = self._heard
-            sn = heard[2] if heard and heard[:2] == (host, port) else None   # heard earlier on this very broker
-            if not sn:
-                try:
-                    sn = await asyncio.to_thread(discover_sn, host, port, 20)
-                except Exception as exc:
-                    self.robot_error = f"no robot found at {host}:{port} ({exc})"
-                    log.warning(self.robot_error)
-                    self._follow(found_sn(self.store).get("sn"))  # the local broker is closed: the cloud still can
-                    return self.local_status()
-            self._heard = (host, port, sn)
-            self.keep_sn(sn, "heart_beat")
-            self._follow(sn)
-            self.transport = LocalTransport(host, port, sn, self._from_thread)
-            self.transport.start()
-            self.robot_error = ""
-            self.store.event("recorder_started", f"robot {sn} at {host}:{port}")
-            return self.local_status()
+            self._follow(found_sn(self.store).get("sn"))   # with none kept yet, the cloud finds it on the account
+            return self.robot_status()
 
     def _follow(self, sn: str | None) -> None:
         if sn and sn != self.sn:
@@ -989,11 +959,12 @@ class Recorder:
         self.plan, self.plan_at, self.run_plan = None, 0.0, None
         self.detector = RunDetector(self.cfg.run_idle_end_s)
         self.app_stream_at, self._stall_anchor = 0.0, None
+        self.received, self.last_message_at = 0, 0.0     # nothing heard from the next robot yet
         self._map_wake.set()
 
     def forget_account_sn(self, sn: str) -> None:
-        """The signed-in Yarbo account has no robot with serial `sn` (kept from an account): forget it and its state;
-        the cloud finds the robot on this account again. A serial found since (a heart_beat) is left alone."""
+        """The signed-in Yarbo account has no robot with serial `sn`: forget it and its state; the cloud finds the
+        robot on this account again. A serial kept since (another robot chosen meanwhile) is left alone."""
         if self.sn == sn and (self.run_id or self.plan_active() is True):
             # It started mowing after the cloud's check: keep it (the guards must go on watching) and send the
             # cloud back to it.
@@ -1001,35 +972,31 @@ class Recorder:
                 self.on_sn(sn)
             return
         kept = found_sn(self.store)
-        if kept.get("sn") == sn and kept.get("from") == "account":
+        if kept.get("sn") == sn:
             self.store.delete_setting(FOUND_SN)
             self.store.event("robot_found", "robot serial forgotten: not on the signed-in Yarbo account")
-        if self.sn == sn and not (self._heard and self._heard[2] == sn):     # heard locally: the robot itself
+        if self.sn == sn:
             self._forget_robot_state()
             self.sn, self._state_sn = None, None
 
-    def keep_sn(self, sn: str, source: str) -> bool:
-        """Keep a found serial so a restart while the local broker is closed still knows the robot. One heard on the
-        robot's heart_beat always wins: the account (or a serial once typed in Settings) never replaces it. Returns
-        whether `sn` is now the kept serial."""
+    def keep_sn(self, sn: str, source: str = "account") -> bool:
+        """Keep a found serial so a restart knows the robot without asking the account again. The Yarbo account is the
+        only source now, so it replaces whatever was kept (an older install may have one from the robot's heart_beat,
+        or typed in Settings). Returns whether `sn` is now the kept serial."""
         if getattr(self.cfg, "demo", False) or not valid_sn(sn):
             return False
-        kept = found_sn(self.store)
-        if kept.get("sn") == sn and (kept.get("from") == "heart_beat" or source != "heart_beat"):
+        if found_sn(self.store) == {"sn": sn, "from": source}:
             return True
-        if source != "heart_beat" and kept.get("from") == "heart_beat":
-            return False
         self.store.set_setting(FOUND_SN, {"sn": sn, "from": source})
         self.store.event("robot_found", f"robot serial kept (from the {source.replace('_', ' ')})")   # no value
         return True
 
-    def use_found_sn(self, sn: str) -> bool:
-        """The Yarbo account gave the serial (its only robot, or the one chosen in Settings → Robot): keep it and
-        follow it, unless the robot's own heart_beat already named another. Never while a run is open: the new
-        robot's telemetry would be recorded into the old robot's run."""
-        if self._heard and self._heard[2] != sn:
-            return False
-        if self.sn and self.sn != sn and self.run_id:
+    def use_found_sn(self, sn: str, chosen: bool = True) -> bool:
+        """The Yarbo account gave the serial: the one a person chose in Settings → Robot (`chosen`), or the account's
+        only robot, found by the cloud's own lookup. A lookup never replaces a robot already followed: a choice made
+        while it ran wins. Never while a run is open: the new robot's telemetry would be recorded into the old
+        robot's run."""
+        if self.sn and self.sn != sn and (not chosen or self.run_id):
             return False
         if not self.keep_sn(sn, "account"):
             return False
@@ -1051,21 +1018,32 @@ class Recorder:
                 self.on_sn(self.sn)
         self.transport = demo_robot.DemoTransport(self.sn, self._from_thread, robot)
         self.transport.start()
-        self.robot_error = ""
         self.store.event("recorder_started", f"demo robot {self.sn} (synthetic yard)")
-        return self.local_status()
+        return self.robot_status()
 
-    def local_status(self) -> dict:
-        t, now = self.transport, time.time()
-        host = self.cfg.yarbo_host
+    def robot_status(self) -> dict:
+        """The way to the robot (the Yarbo cloud, or the demo robot): connected, what came in, and why not."""
+        now, demo = time.time(), getattr(self.cfg, "demo", False)
+        if self.link is not None:
+            connected = self.link.read_route() is not None
+            error = "" if connected else f"Yarbo cloud {getattr(self.link.cloud, 'state', 'not set up')}"
+        else:
+            connected = bool(self.transport and self.transport.connected)
+            error = "" if connected else "not set up"
+        if not self.sn and not demo:
+            error = error or "waiting for the robot's serial"
+        # The cloud can be up while the robot is not: "heard" needs a message from the robot itself lately (the panel
+        # asks for its state every poll_idle_s, so twice that, and at least two minutes).
+        window = max(120.0, 2 * float(getattr(self.cfg, "poll_idle_s", 60) or 60))
+        heard = bool(connected and self.last_message_at and now - self.last_message_at < window)
         return {
-            "connected": bool(t and t.connected),
-            "host": "demo robot" if getattr(self.cfg, "demo", False) else f"{host}:{self.cfg.yarbo_port}" if host else None,
-            "last_message_age_s": round(now - t.last_message_at, 1) if t and t.last_message_at else None,
-            "received": t.received if t else 0,
-            "read_requests_sent": t.published if t else 0,
-            "commands_sent": getattr(t, "commands_sent", 0) if t else 0,
-            "error": self.robot_error or (t.last_error if t else "") or ("connecting" if t and not t.connected else ""),
+            "connected": connected,      # a route to the robot is up (reads can go out)
+            "heard": heard,              # and the robot itself has answered lately
+            "via": "demo robot" if demo else "Yarbo cloud",
+            "last_message_age_s": round(now - self.last_message_at, 1) if self.last_message_at else None,
+            "received": self.received,
+            "read_requests_sent": self.reads_sent,
+            "error": error,
         }
 
     async def apply_weather(self) -> None:
@@ -1141,11 +1119,11 @@ class Recorder:
             s["unanswered"] += 1
             self._wifi_waiting = w = None
         # never within WIFI_DUP_S of the last answer: anything arriving then is that answer's repeat, not ours
-        if (w is None and self.transport and self.transport.connected and now - self._wifi_asked >= WIFI_POLL_S
+        if (w is None and self.can_read() and now - self._wifi_asked >= WIFI_POLL_S
                 and now - self._wifi_answer_at >= WIFI_DUP_S):
             try:
                 self._sent["get_wifi_list"] = self._wifi_asked = now
-                self.transport.request("get_wifi_list")
+                self._send_read("get_wifi_list")
                 self._wifi_waiting = (now, self.t.get("x"), self.t.get("y"))
                 s["asked"] += 1
             except Exception as exc:
@@ -1265,14 +1243,9 @@ class Recorder:
         while True:
             await asyncio.sleep(1)
             now = time.time()
-            if not self.transport:
-                # The robot was off or unset at start: look for it again every minute until it answers.
-                if self.cfg.yarbo_host and now - self._discover_at > 60 and not self._robot_lock.locked():
-                    self._robot_task = asyncio.create_task(self.apply_robot())
-                    self._robot_task.add_done_callback(_log_failure)
-                if not self.can_read():
-                    continue
             readable = self.can_read()
+            if not readable:
+                continue
             if readable and (self.run_id or self._plan_due or plan_flags_active(self.t)):
                 if now - self._plan_asked > (5 if self._plan_due else PLAN_POLL_S):
                     self._plan_asked, self._plan_due = now, False
@@ -1632,9 +1605,7 @@ class Recorder:
             "snapshot_age_s": round(now - self.snapshot_at, 1) if self.snapshot_at else None,
             "heartbeat_age_s": round(now - self.heartbeat_at, 1) if self.heartbeat_at else None,
             "transport": {
-                "local": {
-                    **self.local_status(),
-                },
+                "robot": self.robot_status(),
                 "cloud": {"note": "see ops.cloud in /api/status"},
             },
             "robot": {

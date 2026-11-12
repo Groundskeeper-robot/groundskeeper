@@ -9,10 +9,10 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-from app import auth, control, link as link_mod, main, mcp_server, ops as ops_mod, recorder
+from app import auth, control, main, mcp_server, ops as ops_mod, recorder
 from app.link import NoRoute, RobotLink
 from app.recorder import Recorder
-from app.transport_local import ReadOnlyViolation, check_command
+from app.commands import ReadOnlyViolation, check_command
 from app.store import Store
 from tests.fakelink import FakeLink
 from tests.test_link import FakeCloud as LinkCloud, FakeRec as LinkRec
@@ -200,10 +200,10 @@ def test_a_missing_route_says_so_and_sends_nothing(t):
 
 
 # -- point 1: it goes through check() and Controller.send like any command --------------------------------------------
-def test_it_is_in_the_catalogue_with_a_fixed_payload_and_kept_out_of_the_repeats():
+def test_it_is_in_the_catalogue_with_a_fixed_payload():
     assert KA in control.CATALOGUE and control.CATALOGUE[KA]["args"] == ()
     assert control.payload_for(KA, {"state": 0, "x": 1}) == {"state": 1}
-    assert KA in control.RUN_NEUTRAL and KA not in control.SAFE_TO_REPEAT and KA not in control.CONFIRM
+    assert KA in control.RUN_NEUTRAL and KA not in control.CONFIRM
 
 
 def test_each_beat_gets_the_online_and_route_interlocks_and_an_audit_row(t):
@@ -243,17 +243,16 @@ def test_a_token_or_an_assistant_cannot_send_it_through_the_general_route(t):
 
 def test_it_is_run_neutral_like_the_camera_switch(t):
     ready(t)
-    seq, human = t.controller._seq, t.controller.last_human_cmd_at
+    human = t.controller.last_human_cmd_at
     assert play(t).json()["sent"] is True
-    assert t.controller._seq == seq and t.controller.last_human_cmd_at == human and t.controller.last is None
+    assert t.controller.last_human_cmd_at == human and t.controller.last is None
 
 
-def test_the_local_broker_check_has_no_special_case_for_it():
+def test_the_command_check_has_no_special_case_for_it():
     import inspect
-    from app import transport_local
+    from app import commands
     assert list(inspect.signature(check_command).parameters) == ["cmd"]
-    assert "set_working_state" not in inspect.getsource(transport_local) and "KEEP_AWAKE" not in \
-        inspect.getsource(transport_local)
+    assert "set_working_state" not in inspect.getsource(commands) and "KEEP_AWAKE" not in inspect.getsource(commands)
     check_command(KA)                                                  # allowed as a catalogue command
     with pytest.raises(ReadOnlyViolation):
         check_command("cmd_vel")
@@ -301,8 +300,7 @@ def test_another_press_starts_the_window_again(t):
     assert beat(t).json()["sent"] is True
 
 
-@pytest.mark.parametrize("change", [{"snapshot_age_s": 500}, {"snapshot_age_s": None}, {"route_state": "offline"},
-                                    {"cloud_route": False}])
+@pytest.mark.parametrize("change", [{"snapshot_age_s": 500}, {"snapshot_age_s": None}, {"route_state": "offline"}])
 def test_the_robot_going_offline_ends_the_window(t, change):
     ready(t)
     assert play(t).json()["sent"] is True
@@ -402,31 +400,24 @@ def test_a_stop_nobody_noticed_is_said_when_the_next_beat_arrives(t):
 
 
 # -- the link --------------------------------------------------------------------------------------------------------
-def _link(tmp_path, mode=None):
+def _link(tmp_path):
     store = Store(str(tmp_path))
-    if mode:
-        store.set_setting("robot_route", mode)
     rec, cl, marked = LinkRec(), LinkCloud(), []
     return RobotLink(rec, cl, store, mark_sent=marked.append), rec, cl, marked
 
 
-def test_the_keep_awake_goes_through_the_cloud_only_and_is_marked_as_ours(tmp_path):
+def test_the_keep_awake_goes_through_the_cloud_and_is_marked_as_ours(tmp_path):
     lk, rec, cl, marked = _link(tmp_path)
     assert lk.command(KA, {"state": 1}) == "cloud"
-    assert cl.sent == [KA] and rec.transport.commands == [] and marked == [KA]
+    assert cl.sent == [KA] and marked == [KA]
 
 
-def test_the_keep_awake_waits_for_a_proved_local_route(tmp_path, monkeypatch):
-    lk, rec, cl, _ = _link(tmp_path, mode="local")
-    with pytest.raises(NoRoute):
-        lk.command(KA, {"state": 1})
-    lk.store.set_setting("robot_route", "auto")
+def test_no_keep_awake_while_the_cloud_is_down(tmp_path):
+    lk, rec, cl, _ = _link(tmp_path)
     cl.state, cl.connected = "signed out", False
     with pytest.raises(NoRoute):
         lk.command(KA, {"state": 1})
-    assert cl.sent == [] and rec.transport.commands == []
-    monkeypatch.setattr(link_mod, "LOCAL_KEEPAWAKE_PROVED", True)
-    assert lk.command(KA, {"state": 1}) == "local" and rec.transport.commands == [KA]
+    assert cl.sent == []
 
 
 @pytest.mark.parametrize("payload", [{"state": 0}, {}, {"state": 1, "x": 1}, {"state": True}, {"state": 1.0},
@@ -435,7 +426,7 @@ def test_the_link_refuses_any_keep_awake_payload_but_state_1(tmp_path, payload):
     lk, rec, cl, _ = _link(tmp_path)
     with pytest.raises(NoRoute):
         lk.command(KA, payload)
-    assert cl.sent == [] and rec.transport.commands == []
+    assert cl.sent == []
 
 
 def test_a_beat_does_not_replace_the_links_last_command(tmp_path):
@@ -743,9 +734,9 @@ def test_a_beat_reads_the_light_context_and_never_waits_on_frigate_or_home_assis
         raise AssertionError("a beat must not build the full context (Frigate, Home Assistant)")
 
     t.controller._context = slow_context
-    t.controller.light_context = lambda: {"snapshot_age_s": 3, "route_state": "connected", "cloud_route": True}
+    t.controller.light_context = lambda: {"snapshot_age_s": 3, "route_state": "connected"}
     assert play(t).json()["sent"] is True
-    t.controller.light_context = lambda: {"snapshot_age_s": 600, "route_state": "connected", "cloud_route": True}
+    t.controller.light_context = lambda: {"snapshot_age_s": 600, "route_state": "connected"}
     t.clock[0] += 4
     assert beat(t).json()["ended"] is True                             # its checks still see the robot go offline
 
@@ -755,8 +746,8 @@ def test_the_ops_beat_context_has_what_the_checks_read_and_no_awaits():
     assert not inspect.iscoroutinefunction(ops_mod.Ops.beat_context)
     o = ops_mod.Ops.__new__(ops_mod.Ops)
     o.rec = SimpleNamespace(snapshot_at=None)
-    o.link = SimpleNamespace(state="connected", cloud_only_ok=lambda: True)
-    assert o.beat_context() == {"snapshot_age_s": None, "route_state": "connected", "cloud_route": True}
+    o.link = SimpleNamespace(state="connected")
+    assert o.beat_context() == {"snapshot_age_s": None, "route_state": "connected"}
 
 
 def test_the_events_log_leaves_out_the_beats_that_went_but_keeps_refusals(t):

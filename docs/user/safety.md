@@ -26,8 +26,7 @@ Each one is checked, in order:
 
 1. It is one of those commands.
 2. Control is on.
-3. The robot is online (data under 2 minutes old) and the panel can reach it: on your network, or through the
-   Yarbo cloud as a fallback.
+3. The robot is online (data under 2 minutes old) and the panel can reach it through the Yarbo cloud.
 4. For a start, also: the plan exists, no active error, enough battery, not already running, the yard is clear on
    the cameras, the phone app is not driving it, the lawn is dry, and someone is home.
 5. For a start or a resume: no map, settings or Wi-Fi change is being written to the robot (a Wi-Fi join can take

@@ -5,9 +5,8 @@ Every request passes, in order:
    manual drive, is refused),
 2. the master switch (setting `control_enabled`, default False),
 3. the interlocks for that command (§10.3), enforced here and not only in the UI,
-then goes out through app.link.RobotLink (the robot's local broker first, the Yarbo cloud as a fallback) and is
-written to the audit log with its route and result, whatever happened. The robot accepts run commands on its local
-broker with no handshake (§10.2, proved 2026-10-21).
+then goes out through app.link.RobotLink (the Yarbo cloud, the only route to the robot) and is written to the audit
+log with its route and result, whatever happened.
 
 The robot sends no reply to run commands (seen 2026-10-05: nothing for start_plan or pause on either broker), so a
 command is confirmed by the robot's state changing the way the command should change it (CONFIRM below).
@@ -45,8 +44,8 @@ KEEP_AWAKE_MIN_S = 3.0        # at most one beat this often from the panel, whoe
 KEEP_AWAKE_GAP_S = 15.0       # no beat this long = the watching has stopped; the next beat is a new start
 KEEP_AWAKE_MAX_S = 15 * 60    # one press of play keeps the robot awake at most this long; then a person presses again
 KEEP_AWAKE_JITTER_S = 1.0     # each beat waits a random 0..this first, so the app's beats cannot stay in step (§13)
-# A refusal on one of these ends the window: the robot went offline or out of reach (the cloud too), or the time is up.
-KEEP_AWAKE_ENDS_ON = ("Robot online", "Route to the robot", "Cloud route", "Within the time limit")
+# A refusal on one of these ends the window: the robot went offline or out of reach, or the time is up.
+KEEP_AWAKE_ENDS_ON = ("Robot online", "Route to the robot", "Within the time limit")
 # Set only while Controller.keep_awake is sending (per task): a keep-awake from anywhere else (/api/control/send, say)
 # has no window, so it is refused, and every beat gets the rate limit and the jitter.
 _IN_BEAT = contextvars.ContextVar("keep_awake_beat", default=False)
@@ -142,12 +141,6 @@ def check(cmd: str, args: dict, ctx: dict, cfg: dict, actor: str) -> list[dict]:
             add("Someone home (Alarmo)", ctx["presence"] is True,
                 {True: "yes", False: "Alarmo armed away", None: "unknown"}[ctx["presence"]])
         return out
-    if cmd in ("smart_vision_control", KEEP_AWAKE):
-        # Both go only through the cloud for now (link.CLOUD_ONLY_ON), so a preview must not say it would send with
-        # only the local broker up. Unknown fails closed.
-        cr = ctx.get("cloud_route") is True
-        add("Cloud route", cr, "the Yarbo cloud is connected" if cr
-            else "these go through the Yarbo cloud only for now, and it is not available")
     if cmd == "smart_vision_control":
         # Allowed idle or running, like pause, stop and dock: it only starts the robot's video, so the route and
         # online checks are all it needs. The one extra rule is that "on" is the only thing that can be asked for.
@@ -243,26 +236,19 @@ def verdict(checks: list[dict], override: bool) -> tuple[bool, str]:
     return True, "ok"
 
 
-# Commands that are safe to send twice: if one is not seen in the robot's state within REROUTE_AFTER_S, it goes once
-# more by the other route (local <-> cloud). A start or a resume is never repeated: a late first one plus a second
-# could restart a plan.
-SAFE_TO_REPEAT = ("pause", "stop", "cmd_recharge")
-REROUTE_AFTER_S = 10
-# Commands that say nothing about the run: they never stand down another command's repeat (_seq), never count as a
-# person stepping in (last_human_cmd_at) and never replace the status stream's `last` (a Pause's result stays visible).
+# Commands that say nothing about the run: they never count as a person stepping in (last_human_cmd_at) and never
+# replace the status stream's `last` (a Pause's result stays visible).
 RUN_NEUTRAL = frozenset({"smart_vision_control", KEEP_AWAKE})
 
 
 class Controller:
     def __init__(self, store, link, context_fn, expect_reply_fn, state_fn=None):
-        """link: app.link.RobotLink (command, other_route, note_command, state).
+        """link: app.link.RobotLink (command, state).
         context_fn(args) -> ctx dict (async). expect_reply_fn(cmd) -> Future resolved by the matching data_feedback; registered BEFORE
         publishing so a fast reply cannot be missed. state_fn() -> the robot's latest flat telemetry, used to confirm
         a command took effect (None = no confirmation)."""
         self.store = store
         self.link = link
-        self._seq = 0                     # bumped by every command sent: a reroute waiting on an older one stands down
-        self.others_at = lambda cmd: 0.0  # last command from someone else, other than `cmd`; set by Ops
         self._context, self._expect, self._state = context_fn, expect_reply_fn, state_fn
         self._lock = asyncio.Lock()
         self.poll_s = 0.5
@@ -469,12 +455,8 @@ class Controller:
                 if cmd in ("start_plan", "resume"):
                     self.start_out = {"cmd": cmd, "at": time.time()}   # before the send: a send that fails half-way holds too
                 route = self.link.command(cmd, payload)
-                # A run-neutral command (RUN_NEUTRAL) must not bump _seq (a pause or dock still waiting to be seen
-                # would stand down its other-route repeat) nor look like a person taking over (the guards,
+                # A run-neutral command (RUN_NEUTRAL) must not look like a person taking over (the guards,
                 # ops._people_cmd_at, would stop retrying a pause or dock that didn't take).
-                if cmd not in RUN_NEUTRAL:
-                    self._seq += 1
-                self._spawn(self._follow_up(cmd, payload, args, route, self._seq, actor))
                 if actor != "guard" and cmd not in RUN_NEUTRAL:
                     self.last_human_cmd_at = time.time()
                 result = {"sent": True, "cmd": cmd, "payload": payload, "checks": checks, "route": route}
@@ -512,52 +494,3 @@ class Controller:
             self._tasks.add(task)                       # keep a reference until it finishes
             task.add_done_callback(self._tasks.discard)
         return result
-
-    def _spawn(self, coro) -> None:
-        task = asyncio.get_running_loop().create_task(coro)
-        self._tasks.add(task)
-        task.add_done_callback(self._tasks.discard)
-
-    async def _follow_up(self, cmd: str, payload: dict, args: dict, route: str, seq: int, actor: str) -> None:
-        """After a send, watch the robot's state for up to LATE_WATCH_S. A pause, stop or return to dock not seen
-        within REROUTE_AFTER_S goes once more by the other route: under the lock, only while control is on, no newer
-        command was sent from here and nobody else (the phone app, another client) has sent one since, and logged like
-        any other send. A start or a resume is never repeated. The outcome feeds the link: a command never seen in the
-        whole window counts against the route it went (a robot acting late, within the window, does not); a rerouted
-        one that was then seen tells nothing about the first route and is not counted."""
-        timeout, test, meaning = CONFIRM.get(cmd, (15, None, ""))
-        if test is None or self._state is None:
-            return
-        safe, start, rerouted = cmd in SAFE_TO_REPEAT, time.time(), False
-        while time.time() - start < LATE_WATCH_S:
-            await asyncio.sleep(self.poll_s)
-            if self._seq != seq or self.others_at(cmd) > start:
-                return                                   # a newer command (ours or someone else's): stand down
-            if test(self._state() or {}):
-                if not rerouted:
-                    self.link.note_command(route, True)
-                return
-            elapsed = time.time() - start
-            if safe and not rerouted and elapsed > timeout:
-                rerouted = True                          # too late to repeat it now; keep watching for the outcome
-            if safe and not rerouted and elapsed >= REROUTE_AFTER_S:
-                async with self._lock:
-                    if self._seq != seq or self.others_at(cmd) > start or not self.enabled():
-                        return
-                    if test(self._state() or {}):
-                        self.link.note_command(route, True)
-                        return
-                    other = self.link.other_route(route)
-                    if other is None:
-                        continue
-                    rerouted = True
-                    try:
-                        self.link.command(cmd, payload, route=other)
-                        result = {"sent": True, "cmd": cmd, "payload": payload, "route": other, "rerouted_from": route}
-                        note = f"{cmd}: not seen {time.time() - start:.0f} s after going {route}; sent again through {other}"
-                    except Exception as exc:
-                        result = {"sent": False, "cmd": cmd, "error": str(exc), "rerouted_from": route}
-                        note = f"{cmd}: not seen after going {route}; {other} failed too ({exc})"
-                    self.store.log_control(f"{actor} (rerouted)", other, cmd, json.dumps(args), result)
-                    self.store.event("command_rerouted", note)
-        self.link.note_command(route, False)             # never seen in the whole window
