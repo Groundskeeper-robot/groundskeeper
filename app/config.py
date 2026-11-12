@@ -13,7 +13,6 @@ def _num(name: str, default: float) -> float:
 class Config:
     yarbo_host: str | None
     yarbo_port: int
-    yarbo_sn: str | None
     data_dir: str
     port: int
     poll_idle_s: float
@@ -37,7 +36,6 @@ def load() -> Config:
     return Config(
         yarbo_host=None if demo else os.environ.get("YARBO_HOST", "").strip() or None,
         yarbo_port=int(_num("YARBO_PORT", 1883)),
-        yarbo_sn=None if demo else os.environ.get("YARBO_SN", "").strip() or None,
         data_dir=os.environ.get("DATA_DIR", "./data"),
         port=int(_num("PORT", 8425)),
         poll_idle_s=_num("POLL_IDLE_S", 60),

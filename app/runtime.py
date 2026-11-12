@@ -15,7 +15,7 @@ from .config import Config
 
 # group -> {field in the API: attribute on Config}
 GROUPS: dict[str, dict[str, str]] = {
-    "robot": {"host": "yarbo_host", "port": "yarbo_port", "sn": "yarbo_sn"},
+    "robot": {"host": "yarbo_host", "port": "yarbo_port"},
     "frigate": {"url": "frigate_url"},
     "home_assistant": {"url": "ha_url", "token": "ha_token"},
     "weather": {"tempest_port": "tempest_port"},
@@ -23,7 +23,7 @@ GROUPS: dict[str, dict[str, str]] = {
               "map_refresh_s": "map_refresh_s", "raw_every_s": "raw_every_s", "raw_keep_days": "raw_keep_days",
               "run_idle_end_s": "run_idle_end_s"},
 }
-ENV_NAMES = {"yarbo_host": "YARBO_HOST", "yarbo_port": "YARBO_PORT", "yarbo_sn": "YARBO_SN", "frigate_url": "FRIGATE_URL",
+ENV_NAMES = {"yarbo_host": "YARBO_HOST", "yarbo_port": "YARBO_PORT", "frigate_url": "FRIGATE_URL",
              "ha_url": "HA_URL", "ha_token": "HA_TOKEN", "tempest_port": "TEMPEST_PORT", "panel_url": "PANEL_URL",
              "poll_idle_s": "POLL_IDLE_S", "poll_active_s": "POLL_ACTIVE_S", "map_refresh_s": "MAP_REFRESH_S",
              "raw_every_s": "RAW_EVERY_S", "raw_keep_days": "RAW_KEEP_DAYS", "run_idle_end_s": "RUN_IDLE_END_S"}
@@ -31,7 +31,7 @@ SECRETS = {("home_assistant", "token")}
 # DEMO=1 talks to no robot, Home Assistant, Frigate or Tempest: these groups keep the environment's (empty) values.
 DEMO_LOCKED = ("robot", "frigate", "home_assistant", "weather")
 # false stored here means "switched off", even when the environment has a value
-OFFABLE = {("robot", "host"), ("robot", "sn"), ("frigate", "url"), ("home_assistant", "url"), ("home_assistant", "token"),
+OFFABLE = {("robot", "host"), ("frigate", "url"), ("home_assistant", "url"), ("home_assistant", "token"),
            ("panel", "url")}
 log = logging.getLogger(__name__)
 _ATTR = {attr: (group, field) for group, fields in GROUPS.items() for field, attr in fields.items()}
@@ -70,7 +70,6 @@ def _text(v, what: str, pattern: re.Pattern | None = None, example: str = "") ->
 VALIDATE = {
     ("robot", "host"): lambda v: _text(v, "the robot address", _HOST, "192.0.2.50"),
     ("robot", "port"): lambda v: _number(v, 1, 65535, "the port", integer=True),
-    ("robot", "sn"): lambda v: _text(v, "the serial", _SN, "YB0000DEMO0001"),
     ("frigate", "url"): lambda v: _url(v, "the Frigate address"),
     ("home_assistant", "url"): lambda v: _url(v, "the Home Assistant address"),
     ("home_assistant", "token"): lambda v: _text(v, "the token"),
@@ -83,6 +82,22 @@ VALIDATE = {
     ("panel", "raw_keep_days"): lambda v: _number(v, 1, 3650, "raw snapshot retention", integer=True),
     ("panel", "run_idle_end_s"): lambda v: _number(v, 30, 3600, "the run idle timeout"),
 }
+
+
+# The robot's serial is never typed in: the panel finds it, on the robot's heart_beat (local broker) or on the Yarbo
+# account (the cloud), and keeps it here (not with the settings above) so a restart while the local broker is closed
+# still knows the robot. {"sn": ..., "from": "heart_beat" | "account" | "settings"}; a heart_beat serial always wins.
+FOUND_SN = "robot_sn"
+
+
+def valid_sn(v) -> bool:
+    return isinstance(v, str) and bool(_SN.match(v))
+
+
+def found_sn(store) -> dict:
+    """The kept serial and where it came from, or {}."""
+    got = store.setting(FOUND_SN)
+    return got if isinstance(got, dict) and valid_sn(got.get("sn")) else {}
 
 
 def _check(group: str, field: str, v):
@@ -102,6 +117,8 @@ class Runtime:
         self.store = store
         self._stored: dict = {}
         raw = store.setting("integrations") or {}
+        if isinstance(raw, dict) and isinstance(raw.get("robot"), dict) and "sn" in raw["robot"]:
+            self._move_typed_sn(raw)
         for group, fields in (raw.items() if isinstance(raw, dict) else []):
             if group not in GROUPS or not isinstance(fields, dict):
                 continue
@@ -115,6 +132,17 @@ class Runtime:
                     continue
                 if clean is not None:
                     self._stored.setdefault(group, {})[field] = clean
+
+    def _move_typed_sn(self, raw: dict) -> None:
+        """Before serials were only found, one could be typed in Settings → Robot. Keep it as a found serial (a
+        heart_beat still replaces it) and drop it from the settings, once."""
+        typed = raw["robot"].pop("sn")
+        if valid_sn(typed) and not found_sn(self.store) and not getattr(self.env, "demo", False):
+            self.store.set_setting(FOUND_SN, {"sn": typed.strip(), "from": "settings"})
+        if not raw["robot"]:
+            raw.pop("robot")
+        self.store.set_setting("integrations", raw)
+        log.info("the robot's serial is now found, not set: moved out of Settings → Robot")
 
     def __getattr__(self, name: str):
         if name in ("env", "store", "_stored"):

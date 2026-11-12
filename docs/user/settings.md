@@ -10,7 +10,7 @@ It is open when you go to Settings and closes once you choose a section.
 | Section | What it holds |
 |---|---|
 | [Set up](#settings/setup) | The first-run guide: every step below in order, with what each is for ([more](#help/setup)) |
-| [Robot](#settings/robot) | Find the robot on your network or type its address; port and serial; the Yarbo cloud sign-in; the Wi-Fi survey |
+| [Robot](#settings/robot) | Find the robot on your network or type its address; the port; the Yarbo cloud sign-in; the Wi-Fi survey |
 | [Safety](#settings/safety) | The control and map writing switches ([more](#help/safety)) |
 | [Run rules](#settings/rules) | What must be true to start, and what each guard does during a run |
 | [Lawn conditions](#settings/lawn) | Weather from the Tempest and/or Home Assistant, soil moisture, units, the dry / damp / wet rules and the last 24 h |
@@ -130,11 +130,11 @@ logged; only the session is kept on the server. It is optional: the panel reads 
 network, and uses the cloud only as a fallback when the robot can't be reached there (Settings → Robot → Route to
 the robot shows which way each goes).
 
-The cloud needs the robot's serial. It is read from the robot on your network; when that is closed, the panel asks
-your Yarbo account which robots it has and uses the only one (several: the card lists them, press **Use this** on
-yours). A serial found either way is saved under Advanced: port and serial, so a restart still knows the robot. While
-none is known the card says **waiting for the robot's serial**; type it under Advanced, or set Route to the robot to
-**Yarbo cloud only** and sign in.
+The cloud needs the robot's serial. You never type it: it is read from the robot on your network, and when that is
+closed the panel asks your Yarbo account which robots it has and uses the only one (several: the card lists them,
+press **Use this** on yours). The serial found is kept, so a restart still knows the robot. The one the robot itself
+announces on your network always wins over the account's. While none is known the card says **waiting for the
+robot's serial**: give the panel the robot's address, or sign in to the Yarbo account the robot is on.
 
 ### Robot video
 

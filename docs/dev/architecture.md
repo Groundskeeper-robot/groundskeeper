@@ -350,7 +350,7 @@ own resolution (at most 4096 px a side), and keeps it.
 
 ## Configuration
 
-Everything site-specific is set in the panel: **Settings → Robot** (the robot's address, port and serial),
+Everything site-specific is set in the panel: **Settings → Robot** (the robot's address and port; the serial is always found, never set),
 **AI assistant** (optional, recommended next: a token and connect snippets so an MCP client such as Claude can do
 the rest by conversation, including finding the most detailed imagery for the yard),
 **Cameras** (Frigate), **Home Assistant** (address and token), **Lawn conditions** (the Tempest UDP port),
@@ -366,7 +366,6 @@ Compose stack reads; the stack file itself holds nothing site-specific.
 |---|---|---|
 | `YARBO_HOST` | unset | The robot's LAN address (or set it in Settings → Robot) |
 | `YARBO_PORT` | 1883 | Its broker port |
-| `YARBO_SN` | discovered | Serial; found from `heart_beat` when unset |
 | `DATA_DIR` | `./data` | SQLite and imagery cache |
 | `PORT` | 8425 | HTTP port |
 | `POLL_IDLE_S` / `POLL_ACTIVE_S` | 60 / 2 | Ask for a snapshot when ours is older than this |

@@ -11,6 +11,7 @@ import hashlib
 import json
 import logging
 import math
+import os
 import re
 import secrets
 import time
@@ -48,7 +49,7 @@ from .imagery.discover import discover
 from . import mcp_server
 from .ops import Ops
 from .recorder import Recorder
-from .runtime import GROUPS, Runtime
+from .runtime import GROUPS, Runtime, found_sn
 from .store import Store
 from .transport_local import discover_sn
 
@@ -88,7 +89,10 @@ async def lifespan(app: FastAPI):
         from . import demo
         demo.prepare(store)
     cfg = Runtime(env, store)                    # Settings → integrations over the environment
-    sn = cfg.yarbo_sn or None                    # else the recorder reads it from the robot's heartbeat
+    # Never typed in: the serial the panel found before (heart_beat or Yarbo account), else it is found again.
+    sn = None if env.demo else found_sn(store).get("sn")
+    if os.environ.get("YARBO_SN", "").strip():
+        log.warning("YARBO_SN is no longer used: the panel finds the robot's serial itself")
     imagery = Imagery(env.data_dir)
     imagery.adopt_custom((store.setting("imagery_source") or {}).get("custom"))
     imagery.configure(store.setting("imagery_source"), store.setting("imagery_keys"), store.setting("imagery_context") or {})
@@ -1389,6 +1393,19 @@ async def put_integration(request: Request, group: str, value: dict = Body(...))
 
 
 _SCAN_LOCK = asyncio.Lock()
+
+
+@app.post("/api/robot/account")
+async def robot_from_account(request: Request, body: dict = Body(...)):
+    """Settings → Robot → Yarbo cloud, when the account has several robots: follow the one chosen. Only a serial the
+    account itself listed is taken; none is ever typed in. Nothing is sent to a robot."""
+    sn = (body or {}).get("sn")
+    o = ops(request)
+    if not any(d.get("sn") == sn for d in o.cloud.devices):
+        raise HTTPException(400, "that robot is not on the signed-in Yarbo account")
+    if not rec(request).use_found_sn(sn):
+        raise HTTPException(409, "the panel already hears another robot on its local network")
+    return {"ok": True}
 
 
 @app.post("/api/robot/discover")

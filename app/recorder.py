@@ -30,6 +30,7 @@ from .ha import HAPublisher, entities_from
 from .imagery import Imagery
 from .runs import (ACTIVITY_LABELS, HELD, PAUSE_CAP_S, PROGRESSING, PlanStatus, RunDetector, RunStats, activity,
                    end_reason, is_moving, parse_plan_feedback, plan_flags_active, progressing)
+from .runtime import FOUND_SN, found_sn, valid_sn
 from .store import Store
 from .tempest import TempestListener
 from . import weather as weather_mod
@@ -133,7 +134,7 @@ class Recorder:
         self.on_sn: Callable[[str], None] | None = None  # told when the serial is found or changed (Ops follows)
         self._robot_lock = asyncio.Lock()
         self._discover_at = 0.0
-        self._applied: tuple | None = None               # (host, port) the current serial was found on
+        self._heard: tuple | None = None                 # (host, port, serial) last heard on a heart_beat
         self._robot_task: asyncio.Task | None = None
         self.started_at = time.time()
 
@@ -888,10 +889,10 @@ class Recorder:
 
     # -- the robot connection (Settings → Robot, else the environment) -----------------------------------------
     async def apply_robot(self) -> dict:
-        """(Re)connect to the robot's local broker at the address in effect, finding the serial from heart_beat when
-        none is configured. Safe to call again: the previous connection is dropped first."""
+        """(Re)connect to the robot's local broker at the address in effect. The serial is never typed in: it is read
+        from heart_beat (once per broker) and kept. Safe to call again: the previous connection is dropped first."""
         async with self._robot_lock:
-            host, port, sn = self.cfg.yarbo_host, self.cfg.yarbo_port, self.cfg.yarbo_sn
+            host, port = self.cfg.yarbo_host, self.cfg.yarbo_port
             old, self.transport = self.transport, None
             if old:
                 await asyncio.to_thread(old.stop)        # joins paho's thread: not on the loop
@@ -899,54 +900,58 @@ class Recorder:
             if getattr(self.cfg, "demo", False):
                 return self._apply_demo_robot()
             if not host:
-                if sn and sn != self.sn:                 # cloud-only: the cloud client still needs the serial
-                    self.sn = sn
-                    if self.on_sn:
-                        self.on_sn(sn)
+                self._follow(found_sn(self.store).get("sn"))     # cloud-only: the cloud client still needs the serial
                 self.robot_error = "no robot address yet: set it in Settings → Robot"
                 return self.local_status()
-            if not sn and self.sn and self._applied == (host, port):
-                sn = self.sn                             # found earlier on this very broker
+            heard = self._heard
+            sn = heard[2] if heard and heard[:2] == (host, port) else None   # heard earlier on this very broker
             if not sn:
                 try:
                     sn = await asyncio.to_thread(discover_sn, host, port, 20)
                 except Exception as exc:
                     self.robot_error = f"no robot found at {host}:{port} ({exc})"
                     log.warning(self.robot_error)
+                    self._follow(found_sn(self.store).get("sn"))  # the local broker is closed: the cloud still can
                     return self.local_status()
-            self._applied = (host, port)
-            self.keep_sn(sn)
-            if sn != self.sn:
-                self.sn = sn
-                if self.on_sn:
-                    self.on_sn(sn)
+            self._heard = (host, port, sn)
+            self.keep_sn(sn, "heart_beat")
+            self._follow(sn)
             self.transport = LocalTransport(host, port, sn, self._from_thread)
             self.transport.start()
             self.robot_error = ""
             self.store.event("recorder_started", f"robot {sn} at {host}:{port}")
             return self.local_status()
 
-    def keep_sn(self, sn: str) -> None:
-        """Keep a serial found on the robot's heart_beat or from the Yarbo account where a configured one is kept
-        (Settings → Robot), so a restart while the local broker is closed still knows the robot. A serial already set
-        (in Settings or the environment) is left alone."""
-        if not sn or self.cfg.yarbo_sn or not hasattr(self.cfg, "set"):
-            return
-        if self.cfg.stored("robot", "sn") is False:      # switched off in Settings: the person's choice stands
-            return
-        try:
-            if self.cfg.set("robot", {"sn": sn}):
-                self.store.event("settings_changed", "robot: sn (found by the panel)")    # names only, never values
-        except ValueError as exc:
-            log.warning("could not keep the robot's serial: %s", exc)
-
-    def use_found_sn(self, sn: str) -> None:
-        """The cloud found the serial on the account (one robot there): keep it and follow it."""
-        self.keep_sn(sn)
-        if sn != self.sn:
+    def _follow(self, sn: str | None) -> None:
+        if sn and sn != self.sn:
             self.sn = sn
             if self.on_sn:
                 self.on_sn(sn)
+
+    def keep_sn(self, sn: str, source: str) -> bool:
+        """Keep a found serial so a restart while the local broker is closed still knows the robot. One heard on the
+        robot's heart_beat always wins: the account (or a serial once typed in Settings) never replaces it. Returns
+        whether `sn` is now the kept serial."""
+        if getattr(self.cfg, "demo", False) or not valid_sn(sn):
+            return False
+        kept = found_sn(self.store)
+        if kept.get("sn") == sn and (kept.get("from") == "heart_beat" or source != "heart_beat"):
+            return True
+        if source != "heart_beat" and kept.get("from") == "heart_beat":
+            return False
+        self.store.set_setting(FOUND_SN, {"sn": sn, "from": source})
+        self.store.event("robot_found", f"robot serial kept (from the {source.replace('_', ' ')})")   # no value
+        return True
+
+    def use_found_sn(self, sn: str) -> bool:
+        """The Yarbo account gave the serial (its only robot, or the one chosen in Settings → Robot): keep it and
+        follow it, unless the robot's own heart_beat already named another."""
+        if self._heard and self._heard[2] != sn:
+            return False
+        if not self.keep_sn(sn, "account"):
+            return False
+        self._follow(sn)
+        return True
 
     def _apply_demo_robot(self) -> dict:
         """DEMO=1: the made-up robot (app/demo_robot.py) instead of any broker. It carries on the mow the demo history

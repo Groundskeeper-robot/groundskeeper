@@ -6,6 +6,8 @@
 * A failed refresh means "needs login": reconnecting stops, and the panel says so. It never connects with an
   expired JWT (the SDK swallows that failure; this module does not).
 * Reconnects back off from 5 s to 5 min.
+* One worker at a time. Each has its own stop event; a stopped worker that is still winding down (a connect can take
+  20 s) never installs its connection or writes the status, so a sign-in or restart starts the next one at once.
 * With no serial known (the robot's local broker is closed, nothing set in Settings → Robot), the account's own robot
   list (the SDK's get_devices(), an account lookup that sends the robot nothing) fills it: one robot is used, several
   are offered in Settings → Robot. While it waits the status says so, and the log says so once.
@@ -86,7 +88,6 @@ class CloudTransport:
     def login(self, email: str, password: str) -> None:
         """Blocking; call from a worker thread. The password is not kept anywhere."""
         self.stop()
-        self._join()                    # start() would return early while the old worker is still winding down
         with self._refresh_lock:        # a refresh in flight must not save over (or after) the new session
             self._client = None
             c = self._sdk()
@@ -110,8 +111,8 @@ class CloudTransport:
 
     # -- connection ------------------------------------------------------------------------------------------
     def start(self) -> None:
-        if self._thread and self._thread.is_alive():
-            return
+        if self._thread and self._thread.is_alive() and not self._stop.is_set():
+            return                            # already running; a stopped one winding down is simply replaced
         self._stop = threading.Event()        # each run has its own: a worker still winding down keeps the old one
         self._thread = threading.Thread(target=self._run, args=(self._stop,), name="yarbo-cloud", daemon=True)
         self._thread.start()
@@ -121,18 +122,10 @@ class CloudTransport:
         self._close_client()
 
     def restart(self) -> None:
-        """Drop the connection and connect again (after the robot's serial changed). Blocks while the old worker
-        finishes, so call it off the event loop."""
+        """Drop the connection and connect again (after the robot's serial changed)."""
         self.stop()
-        self._join()
         self.state = "reconnecting"
         self.start()
-
-    def _join(self) -> None:
-        """Wait for the old worker to finish (it may sit up to 20 s in _connect_once)."""
-        t = self._thread
-        if t and t.is_alive() and t is not threading.current_thread():
-            t.join(25)
 
     def _close_client(self) -> None:
         with self._lock:
@@ -162,8 +155,11 @@ class CloudTransport:
             if stale_jwt is not None and self.session_jwt() not in (None, stale_jwt):
                 return "ok"
             client = self._client
-            if client is None:          # signed out while we waited for the lock: nothing to refresh or save
-                self.state, self.error = "needs login", "no Yarbo session: sign in again in Settings → Robot"
+            if client is None:          # no session to refresh or save
+                if self.username is None:   # signed out (perhaps while we waited for the lock): say just that
+                    self.state = "signed out"
+                else:
+                    self.state, self.error = "needs login", "no Yarbo session: sign in again in Settings → Robot"
                 return "expired"
             try:
                 client._auth.refresh()
@@ -183,20 +179,36 @@ class CloudTransport:
     def _refresh(self) -> bool:
         return self.refresh_session() != "expired"   # network trouble: keep the session and retry later
 
+    def _lookup_due(self) -> bool:
+        return self._client is not None and time.time() - self._devices_at >= 600
+
     def _find_sn(self) -> str | None:
         """Ask the account which robots it has (an account lookup; nothing is sent to a robot). One robot: its
         serial. Several: none, and Settings → Robot offers them. Asked again after 10 minutes, so a robot added to
-        the account turns up."""
-        client = self._client
-        if client is None or time.time() - self._devices_at < 600:
+        the account turns up. Runs under the refresh lock: on a 401 the SDK refreshes the session by itself, and a
+        rotated refresh token must be saved, not lost at the next restart. A dead session means "needs login"."""
+        from yarbo_robot_sdk.exceptions import TokenExpiredError
+        if not self._lookup_due():
             return None
         self._devices_at = time.time()
-        try:
-            found = client.get_devices()
-        except Exception as exc:
-            self._devices_at -= 540         # a failed lookup is tried again after a minute, not ten
-            log.warning("could not list the robots on the Yarbo account: %s", type(exc).__name__)
-            return None
+        with self._refresh_lock:
+            client = self._client
+            if client is None:
+                return None
+            before = client.refresh_token
+            try:
+                found = client.get_devices()
+            except TokenExpiredError as exc:
+                self.state, self.error = "needs login", f"session expired: {exc}"
+                log.warning("Yarbo cloud session expired; sign in again in Settings")
+                return None
+            except Exception as exc:
+                self._devices_at -= 540         # a failed lookup is tried again after a minute, not ten
+                log.warning("could not list the robots on the Yarbo account: %s", type(exc).__name__)
+                return None
+            finally:
+                if self._client is client and client.refresh_token != before:
+                    self._save()                # the SDK refreshed (and rotated) the session on a 401
         robots = [d for d in found if getattr(d, "sn", "")]
         if len(robots) == 1:
             self.devices = []
@@ -213,8 +225,12 @@ class CloudTransport:
         while not stop.is_set():
             self.state = "connecting"
             if not self.sn:
+                if self._lookup_due() and not self._refresh():   # a fresh session first, as for a connect
+                    return
                 sn = self._find_sn()
-                if sn and not stop.is_set():
+                if self.state == "needs login":
+                    return
+                if sn and not stop.is_set() and not self.sn:     # not if one came from the heart_beat meanwhile
                     self.sn = sn
                     log.info("Yarbo cloud: using the account's only robot")
                     if self.on_sn:
@@ -242,6 +258,8 @@ class CloudTransport:
                             self._close_client()
                             return
             except Exception as exc:
+                if stop.is_set():               # stopped while connecting: the next worker owns the status
+                    break
                 self.error = str(exc)
                 log.warning("Yarbo cloud connection failed: %s", exc)
             if stop.is_set():
@@ -277,7 +295,8 @@ class CloudTransport:
             done.set()
 
         def on_disconnect(cl, ud, flags, rc, props=None):
-            self.connected = False
+            if cl is self._mqtt:                # not a connection a stopped worker gave up on
+                self.connected = False
 
         def on_message(cl, ud, msg):
             try:
@@ -299,9 +318,16 @@ class CloudTransport:
             if stop.is_set():
                 raise ConnectionError("stopped while connecting")
             raise ConnectionError(f"cloud broker refused the connection: {result.get('rc', 'no reply')}")
-        with self._lock:
-            self._mqtt = client
-        self.connected, self.state, self.error = True, "connected", ""
+        with self._lock:                        # stop() sets the event before it takes this lock to close _mqtt
+            if stop.is_set():
+                installed = False
+            else:
+                self._mqtt, installed = client, True
+                self.connected, self.state, self.error = True, "connected", ""
+        if not installed:
+            client.loop_stop()
+            client.disconnect()
+            raise ConnectionError("stopped while connecting")
         self.connected_since = time.time()
         self._last_refresh = time.time()
         log.info("Yarbo cloud connected via the %s broker", self.broker.split()[0])
