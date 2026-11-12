@@ -268,6 +268,8 @@ class CloudTransport:
             return None                         # stopped meanwhile: a new sign-in owns the check now
         if robots is None:
             return None                         # the lookup failed: still pending
+        if self.sn_source() is None:
+            return None                         # the robot started mowing while the account answered: later
         self._check_sn = False
         if any(d.sn == self.sn for d in robots):
             return None

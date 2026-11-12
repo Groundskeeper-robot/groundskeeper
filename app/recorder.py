@@ -968,6 +968,12 @@ class Recorder:
     def forget_account_sn(self, sn: str) -> None:
         """The signed-in Yarbo account has no robot with serial `sn` (kept from an account): forget it and its state;
         the cloud finds the robot on this account again. A serial found since (a heart_beat) is left alone."""
+        if self.sn == sn and (self.run_id or self.plan_active() is True):
+            # It started mowing after the cloud's check: keep it (the guards must go on watching) and send the
+            # cloud back to it.
+            if self.on_sn:
+                self.on_sn(sn)
+            return
         kept = found_sn(self.store)
         if kept.get("sn") == sn and kept.get("from") == "account":
             self.store.delete_setting(FOUND_SN)

@@ -580,3 +580,48 @@ def test_a_stopped_worker_leaves_a_new_sign_ins_check_alone(tmp_path):
         return FakeSDK.get_devices(sdk)
     sdk.get_devices = signed_in_again_meanwhile
     assert c._kept_sn_elsewhere(stop) is None and c._check_sn
+
+
+# -- a robot that starts mowing during the check, and a switch during a write --------------------------------------
+def test_a_robot_that_starts_mowing_during_the_check_is_kept(tmp_path):
+    sdk = FakeSDK([SN2])
+    c = cloud(tmp_path, sdk, sn=SN)
+    mowing = []
+    c.sn_source = lambda: None if mowing else "account"
+    c._check_sn = True
+
+    def run_started_meanwhile():
+        mowing.append(True)
+        return FakeSDK.get_devices(sdk)
+    sdk.get_devices = run_started_meanwhile
+    assert c._kept_sn_elsewhere(threading.Event()) is None
+    assert c.sn == SN and c._check_sn                            # kept, and checked again once it has finished
+
+
+def test_the_recorder_keeps_a_robot_that_is_mowing_when_the_forget_arrives(tmp_path, monkeypatch):
+    o, env, store = _ops(tmp_path, monkeypatch)
+    r = o.rec
+    assert r.use_found_sn(SN)
+    told = []
+    r.on_sn = told.append
+    r.run_id = 7
+    r.forget_account_sn(SN)
+    assert r.sn == SN and _kept(store)["sn"] == SN and told == [SN]    # and the cloud is sent back to it
+
+
+def test_no_robot_switch_during_a_write(tmp_path, monkeypatch):
+    from fastapi import HTTPException
+    from app import main
+    o, env, store = _ops(tmp_path, monkeypatch)
+    assert o.rec.use_found_sn(SN)
+    o.rec.plan_active = lambda ts=None: False
+    o.cloud.devices = [{"sn": SN, "name": "", "model": ""}, {"sn": SN2, "name": "", "model": ""}]
+    req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(rec=o.rec, ops=o)))
+
+    async def go():
+        async with o.map_writer.lock:
+            try:
+                await main.robot_from_account(req, {"sn": SN2})
+            except HTTPException as exc:
+                return exc.status_code
+    assert run(go()) == 409 and o.rec.sn == SN
