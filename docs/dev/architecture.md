@@ -402,7 +402,7 @@ Imagery: `GET /api/imagery` · `GET /api/imagery/sources` · `GET /api/imagery/s
 `GET /api/imagery/outlines` · `POST /api/imagery/sources/{id}/extent` · `POST /api/imagery/sources/{id}/export {country, region, place, landmark, coverage, worldwide?}` ·
 tiles: `/tiles/world/{z}/{x}/{y}.jpg`, `/tiles/src/{z}/{x}/{y}.jpg`
 
-Panel settings: `GET /api/settings`, `GET /api/about`, `PUT /api/integrations/{robot|frigate|home_assistant|weather|panel}` (partial object, `null` hands a field back to the environment, applied live), `POST /api/integrations/{group}/test`, `PUT /api/settings/{key}` (imagery_alignment, conditions, deck_m, control_enabled, map_write_enabled, gates,
+Panel settings: `GET /api/settings`, `GET /api/about`, `PUT /api/integrations/{robot|frigate|home_assistant|weather|panel}` (partial object, `null` hands a field back to the environment, applied live), `POST /api/integrations/{group}/test`, `PUT /api/settings/{key}` (imagery_alignment, conditions, control_enabled, map_write_enabled, gates,
 yard_cameras, camera_polygons, presence_entity, ha_notify_service, webhook_url) · `PUT /api/schedule/windows` ·
 `PUT /api/maintenance/items` · `POST /api/maintenance/{id}/done` · `POST /api/cloud/login` ·
 `POST /api/cloud/logout` · `POST /api/notify/test`

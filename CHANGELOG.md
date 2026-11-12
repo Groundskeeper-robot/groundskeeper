@@ -72,6 +72,10 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ### Changed
 
+- **Deck width is no longer a setting** (#129). Every deck of a head type is the same, so coverage always uses the
+  head's own width (mower and Mower Pro 0.53 m, snow blower 0.6 m), and swapping heads needs nothing changed. The row
+  in Settings → Robot, `PUT /api/settings/deck_m` and the assistant's `deck_m` setting are gone; a width saved
+  before is ignored and runs are worked out again with the head's width.
 - **The robot's serial is never typed in.** The serial field is gone from Settings → Robot and `YARBO_SN` is no longer
   read (the log says so if it is still set). A serial typed in before is kept as a found one until the account names
   another.

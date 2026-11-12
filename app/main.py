@@ -1295,7 +1295,6 @@ async def health_view(request: Request, hours: float = 24):
 # -- settings (this panel only) ----------------------------------------------------------------------------------
 SETTINGS_DEFAULTS = {
     "imagery_alignment": {"east_m": 0.0, "north_m": 0.0, "rotate_deg": 0.0, "opacity": 1.0},
-    "deck_m": None,
     "control_enabled": False,
     "map_write_enabled": False,
     "mcp_control_enabled": False,
@@ -1507,12 +1506,6 @@ async def put_setting(request: Request, key: str, value: Any = Body(None)):
         r.store.set_setting(key, cfg.to_dict())
         r.evaluate_conditions()
         return cfg.to_dict()
-    if key == "deck_m":
-        if value is not None and not (isinstance(value, (int, float)) and 0.2 <= value <= 1.5):
-            raise HTTPException(400, "deck width must be between 0.2 and 1.5 m, or null for the head default")
-        r.store.set_setting(key, value)
-        r.store.analysis_clear()
-        return {"deck_m": value}
     if key == "map_write_enabled":
         if not isinstance(value, bool):
             raise HTTPException(400, "true or false")
