@@ -39,11 +39,13 @@ Demo mode runs a made-up robot mowing a made-up yard, through the same recorder,
 DEMO=1 PANEL_AUTH=off DATA_DIR=./demo-data .venv/bin/python -m app     # http://127.0.0.1:8425
 ```
 
-On Windows the commands on this page work as they are in Git Bash or WSL. In PowerShell, set the variables first
-and use the `Scripts` folder:
+On Windows the commands on this page work as they are in WSL. With Windows Python (Git Bash or PowerShell) the
+virtual environment's programs are in `.venv/Scripts`, not `.venv/bin`. In PowerShell, this runs the demo and then
+clears the variables, so a later run in the same window doesn't start with sign-in off:
 
 ```powershell
-$env:DEMO = "1"; $env:PANEL_AUTH = "off"; $env:DATA_DIR = "./demo-data"; .venv\Scripts\python -m app
+$env:DEMO = "1"; $env:PANEL_AUTH = "off"; $env:DATA_DIR = "./demo-data"
+try { .venv\Scripts\python -m app } finally { Remove-Item Env:DEMO, Env:PANEL_AUTH, Env:DATA_DIR }
 ```
 
 `DEMO_SPEED=10` makes it mow faster. Use a separate `DATA_DIR` for the demo: it refuses to start on a folder that
