@@ -89,6 +89,9 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ### Fixed
 
+- **A snow blower's area can no longer be given mower settings** (#128). Map Studio's area settings are the mower's
+  record, so on an area labelled only for another head (a driveway labelled Snow Blower) they show read-only and a
+  save is refused, as it is when the area's labels cannot be read. Unlabelled areas stay editable.
 - **The imagery credit no longer covers the map legend** (#122). With Signal or Problem areas on, the legend's
   extra row slid under the credit and hid the Signal menu; the credit now sits just above the legend however tall it
   is. Phones show the credit too (it was hidden there), above the legend's row, so **Align** is reachable on a phone;
