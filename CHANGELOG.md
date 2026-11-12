@@ -110,6 +110,9 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ### Fixed
 
+- **The Metrics switch shows with `PANEL_AUTH=off` too** (#143). Behind a reverse proxy that signs people in, Settings
+  → Access showed only "Sign-in: Off", so metrics could not be switched on (or off again). The switch is now there;
+  the API tokens still are not, as they mean nothing with sign-in off.
 - **Keyboard focus stays put when Live refreshes** (#141). Live redraws its cards every few seconds and the Cameras
   tile redraws on each change, which dropped focus to the page. Focus now stays on the same control (a camera chip,
   Close) or, when it goes away, moves to the one that replaces it (Open to Close, Close to Open).

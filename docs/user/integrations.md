@@ -38,6 +38,8 @@ All optional. Each is set in Settings and has a Test button.
         - targets: ["192.0.2.10:8425"]               # the panel; add scheme: https behind a reverse proxy
   ```
 
+  With `PANEL_AUTH=off` there are no tokens: scrape without one, and only the proxy keeps others out.
+
   Over plain HTTP the token crosses the network unencrypted. On a shared network, put the panel behind an HTTPS
   reverse proxy and set `scheme: https` in the scrape job.
 
