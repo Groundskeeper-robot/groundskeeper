@@ -122,7 +122,7 @@ FIRMWARE_SETTLE_S = 60    # a new firmware version counts once it has been repor
 
 
 class Recorder:
-    sn: str | None = None            # the robot followed (set in __init__; the class default keeps bare test objects valid)
+    sn: str | None = None            # the robot followed (set in __init__; a bare object made in a test has none)
 
     def __init__(self, cfg: Config, store: Store, imagery: Imagery, sn: str):
         self.cfg, self.store, self.imagery, self.sn = cfg, store, imagery, sn
