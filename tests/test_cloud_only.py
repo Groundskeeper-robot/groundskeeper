@@ -630,3 +630,16 @@ def test_a_read_is_marked_before_it_goes_and_unmarked_if_it_fails(tmp_path):
     with pytest.raises(ConnectionError):
         RobotLink(None, Cloud(True), None, mark_sent=mark).read("get_map")
     assert marks == []
+
+
+def test_an_echo_of_a_request_is_not_hearing_the_robot(tmp_path, monkeypatch):
+    """The cloud also delivers app/ topics (the panel's own read requests come back): only the robot's device/
+    messages count towards "heard"."""
+    o, env, store = _ops(tmp_path, monkeypatch)
+    r = o.rec
+    r._follow(SN)
+    o.cloud.state, o.cloud.connected = "connected", True
+    r._handle(f"snowbot/{SN}/app/get_device_msg", {}, time.time())
+    assert r.last_message_at == 0.0 and not r.robot_status()["heard"]
+    r._handle(f"snowbot/{SN}/device/heart_beat", {"working_state": 1}, time.time())
+    assert r.robot_status()["heard"]

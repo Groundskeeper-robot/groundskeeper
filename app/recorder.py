@@ -568,9 +568,10 @@ class Recorder:
             return
         if self.sn and parts[1] != self.sn:
             return                       # another robot's (queued before a switch): never this one's state or reply
-        self.received += 1               # counted here, for the robot followed (robot_status: "heard")
-        self.last_message_at = ts
+        self.received += 1               # counted here, for the robot followed
         channel, name = parts[2], parts[3]
+        if channel == "device":
+            self.last_message_at = ts    # robot_status "heard": the robot itself, not an echo of a request on app/
         if channel == "app":
             if ours is None:
                 ours = self.own_echo(name, ts, data)          # decided here, once, for the session record and below
