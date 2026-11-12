@@ -61,7 +61,7 @@ const CAM_SDK_OFF = [
 
 const cams = { open: false, camera: savedCamera(), phase: "closed", message: "", hint: "", client: null, ticket: 0,
                slowTimer: null, beatTimer: null, controlOff: false, leaving: Promise.resolve(), settings: null,
-               settingsAt: 0, card: null, stage: null, sdk: null, subscribed: 0 };
+               settingsAt: 0, card: null, stage: null, sdk: null, subscribed: 0, leftAt: 0 };
 
 // The hints on screen are short; what each one means is its tooltip (and docs/user/live.md).
 const CAM_HELP = {
@@ -169,6 +169,7 @@ function camerasPick(camera) {
 // Leaves the channel and forgets everything about the stream. Sends nothing to the robot.
 function camerasStop(message) {
   cams.open = false;
+  cams.leftAt = 0;                                  // a closed tile is no longer changing camera: no rejoin gap
   camerasLeave();
   camerasSet("closed", message || "");
 }
@@ -424,7 +425,7 @@ function camerasWhy(e, step) {
 }
 
 async function camerasStart({ on, fresh = true }) {
-  const rejoin = !!cams.client;                   // replacing a client in a channel: a camera change or renewal
+  if (cams.client) cams.leftAt = Date.now();      // leaving a channel to join another: the rejoin gap runs from here
   camerasLeave();
   const ticket = cams.ticket;
   const live = () => ticket === cams.ticket && cams.open;
@@ -435,8 +436,10 @@ async function camerasStart({ on, fresh = true }) {
   try {
     await cams.leaving;                           // never two live clients: wait out any leave still in flight
     if (!live()) return;
-    if (rejoin) {
-      await new Promise((r) => { setTimeout(r, CAM_REJOIN_GAP_MS); });
+    // Counted from the last leave, not this start: a second camera change within the gap waits out the rest of it.
+    const gap = cams.leftAt ? CAM_REJOIN_GAP_MS - (Date.now() - cams.leftAt) : 0;
+    if (gap > 0) {
+      await new Promise((r) => { setTimeout(r, gap); });
       if (!live()) return;
     }
     camerasBeats(ticket, fresh);                  // keep the robot awake from now on: it streams only while kept so

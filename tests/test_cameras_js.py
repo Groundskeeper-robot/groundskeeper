@@ -89,7 +89,21 @@ def test_changing_camera_leaves_the_channel_and_switches_the_cameras_on_again():
 
 @needs_node
 def test_a_first_open_does_not_wait_for_the_rejoin_gap():
-    assert "rejoin-gap" not in [c[0] for c in segment(run_flow(), "open")]
+    calls = run_flow()
+    assert "rejoin-gap" not in [c[0] for c in segment(calls, "open")]
+    assert "rejoin-gap" not in [c[0] for c in segment(calls, "open-long-after")]
+
+
+@needs_node
+def test_a_second_quick_camera_change_still_waits_out_the_gap():
+    # Left then Right at once: the Right start finds no client (Left's start already left it) but still waits out the
+    # gap from that leave. The Left start is superseded before its gap, so one gap, and it is Right's.
+    seg = segment(run_flow(), "quick-picks")
+    names = [c[0] for c in seg]
+    assert names.count("rejoin-gap") == 1 and names.index("leave") < names.index("rejoin-gap")
+    posts = [json.loads(c[2]) for c in seg if c[0] == "post" and c[1] == "/api/video/token"]
+    assert posts == [{"camera": "right"}]                      # the Left start was superseded before it asked
+    assert names.index("rejoin-gap") < names.index("post")
 
 
 @needs_node

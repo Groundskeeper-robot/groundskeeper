@@ -129,8 +129,8 @@ const sandbox = {
   },
   // The script-load timeout (20 s) is shortened when a test wants to see it fire; no other timer is touched.
   setTimeout: (fn, ms) => {
-    // The rejoin gap (3 s) passes on the next tick, and is logged so a test can see it was asked for.
-    if (ms === 3000) { log("rejoin-gap"); return setImmediate(fn); }
+    // The rejoin gap (at most 3 s, the only timer this short) passes on the next tick, and is logged.
+    if (ms <= 3000) { log("rejoin-gap"); return setImmediate(fn); }
     const t = setTimeout(fn, (knobs.fastSdk && ms === 20000) || (knobs.fastJoin && ms === 30000) ? 5 : ms);
     if (ms === 30000) t.unref();
     return t;
@@ -448,6 +448,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   sandbox.WebSocket = FakeWS;
   // 20. Over plain http there is no crypto.subtle: the SDK's wrap of the placeholder gets the stand-in, only while the
   // client lives, and every other call is refused. Over https the browser's own is used and never replaced.
+  // 21. Two camera changes in quick succession: the second still waits out the gap from the first one's leave.
+  mark("quick-picks-setup"); sandbox.camerasOpen(); await settle();
+  mark("quick-picks"); sandbox.camerasPick("left"); sandbox.camerasPick("right"); await settle();
+  sandbox.camerasStop(); await settle();
+  // A first open long after the last leave does not wait.
+  sandbox.cams.leftAt = Date.now() - 60000;
+  mark("open-long-after"); sandbox.camerasOpen(); await settle(); sandbox.camerasStop(); await settle();
   knobs.wrap = true;
   const tryCall = async (name, fn) => {
     try { await fn(); calls.push(["crypto-call", name, "ok"]); } catch (e) { calls.push(["crypto-call", name, e.message]); }
