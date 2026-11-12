@@ -98,6 +98,10 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 - **The phone header**: the robot's state ("docked, charging") is no longer cut short with large text, and some
   Android browsers no longer leave an empty band above the title. An installed app still keeps clear of the status
   bar.
+- **Cloud commands: a send the cloud connection refuses is now an error, and the panel's own send is marked before it
+  goes.** A command the MQTT client did not take (for example while it was reconnecting) was counted as sent and the
+  panel carried on as if it had gone. It now raises. The panel also notes its own command before sending it, so the
+  robot's echo, which can arrive before the send call returns, is not mistaken for the phone app or another person.
 
 ### Fixed
 

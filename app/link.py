@@ -16,7 +16,8 @@ local write is proved (LOCAL_WRITES_PROVED), go only through the cloud.
 Entry points: `command()` takes only the run commands (control.CATALOGUE) and only Controller calls it;
 `write_command()` takes only the captured writes (mapwrite.WRITE_COMMANDS) and only MapWriter calls it. Nothing else
 reaches LocalTransport.command or CloudTransport.publish (tests/test_guards.py). cmd_vel is refused on every route.
-Every send is recorded through `mark_sent`, so the robot echoing it back is never taken for someone else's command.
+Every send is recorded through `mark_sent` before it goes, so the robot echoing it back (which can be handled before
+the send call returns) is never taken for someone else's command; a send that fails takes its mark back.
 """
 import time
 
@@ -48,7 +49,7 @@ class NoRoute(ConnectionError):
 class RobotLink:
     def __init__(self, rec, cloud, store, mark_sent=None):
         self.rec, self.cloud, self.store = rec, cloud, store
-        self.mark_sent = mark_sent or (lambda cmd: None)   # (cmd) -> None: the recorder's own-send record
+        self.mark_sent = mark_sent or (lambda cmd: None)   # (cmd) -> undo or None: own-send record
         self._misses = {"reads": 0, "commands": 0}
         self._off_until = {"reads": 0.0, "commands": 0.0}
         self.reads_route: str | None = None
@@ -190,12 +191,18 @@ class RobotLink:
         if route == "local":
             if not self.local_commands_up():
                 raise NoRoute("the robot's local broker is not connected")
-            self.rec.transport.command(cmd, payload)
+            send = self.rec.transport.command
         else:
             if not self.cloud_up():
                 raise NoRoute(f"the Yarbo cloud is {getattr(self.cloud, 'state', 'not set up')}")
-            self.cloud.publish(cmd, payload)
-        self.mark_sent(cmd)              # after it went; an echo handled before this counts as another client's
+            send = self.cloud.publish
+        undo = self.mark_sent(cmd)       # before it goes: the echo can be handled before the send call returns
+        try:
+            send(cmd, payload)
+        except BaseException:
+            if callable(undo):
+                undo()                   # it never went, so it is not ours
+            raise
         if cmd not in QUIET_COMMANDS:    # a keep-awake beat every 4 s is not "the last command" (status shows that)
             self.last_command = {"cmd": cmd, "route": route, "at": time.time()}
         if what:
