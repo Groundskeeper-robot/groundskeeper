@@ -38,6 +38,9 @@ All optional. Each is set in Settings and has a Test button.
         - targets: ["192.0.2.10:8425"]               # the panel; add scheme: https behind a reverse proxy
   ```
 
+  Over plain HTTP the token crosses the network unencrypted. On a shared network, put the panel behind an HTTPS
+  reverse proxy and set `scheme: https` in the scrape job.
+
   `yarbo_*` are the robot's own values: `yarbo_battery_ratio`, `_battery_voltage_volts`, `_battery_current_amperes`,
   `_battery_temperature_celsius`, `_cpu_temperature_celsius`, `_charging`, `_error_code`, `_working_state`,
   `_activity{state}`, `_rtk_fix{quality}`, `_rtk_satellites`, `_odometry_confidence_ratio`, `_heading_degrees`,
