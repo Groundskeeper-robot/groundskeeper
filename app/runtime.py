@@ -117,7 +117,8 @@ class Runtime:
         self.store = store
         self._stored: dict = {}
         raw = store.setting("integrations") or {}
-        if isinstance(raw, dict) and isinstance(raw.get("robot"), dict) and "sn" in raw["robot"]:
+        if (isinstance(raw, dict) and isinstance(raw.get("robot"), dict) and "sn" in raw["robot"]
+                and not getattr(cfg, "demo", False)):     # a demo leaves the real install's settings as they are
             self._move_typed_sn(raw)
         for group, fields in (raw.items() if isinstance(raw, dict) else []):
             if group not in GROUPS or not isinstance(fields, dict):
@@ -137,7 +138,7 @@ class Runtime:
         """Before serials were only found, one could be typed in Settings → Robot. Keep it as a found serial (a
         heart_beat still replaces it) and drop it from the settings, once."""
         typed = raw["robot"].pop("sn")
-        if valid_sn(typed) and not found_sn(self.store) and not getattr(self.env, "demo", False):
+        if valid_sn(typed) and not found_sn(self.store):
             self.store.set_setting(FOUND_SN, {"sn": typed.strip(), "from": "settings"})
         if not raw["robot"]:
             raw.pop("robot")

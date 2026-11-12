@@ -106,14 +106,14 @@ def test_waiting_for_the_serial_is_said_in_the_status_and_once_in_the_log(tmp_pa
 # -- cloud.py bugs ---------------------------------------------------------------------------------------------------
 def test_a_refresh_with_no_session_says_needs_login(tmp_path):
     c = cloud(tmp_path, None, sn=SN)
-    c.username = "someone@example.invalid"
+    c.username = "user@example.com"
     assert c.refresh_session() == "expired"
     assert c.state == "needs login" and c.error
 
 
 def test_the_worker_stops_with_a_reason_when_the_session_is_gone(tmp_path):
     c = cloud(tmp_path, None, sn=SN)
-    c.username = "someone@example.invalid"
+    c.username = "user@example.com"
     c._run(threading.Event())                   # returns at once: nothing to connect with
     assert c.status()["state"] == "needs login" and c.status()["error"]
 
@@ -309,3 +309,69 @@ def test_only_a_robot_the_account_listed_can_be_chosen(tmp_path, monkeypatch):
         assert exc.status_code == 400
     assert run(main.robot_from_account(req, {"sn": SN2})) == {"ok": True}
     assert o.rec.sn == SN2 and o.cloud.sn == SN2 and _kept(store) == {"sn": SN2, "from": "account"}
+
+
+def test_a_lookup_that_ends_after_a_stop_writes_nothing(tmp_path):
+    """A stopped worker's late lookup must not overwrite the next worker's status or robot list."""
+    stop = threading.Event()
+    sdk = FakeSDK([SN, SN2])
+
+    def stopped_meanwhile():
+        stop.set()                              # signed out, or a new worker started, while the account answered
+        return FakeSDK.get_devices(sdk)
+    sdk.get_devices = stopped_meanwhile
+    c = cloud(tmp_path, sdk)
+    c.error = "before"
+    c._run(stop)
+    assert c.devices == [] and c.error == "before" and c.status()["devices"] == []
+
+
+def test_a_rotated_session_that_cannot_be_saved_keeps_the_worker_going(tmp_path, monkeypatch, caplog):
+    sdk = FakeSDK([SN, SN2])
+
+    def rotate_then_list():
+        sdk.token, sdk.refresh_token = "jwt.rotated", "refresh.rotated"
+        return FakeSDK.get_devices(sdk)
+    sdk.get_devices = rotate_then_list
+    c = cloud(tmp_path, sdk)
+    c.username = "user@example.com"
+
+    def disk_full():
+        raise OSError("no space left on device")
+    monkeypatch.setattr(c, "_save", disk_full)
+    stop = CountingStop(3)
+    with caplog.at_level(logging.WARNING, logger="app.cloud"):
+        c._run(stop)                            # no exception escapes the worker: it goes on waiting
+    assert stop.waits == 3 and sdk.refresh_token == "refresh.rotated"
+    assert any("could not save the Yarbo session" in r.getMessage() for r in caplog.records)
+
+
+def test_another_robot_is_not_followed_while_a_run_is_open(tmp_path, monkeypatch):
+    from fastapi import HTTPException
+    from app import main
+    o, env, store = _ops(tmp_path, monkeypatch)
+    assert o.rec.use_found_sn(SN)
+    o.rec.run_id = 7                            # robot A is mid-run
+    o.cloud.devices = [{"sn": SN, "name": "", "model": ""}, {"sn": SN2, "name": "", "model": ""}]
+    req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(rec=o.rec, ops=o)))
+    try:
+        run(main.robot_from_account(req, {"sn": SN2}))
+        raise AssertionError("switched robots during a run")
+    except HTTPException as exc:
+        assert exc.status_code == 409
+    assert not o.rec.use_found_sn(SN2)
+    assert o.rec.sn == SN and _kept(store)["sn"] == SN       # B's telemetry can't land in A's run
+    o.rec.run_id = None
+    assert o.rec.use_found_sn(SN2) and o.rec.sn == SN2      # once the run has ended
+
+
+def test_a_demo_leaves_a_real_installs_typed_serial_alone(tmp_path, monkeypatch):
+    from dataclasses import replace
+    from app import config
+    from app.runtime import Runtime
+    from app.store import Store
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    store = Store(str(tmp_path))
+    store.set_setting("integrations", {"robot": {"host": "192.0.2.50", "sn": SN}})
+    Runtime(replace(config.load(), demo=True), store)
+    assert store.setting("integrations") == {"robot": {"host": "192.0.2.50", "sn": SN}} and _kept(store) == {}

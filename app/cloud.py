@@ -179,10 +179,19 @@ class CloudTransport:
     def _refresh(self) -> bool:
         return self.refresh_session() != "expired"   # network trouble: keep the session and retry later
 
+    def _save_rotated(self) -> None:
+        """Save a session the SDK rotated on its own. A failed write keeps the new tokens in memory (the worker carries
+        on with them) and says so; the next refresh saves again."""
+        try:
+            self._save()
+        except OSError as exc:
+            self.error = f"could not save the Yarbo session: {exc}"
+            log.warning("could not save the Yarbo session after the SDK refreshed it: %s", type(exc).__name__)
+
     def _lookup_due(self) -> bool:
         return self._client is not None and time.time() - self._devices_at >= 600
 
-    def _find_sn(self) -> str | None:
+    def _find_sn(self, stop: threading.Event | None = None) -> str | None:
         """Ask the account which robots it has (an account lookup; nothing is sent to a robot). One robot: its
         serial. Several: none, and Settings → Robot offers them. Asked again after 10 minutes, so a robot added to
         the account turns up. Runs under the refresh lock: on a 401 the SDK refreshes the session by itself, and a
@@ -199,8 +208,9 @@ class CloudTransport:
             try:
                 found = client.get_devices()
             except TokenExpiredError as exc:
-                self.state, self.error = "needs login", f"session expired: {exc}"
-                log.warning("Yarbo cloud session expired; sign in again in Settings")
+                if stop is None or not stop.is_set():
+                    self.state, self.error = "needs login", f"session expired: {exc}"
+                    log.warning("Yarbo cloud session expired; sign in again in Settings")
                 return None
             except Exception as exc:
                 self._devices_at -= 540         # a failed lookup is tried again after a minute, not ten
@@ -208,7 +218,9 @@ class CloudTransport:
                 return None
             finally:
                 if self._client is client and client.refresh_token != before:
-                    self._save()                # the SDK refreshed (and rotated) the session on a 401
+                    self._save_rotated()        # the SDK refreshed (and rotated) the session on a 401
+        if stop is not None and stop.is_set():
+            return None                         # stopped while asking: the next worker owns the status
         robots = [d for d in found if getattr(d, "sn", "")]
         if len(robots) == 1:
             self.devices = []
@@ -227,8 +239,8 @@ class CloudTransport:
             if not self.sn:
                 if self._lookup_due() and not self._refresh():   # a fresh session first, as for a connect
                     return
-                sn = self._find_sn()
-                if self.state == "needs login":
+                sn = self._find_sn(stop)
+                if stop.is_set() or self.state == "needs login":
                     return
                 if sn and not stop.is_set() and not self.sn:     # not if one came from the heart_beat meanwhile
                     self.sn = sn

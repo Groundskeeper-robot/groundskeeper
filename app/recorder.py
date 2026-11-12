@@ -945,8 +945,11 @@ class Recorder:
 
     def use_found_sn(self, sn: str) -> bool:
         """The Yarbo account gave the serial (its only robot, or the one chosen in Settings → Robot): keep it and
-        follow it, unless the robot's own heart_beat already named another."""
+        follow it, unless the robot's own heart_beat already named another. Never while a run is open: the new
+        robot's telemetry would be recorded into the old robot's run."""
         if self._heard and self._heard[2] != sn:
+            return False
+        if self.sn and self.sn != sn and self.run_id:
             return False
         if not self.keep_sn(sn, "account"):
             return False
