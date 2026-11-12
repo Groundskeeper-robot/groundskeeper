@@ -30,7 +30,7 @@ def _transport(tmp_path, info) -> CloudTransport:
 def _recorder(tmp_path) -> Recorder:
     async def no_imagery(*a, **k):
         return None
-    cfg = Config(yarbo_host=None, yarbo_port=1883, data_dir=str(tmp_path), port=8425, poll_idle_s=60,
+    cfg = Config(data_dir=str(tmp_path), port=8425, poll_idle_s=60,
                  poll_active_s=2, map_refresh_s=21600, raw_every_s=60, raw_keep_days=90, run_idle_end_s=300,
                  tempest_port=0, ha_url=None, ha_token=None, demo=True, frigate_url=None, panel_url=None)
     r = Recorder(cfg, Store(str(tmp_path)), SimpleNamespace(yard_meta=None, ensure_yard=no_imagery), None)
@@ -55,7 +55,6 @@ class FakeCloud:
 
 def _link(tmp_path, cloud, mark_sent=None) -> RobotLink:
     store = Store(str(tmp_path))
-    store.set_setting("robot_route", "cloud")
     return RobotLink(SimpleNamespace(transport=None), cloud, store, mark_sent=mark_sent)
 
 
@@ -82,7 +81,7 @@ def test_an_echo_handled_during_the_send_sees_the_panels_mark(tmp_path):
     rec = _recorder(tmp_path)
     seen = []
     cloud = FakeCloud(during=lambda cmd: seen.append(time.time() - rec._sent.get(cmd, 0) < 5))
-    _link(tmp_path, cloud, mark_sent=rec.mark_sent).command("pause", {}, route="cloud")
+    _link(tmp_path, cloud, mark_sent=rec.mark_sent).command("pause", {})
     assert seen == [True] and cloud.sent == ["pause"]
 
 
@@ -90,7 +89,7 @@ def test_a_send_that_fails_takes_its_mark_back(tmp_path):
     rec = _recorder(tmp_path)
     lk = _link(tmp_path, FakeCloud(error=ConnectionError("no")), mark_sent=rec.mark_sent)
     with pytest.raises(ConnectionError, match="no"):
-        lk.command("pause", {}, route="cloud")
+        lk.command("pause", {})
     assert "pause" not in rec._sent
 
 
@@ -99,18 +98,18 @@ def test_a_send_that_fails_puts_the_earlier_mark_back(tmp_path):
     rec._sent["pause"] = 123.0
     lk = _link(tmp_path, FakeCloud(error=ConnectionError("no")), mark_sent=rec.mark_sent)
     with pytest.raises(ConnectionError):
-        lk.command("pause", {}, route="cloud")
+        lk.command("pause", {})
     assert rec._sent["pause"] == 123.0
 
 
 @pytest.mark.parametrize("mark", [None, lambda cmd: None])
 def test_a_mark_that_returns_nothing_still_works(tmp_path, mark):
     cloud = FakeCloud()
-    _link(tmp_path, cloud, mark_sent=mark).command("pause", {}, route="cloud")
+    _link(tmp_path, cloud, mark_sent=mark).command("pause", {})
     assert cloud.sent == ["pause"]
     failing = FakeCloud(error=ConnectionError("no"))
     with pytest.raises(ConnectionError):
-        _link(tmp_path, failing, mark_sent=mark).command("pause", {}, route="cloud")
+        _link(tmp_path, failing, mark_sent=mark).command("pause", {})
 
 
 def _own_snapshot(rec):
@@ -129,7 +128,7 @@ def test_a_counted_send_that_fails_leaves_the_credits_and_trust_as_they_were(tmp
     before = _own_snapshot(rec)
     lk = _link(tmp_path, FakeCloud(error=ConnectionError("no")), mark_sent=rec.mark_sent)
     with pytest.raises(ConnectionError):
-        lk.command("set_working_state", {"state": 1}, route="cloud")
+        lk.command("set_working_state", {"state": 1})
     assert _own_snapshot(rec) == before
     assert "set_working_state" not in rec._sent
 
@@ -140,5 +139,5 @@ def test_a_counted_send_that_fails_keeps_the_credit_an_earlier_send_queued(tmp_p
     before = _own_snapshot(rec)
     lk = _link(tmp_path, FakeCloud(error=ConnectionError("no")), mark_sent=rec.mark_sent)
     with pytest.raises(ConnectionError):
-        lk.command("set_working_state", {"state": 1}, route="cloud")
+        lk.command("set_working_state", {"state": 1})
     assert _own_snapshot(rec) == before

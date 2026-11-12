@@ -620,7 +620,7 @@ class Store:
         self.db.execute("INSERT INTO firmware_seen (ts, component, version) VALUES (?, ?, ?)",
                         (time.time(), component, version))
 
-    # -- commands other clients send on the local broker -----------------------------------------------------
+    # -- commands other clients send the robot -----------------------------------------------------------------
     def command_seen(self, name: str, ts: float, sample: str) -> bool:
         """Count a command another client published. Returns True the first time a name is ever seen."""
         cur = self.db.execute("UPDATE commands_seen SET last=?, count=count+1, sample=? WHERE name=?",

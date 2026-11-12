@@ -13,8 +13,6 @@ def _num(name: str, default: float) -> float:
 
 @dataclass(frozen=True)
 class Config:
-    yarbo_host: str | None
-    yarbo_port: int
     data_dir: str
     port: int
     poll_idle_s: float
@@ -36,8 +34,6 @@ class Config:
 def load() -> Config:
     demo = os.environ.get("DEMO", "").strip() == "1" or os.environ.get("DEMO_SEED", "").strip() == "1"
     return Config(
-        yarbo_host=None if demo else os.environ.get("YARBO_HOST", "").strip() or None,
-        yarbo_port=int(_num("YARBO_PORT", 1883)),
         data_dir=os.environ.get("DATA_DIR", "./data"),
         port=int(_num("PORT", 8425)),
         poll_idle_s=_num("POLL_IDLE_S", 60),
