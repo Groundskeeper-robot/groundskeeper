@@ -25,7 +25,8 @@ sensor is on the mower module, so with the snow blower attached the panel's rain
 - **Fixed in code, not settings.** Which rules a head relaxes is not configurable, so a setting can never make a head
   skip a rule that protects people. Settings → Run rules says which rules are mower-only.
 - The head is read from the robot's latest report each time a check or guard runs, so a head change takes effect at
-  the next check.
+  the next check. The snow blower's relaxations apply only while that report is fresh (the robot-online limit); a
+  stale, missing or unknown report gets the full mower rules.
 - A head-specific editor or write is not offered for an area labelled only for other heads: the mower area settings
   editor is read-only on an area whose labels leave out Lawn Mower, and when the labels cannot be read. An area with
   no labels (new areas, the demo) stays editable (#128).
