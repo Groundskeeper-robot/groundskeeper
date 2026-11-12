@@ -83,6 +83,9 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   `YARBO_HOST` and `YARBO_PORT` environment variables (both ignored if set). `/health` reports `robot_connected`
   (the robot answered through the cloud lately) in place of `local_connected`. The setup guide's first step is the
   Yarbo cloud sign-in.
+- **Yarbo's SDK 0.3.0** (was 0.2.1). The code is the same; Yarbo changed its licence from MIT to PolyForm
+  Noncommercial, so the Docker image, which includes it, is for noncommercial use. The panel's own code stays MIT.
+  See THIRD_PARTY_NOTICES.md.
 
 ### Fixed
 
@@ -98,6 +101,11 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   account's robots says so. Signing in again while the old connection was still winding down no longer leaves the
   cloud with no connection, and no longer waits for it. A session the Yarbo SDK refreshes during the robot lookup is
   now saved, so it survives a restart.
+- **Cameras: Settings shows Robot video as configured only for an `https://` service address,** as the token route
+  does.
+- **Cameras: the Control-off and "Asleep, or cameras off" hints say to close and open the tile again.** An open tile
+  does not send the camera switch again when Control comes on. The image carries the panel's licence beside the
+  notices, and the Help pages and design notes now list the keep-awake and the finished Cameras pieces.
 - **A stray shape far from the yard no longer moves the yard.** The panel worked out where the yard is from the outline
   of every shape on the robot's map, so one far away (for example a charging point with an empty location) made the map
   open zoomed out to half the world and imagery sources say they do not cover the yard. Shapes more than 2 km from the
