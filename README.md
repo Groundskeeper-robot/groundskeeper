@@ -171,8 +171,8 @@ and can change in any release, patch releases included, so pin the version you d
 - The panel asks for a password. You set it on the first visit, using a one-time code from the container's log.
   Programs use named API tokens instead.
 - Control is **off** on a new install. Switching it on means typing ENABLE, and it is logged.
-- Only five run commands exist: start a plan, pause, resume, stop and dock, plus switching the robot's cameras on
-  (people only, never off). Manual driving (`cmd_vel`) is blocked for
+- Only five run commands exist: start a plan, pause, resume, stop and dock, plus switching the robot's cameras on and
+  keeping it awake for the Cameras tile (people only, cloud only, never off). Manual driving (`cmd_vel`) is blocked for
   good.
 - Every start passes hard interlocks that can't be overridden: the robot is online, it has no active error and
   enough battery, the phone app isn't driving it, and the yard is clear. Soft checks, such as a wet lawn, need a

@@ -1301,7 +1301,8 @@ async def settings(request: Request):
     out["gates"] = control.gates(store)
     out["integrations"] = request.app.state.cfg.describe()
     # Only whether it is set, never the address: the route sends the Yarbo session there, so Settings cannot change it.
-    out["robot_video_configured"] = bool(request.app.state.cfg.robot_service_url)
+    # The token route's rule too: an http:// address from the environment is refused there, so it is not "configured".
+    out["robot_video_configured"] = str(request.app.state.cfg.robot_service_url or "").lower().startswith("https://")
     out["mcp"] = mcp_server.token_status(store)
     from . import weather as weather_mod
     out["weather_sources"] = weather_mod.config(store.setting("weather_sources"))

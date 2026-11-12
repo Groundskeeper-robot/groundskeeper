@@ -95,6 +95,11 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   account's robots says so. Signing in again while the old connection was still winding down no longer leaves the
   cloud with no connection, and no longer waits for it. A session the Yarbo SDK refreshes during the robot lookup is
   now saved, so it survives a restart.
+- **Cameras: Settings shows Robot video as configured only for an `https://` service address,** as the token route
+  does.
+- **Cameras: the Control-off and "Asleep, or cameras off" hints say to close and open the tile again.** An open tile
+  does not send the camera switch again when Control comes on. The image carries the panel's licence beside the
+  notices, and the Help pages and design notes now list the keep-awake and the finished Cameras pieces.
 - **A stray shape far from the yard no longer moves the yard.** The panel worked out where the yard is from the outline
   of every shape on the robot's map, so one far away (for example a charging point with an empty location) made the map
   open zoomed out to half the world and imagery sources say they do not cover the yard. Shapes more than 2 km from the

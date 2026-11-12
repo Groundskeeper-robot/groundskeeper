@@ -173,8 +173,8 @@ through the controller like any command, at most 15 min per press of play (desig
 ## Robot video (Agora)
 
 The robot's cameras are not served on the LAN. The robot publishes each camera to Agora's real-time network, and the
-phone app joins as a viewer with a token it asks Yarbo's cloud for. Everything below is a **planned route** (`design.md`
-§13): the panel does not do it yet. Evidence is a recorder that has run daily against one robot and a live check of the
+phone app joins as a viewer with a token it asks Yarbo's cloud for. The panel uses this route (`design.md` §13)
+for the Cameras tile. Evidence is a recorder that has run daily against one robot and a live check of the
 token request, not a stored capture of the app, so each line is marked **[observed]** (seen working in that recorder or
 check, with no capture to link) or **[unconfirmed]**. Nothing here is **[captured]**; the maintainers' rule is that
 robot behaviour comes from a capture of the official app, so a capture is still wanted for the observed lines.
