@@ -303,9 +303,12 @@ A skipped window records why and what would fix it.
 - A window has a head (mower, snow or any). A window for another head than the attached one is skipped without a
   notification, so mower windows can stay through the snow season.
 - A head change is an alert and counts for the maintenance items that run "once per head change" (§15).
+- The area settings editor holds the mower's record, so it is read-only on an area labelled only for other heads
+  (a snow blower's driveway) and when the area's labels cannot be read; an unlabelled area stays editable
+  (`areasettings.other_head_block`).
 - The start checks and guards do not depend on the head yet: "Lawn dry" and the rain guard apply to a snow head too
-  (#126, #127), the area settings editor reads the mower's record for every area (#128), and the UI shows the same
-  controls and wording for every head (#134). The direction is [ADR 0009](decisions/0009-head-aware-run-rules.md).
+  (#126, #127), and the UI shows the same controls and wording for every head (#134). The direction is
+  [ADR 0009](decisions/0009-head-aware-run-rules.md).
 
 ---
 
