@@ -1403,8 +1403,8 @@ async def robot_from_account(request: Request, body: dict = Body(...)):
     o = ops(request)
     if not any(d.get("sn") == sn for d in o.cloud.devices):
         raise HTTPException(400, "that robot is not on the signed-in Yarbo account")
-    if rec(request).run_id and rec(request).sn not in (None, sn):
-        raise HTTPException(409, "a run is open on the robot the panel follows now; switch when it has ended")
+    if (rec(request).run_id or rec(request).plan_active() is True) and rec(request).sn not in (None, sn):
+        raise HTTPException(409, "the robot the panel follows now is mowing; switch when it has finished")
     if not rec(request).use_found_sn(sn):
         raise HTTPException(409, "the panel already hears another robot on its local network")
     return {"ok": True}

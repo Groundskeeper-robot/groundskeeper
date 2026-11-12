@@ -947,6 +947,12 @@ class Recorder:
             self.store.end_run(finished, max(self.detector.last_moving, self.run_started), "robot changed", stats)
             self.store.event("run_ended", f"run {finished}: robot changed, {stats.distance_m:.0f} m")
             self.run_id, self.run_stats, self.run_plan = None, None, None
+            try:
+                self._finish_wifi_survey(finished)
+            except Exception:
+                log.exception("Wi-Fi survey wrap-up failed")
+        self.wifi_survey, self._wifi_waiting = None, None
+        self.replies = {}                # its map backups and Wi-Fi lists are not the next robot's
         self.snapshot, self.snapshot_at, self.update_at, self.t = {}, 0.0, 0.0, {}
         self.heartbeat, self.heartbeat_at = {}, 0.0
         self.poses.clear()
@@ -966,7 +972,7 @@ class Recorder:
         if kept.get("sn") == sn and kept.get("from") == "account":
             self.store.delete_setting(FOUND_SN)
             self.store.event("robot_found", "robot serial forgotten: not on the signed-in Yarbo account")
-        if self.sn == sn:
+        if self.sn == sn and not (self._heard and self._heard[2] == sn):     # heard locally: the robot itself
             self._forget_robot_state()
             self.sn, self._state_sn = None, None
 

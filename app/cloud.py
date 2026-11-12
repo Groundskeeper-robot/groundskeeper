@@ -26,6 +26,7 @@ from pathlib import Path
 import paho.mqtt.client as mqtt
 
 from .codec import decode, encode
+from .runtime import valid_sn
 
 log = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ class CloudTransport:
         self.sn_source: Callable[[], str | None] | None = None
         self.on_forget: Callable[[str], None] | None = None
         self._check_sn = False           # after a sign-in: is the kept serial on this account?
+        self._check_tried_at = 0.0
         self._devices_at = 0.0
         self.state = "signed out"
         self.username: str | None = None
@@ -100,7 +102,7 @@ class CloudTransport:
             self.username = email.lower()
             self._save()
         self.error, self.devices, self._devices_at = "", [], 0.0     # another account may have other robots
-        self._check_sn = True            # a serial kept from another account must not be followed on this one
+        self._check_sn, self._check_tried_at = True, 0.0   # a serial from another account mustn't be followed here
         self.start()
 
     def logout(self) -> None:
@@ -243,7 +245,7 @@ class CloudTransport:
                     self._save_rotated()        # the SDK refreshed (and rotated) the session on a 401
         if stop is not None and stop.is_set():
             return None                         # stopped while asking: the next worker owns the status
-        return [d for d in found if getattr(d, "sn", "")]
+        return [d for d in found if valid_sn(getattr(d, "sn", None))]   # it goes into MQTT topics: no + # /
 
     def _kept_sn_elsewhere(self, stop: threading.Event) -> list | None:
         """After a sign-in: when the kept serial came from an account and this account doesn't list it, drop it and
@@ -258,7 +260,12 @@ class CloudTransport:
         if source != "account":
             self._check_sn = False              # from the robot itself: not an account's to drop
             return None
+        if time.time() - self._check_tried_at < 600:
+            return None                         # asked recently and it failed: try again later, not every minute
+        self._check_tried_at = time.time()
         robots = self._list_robots(stop, force=True)
+        if stop.is_set():
+            return None                         # stopped meanwhile: a new sign-in owns the check now
         if robots is None:
             return None                         # the lookup failed: still pending
         self._check_sn = False

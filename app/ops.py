@@ -58,7 +58,7 @@ class Ops:
         self.cloud = CloudTransport(cfg.data_dir, rec.sn, self._from_cloud, on_sn=self._cloud_found_sn)
         self._loop: asyncio.AbstractEventLoop | None = None
         # After a sign-in the cloud checks a serial kept from the account against the new account (never mid-run).
-        self.cloud.sn_source = lambda: None if self.rec.run_id else found_sn(self.store).get("from")
+        self.cloud.sn_source = self._kept_sn_source
         self.cloud.on_forget = self._cloud_forgot_sn
         # Local first, the cloud as a fallback, for reads and commands alike (app/link.py).
         self.link = RobotLink(rec, self.cloud, self.store, mark_sent=rec.mark_sent)
@@ -173,6 +173,13 @@ class Ops:
         self.cloud.sn = sn
         if self.cloud._thread and self.cloud._thread.is_alive():
             asyncio.get_running_loop().run_in_executor(None, self.cloud.restart)
+
+    def _kept_sn_source(self) -> str | None:
+        """Where the kept serial came from, for the cloud's check after a sign-in; None defers the check while the
+        robot is mowing (a run is open or its flags say a plan is going): the guards must keep watching it."""
+        if self.rec.run_id or self.rec.plan_active() is True:
+            return None
+        return found_sn(self.store).get("from")
 
     def _cloud_forgot_sn(self, sn: str) -> None:
         """From the cloud worker thread: the signed-in account has no robot with serial `sn`."""

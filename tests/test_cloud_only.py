@@ -464,7 +464,9 @@ def test_the_check_after_a_sign_in_stays_pending_until_it_can_run(tmp_path):
     assert c._kept_sn_elsewhere(threading.Event()) is None and c._check_sn and sdk.listed == 0
     c.sn_source = lambda: "account"                              # the run ended; the account doesn't answer
     assert c._kept_sn_elsewhere(threading.Event()) is None and c._check_sn and sdk.listed == 1
-    sdk.fail, sdk.robots = None, [SN]                             # it answers, and has the robot
+    sdk.fail, sdk.robots = None, [SN]                             # it answers again, and has the robot ...
+    assert c._kept_sn_elsewhere(threading.Event()) is None and c._check_sn and sdk.listed == 1   # ... not asked yet
+    c._check_tried_at -= 601                                      # ten minutes on
     assert c._kept_sn_elsewhere(threading.Event()) is None and not c._check_sn and c.sn == SN
 
 
@@ -514,3 +516,67 @@ def test_a_late_forget_leaves_a_newer_serial_alone(tmp_path, monkeypatch):
 def recmod_runstats():
     from app.runs import RunStats
     return RunStats()
+
+
+# -- the whole-PR review: serial format, mowing robots, a heard robot, the last robot's lists ------------------------
+def test_a_malformed_serial_from_the_account_is_never_followed(tmp_path):
+    """It would go into the MQTT topics: a "+" or "#" would subscribe to every robot."""
+    c = cloud(tmp_path, FakeSDK(["YB+0000", "YB/../X", SN2]))
+    assert c._find_sn() == SN2
+
+
+def test_the_account_check_waits_while_the_robot_is_mowing(tmp_path, monkeypatch):
+    o, env, store = _ops(tmp_path, monkeypatch)
+    assert o.rec.use_found_sn(SN)
+    o.rec.plan_active = lambda ts=None: True                      # a plan is going, no run recorded yet
+    assert o._kept_sn_source() is None
+    o.rec.plan_active = lambda ts=None: False
+    assert o._kept_sn_source() == "account"
+
+
+def test_no_robot_switch_while_a_plan_is_going(tmp_path, monkeypatch):
+    from fastapi import HTTPException
+    from app import main
+    o, env, store = _ops(tmp_path, monkeypatch)
+    assert o.rec.use_found_sn(SN)
+    o.rec.plan_active = lambda ts=None: True
+    o.cloud.devices = [{"sn": SN, "name": "", "model": ""}, {"sn": SN2, "name": "", "model": ""}]
+    req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(rec=o.rec, ops=o)))
+    try:
+        run(main.robot_from_account(req, {"sn": SN2}))
+        raise AssertionError("switched robots during a plan")
+    except HTTPException as exc:
+        assert exc.status_code == 409 and o.rec.sn == SN
+
+
+def test_a_robot_the_panel_hears_itself_is_never_forgotten(tmp_path, monkeypatch):
+    o, env, store = _ops(tmp_path, monkeypatch)
+    r = o.rec
+    r._follow(SN)
+    r._heard = ("192.0.2.50", 1883, SN)                           # its heart_beat on the local broker
+    r.forget_account_sn(SN)
+    assert r.sn == SN
+
+
+def test_a_switch_drops_the_last_robots_lists_and_survey(tmp_path, monkeypatch):
+    o, env, store = _ops(tmp_path, monkeypatch)
+    r = o.rec
+    r._follow(SN)
+    r.replies["get_all_map_backup"] = {"ts": 1.0, "changed": 1.0, "data": [{"id": 7}]}
+    r.wifi_survey, r._wifi_waiting = {"asked": 3}, (1.0, 0.0, 0.0)
+    r._follow(SN2)
+    assert r.replies == {} and r.wifi_survey is None and r._wifi_waiting is None
+
+
+def test_a_stopped_worker_leaves_a_new_sign_ins_check_alone(tmp_path):
+    stop = threading.Event()
+    sdk = FakeSDK([SN])
+    c = cloud(tmp_path, sdk, sn=SN)
+    c.sn_source, c._check_sn = (lambda: "account"), True
+
+    def signed_in_again_meanwhile():
+        stop.set()
+        c._check_sn = True                                       # login() set it for the new account
+        return FakeSDK.get_devices(sdk)
+    sdk.get_devices = signed_in_again_meanwhile
+    assert c._kept_sn_elsewhere(stop) is None and c._check_sn
