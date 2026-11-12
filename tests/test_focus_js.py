@@ -20,6 +20,11 @@ def run_flow() -> dict:
     return {row[0]: row[1:] for row in json.loads(out)}
 
 
+def run_emerg() -> dict:
+    out = subprocess.run(["node", str(ROOT / "tests" / "emerg_flow.cjs")], capture_output=True, text=True, check=True)
+    return json.loads(out.stdout)
+
+
 @needs_node
 def test_opening_closing_and_retrying_move_focus_to_the_control_that_takes_over():
     r = run_flow()
@@ -83,14 +88,16 @@ def test_an_armed_emergency_button_never_gets_focus_back_so_a_stray_key_cannot_s
     assert r["emerg-armed-refresh"] == ["BODY", None]                  # and no later refresh while armed puts it back
 
 
-def test_the_emergency_card_marks_the_armed_button():
-    assert '"data-nofocus": armed ? "" : null' in (ROOT / "web" / "ops.js").read_text(encoding="utf-8")
+@needs_node
+def test_the_emergency_card_marks_only_the_armed_button():
+    r = run_emerg()
+    assert r["cardUnarmed"] == []                                      # the real card from web/ops.js, nothing armed
+    assert r["cardArmed"] == ["stop"]                                  # armed: that button alone is data-nofocus
 
 
 @needs_node
 def test_emergency_tap_ignores_a_too_quick_second_tap_sends_once_after_the_gap_and_expires():
-    out = subprocess.run(["node", str(ROOT / "tests" / "emerg_flow.cjs")], capture_output=True, text=True, check=True)
-    r = json.loads(out.stdout)
+    r = run_emerg()
     assert r["armed"] is True                                          # the first tap arms and sends nothing
     assert r["tooQuick"] == {"sent": 0, "stillArmed": True}            # 500 ms on: a double-click, ignored
     assert r["afterGap"]["sent"] == [["/api/control/send", "resume", True]]   # 1.05 s after arming: sent once
