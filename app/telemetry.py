@@ -50,6 +50,12 @@ FIELDS = {
     "blade_temp_l": "mower_head_info03.left_blade_motor_temp",
     "blade_temp_r": "mower_head_info04.right_blade_motor_temp",
     "cpu_temp": "system_info.cpu.Temperature",
+    "cpu_usage": "system_info.cpu.Usage",                      # percent, 0-100 for the whole CPU
+    "mem_available_kb": "system_info.mem.MemAvailable",         # kB, as in /proc/meminfo
+    "mem_free_kb": "system_info.mem.MemFree",
+    "mem_cached_kb": "system_info.mem.Cached",
+    "disk_available_b": "system_info.userdata.disk.availableSize",   # bytes, the robot's user-data partition
+    "disk_used_b": "system_info.userdata.disk.usedSize",
     "odo_l": "WheelSpeedMSG.dist_left",
     "odo_r": "WheelSpeedMSG.dist_right",
 }
@@ -114,13 +120,28 @@ HEAD_TYPES = {0: "None", 1: "Snow Blower", 2: "Blower", 3: "Mower", 4: "Smart Co
 RTK_LABELS = {0: "no fix", 1: "single point", 2: "DGPS", 4: "RTK fixed", 5: "RTK float", 6: "dead reckoning"}
 
 
+_MISSING = object()
+
+
+def _find(cur, parts):
+    """Walk `parts` down nested dicts. A key may also be a flat dotted string: the robot's system_info sends
+    "cpu.Usage" as one key, not {"cpu": {"Usage": ...}}, so every way of joining the next parts is tried."""
+    if not parts:
+        return cur
+    if not isinstance(cur, dict):
+        return _MISSING
+    for i in range(1, len(parts) + 1):
+        key = ".".join(parts[:i])
+        if key in cur:
+            found = _find(cur[key], parts[i:])
+            if found is not _MISSING:
+                return found
+    return _MISSING
+
+
 def get(d, path: str, default=None):
-    cur = d
-    for part in path.split("."):
-        if not isinstance(cur, dict) or part not in cur:
-            return default
-        cur = cur[part]
-    return cur
+    found = _find(d, path.split("."))
+    return default if found is _MISSING else found
 
 
 def _number(value):
