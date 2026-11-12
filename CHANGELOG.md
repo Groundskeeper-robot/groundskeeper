@@ -12,6 +12,13 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   browser and nothing is sent anywhere. It says **weak link** when loss is 5% or more, the picture froze for 10% of
   the time or the library rates the robot's upload poor, and **slow to draw** when this browser shows far fewer
   frames than arrive. The demo shows a made-up line.
+- **Prometheus metrics** (2 of 3 for #95): `GET /api/metrics` in the Prometheus text format, **off** until
+  Settings → Access → **Metrics** is switched on, scraped with a metrics-only API token. `yarbo_*` for the robot's
+  values (battery, RTK, wheels, signal, plan progress, errors) and `groundskeeper_*` for the panel's own state (cloud
+  and route connected, run active, guards, last command). It has no position (no latitude, longitude, local x/y or
+  RTK height), no serial and no robot label; a scrape asks nothing of the robot, Home Assistant or Frigate; robot
+  values are dropped once the snapshot is over 5 minutes old, with `yarbo_snapshot_age_seconds` left to alert on.
+  See Integrations. Not on the MCP server.
 - **Pre-release images for testing** (`ghcr.io/groundskeeper-robot/groundskeeper-dev`): `:edge` after every merge
   and `:nightly` once a night, in their own package so they never replace `:latest` or a release. Settings → This
   panel shows the channel beside the version, for example `0.19.7 · nightly · 1a756d0`. See the README.
