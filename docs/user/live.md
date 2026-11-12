@@ -61,7 +61,9 @@ are pink, edge passes violet.
   An error says which step failed and a short reason, such as "Joining failed: OperationError".
   - The tile works with the panel opened over plain http at its LAN address (`http://<server>:8427`) as well as
     over https: it only watches, so it never asks for the browser's camera or microphone, which browsers allow
-    only on https or localhost.
+    only on https or localhost. Over plain http the panel hands the browser the stream's token and key
+    unencrypted, as it does everything else, so anyone on the same network can read them: use https on a network
+    you do not trust.
   - **Control is off** (hover the note for this): the panel cannot switch the cameras on, so it plays only if they
     are already on, for example from the Yarbo app. Switch Control on, then **Close** and **Open** the tile again:
     an open tile does not send the camera switch again when Control comes on.
