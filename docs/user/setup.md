@@ -2,10 +2,11 @@
 <!-- order: 1 -->
 
 [Settings → Set up](#settings/setup) walks through these steps in order. It opens by itself on a fresh install
-(not signed in to the Yarbo cloud or no map yet), and each step is the same controls as its own Settings section,
-so you can also skip the guide and work through the list below. A tick means the panel already has what the step
-needs; nothing is stored for the guide itself. The page updates by itself while something is on its way (the robot
-connecting, the cloud signing in, the imagery loading), so there is no need to reload.
+(not signed in to the Yarbo cloud or no map yet) and when the saved Yarbo session has expired. Each step is the
+same controls as its own Settings section, so you can also skip the guide and work through the list below. A tick
+means the panel already has what the step needs; nothing is stored for the guide itself. The page updates by itself
+while something is on its way (the robot connecting, the cloud signing in, the imagery loading), so there is no need
+to reload.
 
 Before any of this, the first visit sets the admin password. It needs the setup code from the panel's log
 (`docker logs groundskeeper`); see [Signing in](#help/settings).
