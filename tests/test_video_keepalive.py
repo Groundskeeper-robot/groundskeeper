@@ -742,9 +742,9 @@ def test_a_beat_reads_the_light_context_and_never_waits_on_frigate_or_home_assis
         raise AssertionError("a beat must not build the full context (Frigate, Home Assistant)")
 
     t.controller._context = slow_context
-    t.controller.light_context = lambda: {"snapshot_age_s": 3, "route_state": "connected"}
+    t.controller.light_context = lambda: {"snapshot_age_s": 3, "route_state": "connected", "cloud_route": True}
     assert play(t).json()["sent"] is True
-    t.controller.light_context = lambda: {"snapshot_age_s": 600, "route_state": "connected"}
+    t.controller.light_context = lambda: {"snapshot_age_s": 600, "route_state": "connected", "cloud_route": True}
     t.clock[0] += 4
     assert beat(t).json()["ended"] is True                             # its checks still see the robot go offline
 
@@ -754,8 +754,8 @@ def test_the_ops_beat_context_has_what_the_checks_read_and_no_awaits():
     assert not inspect.iscoroutinefunction(ops_mod.Ops.beat_context)
     o = ops_mod.Ops.__new__(ops_mod.Ops)
     o.rec = SimpleNamespace(snapshot_at=None)
-    o.link = SimpleNamespace(state="connected")
-    assert o.beat_context() == {"snapshot_age_s": None, "route_state": "connected"}
+    o.link = SimpleNamespace(state="connected", cloud_only_ok=lambda: True)
+    assert o.beat_context() == {"snapshot_age_s": None, "route_state": "connected", "cloud_route": True}
 
 
 def test_the_events_log_leaves_out_the_beats_that_went_but_keeps_refusals(t):

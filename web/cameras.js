@@ -60,9 +60,9 @@ const cams = { open: false, camera: savedCamera(), phase: "closed", message: "",
 // The hints on screen are short; what each one means is its tooltip (and docs/user/live.md).
 const CAM_HELP = {
   "Control is off.": "The panel cannot switch the cameras on or keep the robot awake while Control is off. They play " +
-                     "if the robot already has them on.",
+                     "if the robot already has them on. Switch Control on, then close and open the tile again.",
   "Asleep, or cameras off.": "The robot may be asleep, or its cameras are off: open the Yarbo app, or switch Control " +
-                             "on to wake them.",
+                             "on, then close and open the tile again.",
   "Cameras off, or asleep.": "Its cameras may have switched off, or the robot went to sleep.",
 };
 

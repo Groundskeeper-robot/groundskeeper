@@ -18,8 +18,10 @@ still notify.
 
 ## What every command passes
 
-Only five run commands exist: start a plan, pause, resume, stop, return to dock; the sixth only switches the robot's
-cameras on, and only for a person at the panel. **Manual driving is blocked for good.**
+Only five run commands exist: start a plan, pause, resume, stop, return to dock. Two more serve only the Cameras tile,
+and only for a person at the panel: switching the robot's cameras on, and a keep-awake (every 4 seconds while the tile
+is open, at most 15 minutes per **Open**). Both go through the Yarbo cloud only, never on your network, and neither
+can switch anything off. **Manual driving is blocked for good.**
 Each one is checked, in order:
 
 1. It is one of those commands.

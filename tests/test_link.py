@@ -115,7 +115,7 @@ def _controller(tmp_path, monkeypatch, state):
     async def context(args):
         return {"snapshot_age_s": 1, "route_state": "connected", "plans": [{"id": 1}], "error_code": 0, "battery": 90,
                 "running": False, "yard": {"ok": True, "detail": "clear"}, "phone_app_active": False,
-                "conditions": "Dry", "presence": True, "writing": False}
+                "conditions": "Dry", "presence": True, "writing": False, "cloud_route": True}
 
     def expect(cmd):
         return asyncio.get_running_loop().create_future()
@@ -404,3 +404,9 @@ def test_a_late_echo_of_the_watched_command_does_not_stop_the_repeat(tmp_path, m
 
     asyncio.run(go())
     assert cl.sent == ["pause"]
+
+
+def test_cloud_only_ok_needs_the_cloud_and_a_mode_that_allows_it(tmp_path):
+    assert _link(tmp_path)[0].cloud_only_ok() is True
+    assert _link(tmp_path / "a", mode="local")[0].cloud_only_ok() is False
+    assert _link(tmp_path / "b", cloud="needs login")[0].cloud_only_ok() is False

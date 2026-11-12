@@ -1,6 +1,8 @@
 # Third-party notices
 
-The panel's own code is [MIT](LICENSE). The Docker image also carries these libraries in `web/vendor/`, fetched at
+The panel's own code is
+[MIT](https://github.com/Groundskeeper-robot/groundskeeper/blob/main/LICENSE) (a full link, as this file sits
+beside no `LICENSE` in the Docker image). The image also carries these libraries in `web/vendor/`, fetched at
 build time by the `Dockerfile` (pinned, checksummed) and never loaded from a CDN at runtime. They are not stored in git.
 
 | Library | Version | Licence |

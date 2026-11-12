@@ -142,6 +142,12 @@ def check(cmd: str, args: dict, ctx: dict, cfg: dict, actor: str) -> list[dict]:
             add("Someone home (Alarmo)", ctx["presence"] is True,
                 {True: "yes", False: "Alarmo armed away", None: "unknown"}[ctx["presence"]])
         return out
+    if cmd in ("smart_vision_control", KEEP_AWAKE):
+        # Both go only through the cloud for now (link.CLOUD_ONLY_ON), so a preview must not say it would send with
+        # only the local broker up. Unknown fails closed.
+        cr = ctx.get("cloud_route") is True
+        add("Cloud route", cr, "the Yarbo cloud is connected" if cr
+            else "these go through the Yarbo cloud only for now, and it is not available")
     if cmd == "smart_vision_control":
         # Allowed idle or running, like pause, stop and dock: it only starts the robot's video, so the route and
         # online checks are all it needs. The one extra rule is that "on" is the only thing that can be asked for.

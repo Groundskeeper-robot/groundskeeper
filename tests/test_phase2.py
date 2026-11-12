@@ -21,7 +21,8 @@ class FakeCloud:
 def good_ctx(**over):
     ctx = {"snapshot_age_s": 5, "route_state": "connected", "plans": [{"id": 1, "name": "Mow All"}], "error_code": 0,
            "battery": 90, "running": False, "yard": {"ok": True, "detail": "clear", "events": []},
-           "phone_app_active": False, "conditions": "Dry", "presence": True, "writing": False}
+           "phone_app_active": False, "conditions": "Dry", "presence": True, "writing": False,
+           "cloud_route": True}
     ctx.update(over)
     return ctx
 
@@ -562,3 +563,23 @@ def test_a_saved_serial_reaches_the_cloud_client_with_no_robot_address(tmp_path,
     assert not o.cfg.yarbo_host and o.cloud.sn is None
     run(o.rec.apply_robot())
     assert o.rec.sn == "YB0000DEMO0001" and o.cloud.sn == "YB0000DEMO0001"
+
+
+@pytest.mark.parametrize("cmd", ["smart_vision_control", "set_working_state"])
+def test_the_cloud_only_commands_preview_as_blocked_without_the_cloud_route(tmp_path, cmd):
+    """Only the local broker is up: command() would refuse the send, so the preview must not say it would go."""
+    for ctx in ({"cloud_route": False}, {"cloud_route": None}, {"cloud_route": 1}):
+        store, cloud, c = make_controller(tmp_path, ctx=good_ctx(**ctx), enabled=True)
+        out = run(c.preview(cmd, {}))
+        assert out["would_send"] is False
+        assert any(k["name"] == "Cloud route" and k["ok"] is not True and k["hard"] for k in out["checks"])
+    gone = good_ctx()
+    del gone["cloud_route"]                                         # an unknown route fails closed too
+    store, cloud, c = make_controller(tmp_path, ctx=gone, enabled=True)
+    assert any(k["name"] == "Cloud route" and k["ok"] is False for k in run(c.preview(cmd, {}))["checks"])
+
+
+def test_the_cloud_route_check_does_not_touch_other_commands(tmp_path):
+    store, cloud, c = make_controller(tmp_path, ctx=good_ctx(cloud_route=False), enabled=True)
+    assert "Cloud route" not in [k["name"] for k in run(c.preview("pause", {}))["checks"]]
+

@@ -254,7 +254,7 @@ class Ops:
         lock across a Frigate or Home Assistant timeout."""
         r = self.rec
         return {"snapshot_age_s": round(time.time() - r.snapshot_at, 1) if r.snapshot_at else None,
-                "route_state": self.link.state}
+                "route_state": self.link.state, "cloud_route": self.link.cloud_only_ok()}
 
     async def context(self, args: dict) -> dict:
         r = self.rec
@@ -265,6 +265,7 @@ class Ops:
         return {
             "snapshot_age_s": snap_age,
             "route_state": self.link.state,
+            "cloud_route": self.link.cloud_only_ok(),
             "plans": r.plans,
             "error_code": int(t.get("error_code") or 0),
             "battery": t.get("battery"),

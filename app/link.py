@@ -99,6 +99,11 @@ class RobotLink:
             return "cloud" if self.mode() != "local" and self.cloud_up() else None
         return self.command_route()
 
+    def cloud_only_ok(self) -> bool:
+        """A command in CLOUD_ONLY_ON has a route now: the cloud is up and the mode allows it (what command() needs
+        while the local broker is not proved for it). For the interlocks."""
+        return self.mode() != "local" and self.cloud_up()
+
     def other_route(self, route: str) -> str | None:
         """The fallback for a command that went `route` and was not seen (Automatic only)."""
         if self.mode() != "auto":

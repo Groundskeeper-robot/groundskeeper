@@ -35,7 +35,7 @@ recorded, and guarded.
 | **Health & Maintenance** | RTK/RTCM, HaLow, battery cells, motors, firmware, error dictionary, service timers | §15 |
 | **Insights** | Aggregates across runs, seasons and years | §16 |
 | **Integrations** | Home Assistant entities and alerts, webhooks, an MCP server for AI assistants, notifications | §17 |
-| **Robot cameras** | Planned: a Cameras tile on Live, people only, off by default; see §13 | §13 |
+| **Robot cameras** | A Cameras tile on Live, people only, off by default; plays on one robot, see §13 | §13 |
 
 ### Non-goals
 
@@ -58,7 +58,7 @@ recorded, and guarded.
 | Where the phone app's traffic goes | — | **Cloud, even on the home Wi-Fi** |
 | Official run commands | Not used (see §10.2) | Yes; the panel's control route |
 | Map / plan / schedule writes | Not used | Yes, as captured from the app (`map-writes.md`) |
-| Camera video | No | Planned, not on MQTT: the switch is, the stream is Agora's (§13) |
+| Camera video | No | Yes, not on MQTT: the switch is, the stream is Agora's (§13) |
 
 Details and ACLs are in [`protocol.md`](protocol.md).
 
@@ -330,8 +330,9 @@ and blade load. Wheel slip confounds wet grass with slope and turning; without a
 ### 10.1 Catalogue
 The source of truth for official commands is the SDK's `devices/yarbo_Y.json` → `control_topics`. The panel exposes
 exactly five run commands: `start_plan`, `pause`, `resume`, `stop`, `cmd_recharge` (return to dock), plus
-`smart_vision_control {"state":1}` (cameras on; people only, cloud only, never off; §13). Everything else
-is refused, and **`cmd_vel` (manual drive) is hard-blocked for every actor**.
+`smart_vision_control {"state":1}` (cameras on) and `set_working_state {"state":1}` (keep-awake), both people only,
+cloud only and never off (§13). Everything else is refused, and **`cmd_vel` (manual drive) is hard-blocked for every
+actor**.
 
 The robot sends no reply to run commands on either broker, so a command is **confirmed by the robot's state
 changing** the way the command should change it (for example `planning_paused` becoming 1 after `pause`). An
@@ -485,7 +486,9 @@ The panel does not get into the robot, and no video passes through the panel. It
      limit, the robot going offline or losing its route, no route at all, or the beats stopping ends the window: the
      tile closes and says so, and a person presses Open again. A run does not end it (the robot is awake for the run
      anyway, and the viewer may need the beats). With Control off nothing goes out and no audit row is written per
-     beat, and the window ends only when its time is up.
+     beat. The window then ends `KEEP_AWAKE_GAP_S` (15 s) after the last beat that went out, even while the tile keeps
+     asking: nothing is sent, so the beats have stopped by the gap rule. This is deliberate, and Control coming back
+     on does not reopen it: closing and opening the tile starts a new window.
    - At most one beat per `KEEP_AWAKE_MIN_S` (3 s) for all viewers together, dropped quietly before `send` (a quiet
      `{"sent": false, "limited": true}`), so several tabs cannot fill the audit log with refusals.
    - Each beat waits a random 0 to `KEEP_AWAKE_JITTER_S` (1 s) first, so the phone app's beats cannot stay in step with
