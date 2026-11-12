@@ -22,7 +22,7 @@ dependencies = [
     "uvicorn[standard]>=0.54.0,<1",
     "paho-mqtt>=2.2.0,<3",
     "httpx>=0.28.1,<1",
-    "yarbo-data-sdk==0.2.1",          # MIT; 0.3.0 and later are PolyForm Noncommercial
+    "yarbo-data-sdk==0.3.0",          # PolyForm Noncommercial 1.0.0 (THIRD_PARTY_NOTICES.md)
     "pillow>=13.0.0,<14",
     "numpy>=2.5.4,<3",
     "mcp>=2.3,<3",

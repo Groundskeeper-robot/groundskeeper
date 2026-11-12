@@ -55,14 +55,15 @@ are pink, edge passes violet.
 - **Problem areas:** a weak-positioning spot also says when HaLow was weak there (−77 dBm or lower) or corrections
   came late. A good link there points at the sky view instead: trees, walls, the house.
 - **Cameras:** the robot's own cameras (front, left, right, back), not the yard cameras of the follow-cam. The tile
-  is there only when [Settings → Robot → Robot video](#help/settings) is on. **Open**
+  is there only when [Settings → Robot → Robot video](#settings/robot) is on. **Open**
   switches the robot's cameras on (needs Control on) and shows one camera at a time: pick Front, Left, Right or
   Back. The state beside the title is *Connecting*, *Waiting for the robot*, *Live* or an error with **Try again**.
   An error says which step failed and a short reason, such as "Joining failed: OperationError".
   - **Control is off** (hover the note for this): the panel cannot switch the cameras on, so it plays only if they
-    are already on, for example from the Yarbo app.
+    are already on, for example from the Yarbo app. Switch Control on, then **Close** and **Open** the tile again:
+    an open tile does not send the camera switch again when Control comes on.
   - **Asleep, or cameras off** (and **Cameras off, or asleep** when the video stops): the robot may be asleep or its
-    cameras off. Open the Yarbo app, or switch Control on to wake them.
+    cameras off. Open the Yarbo app, or switch Control on, then **Close** and **Open** the tile again.
   - The video comes from Agora's network to your browser and plays only while the tile is open: **Close**, another
     page, a hidden tab or a closed page stop it. The panel never switches the cameras off, because that would cut the
     Yarbo app's view too; the robot does that itself.

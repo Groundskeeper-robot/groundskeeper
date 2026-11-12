@@ -22,7 +22,7 @@ ADD --chmod=644 --checksum=sha256:08fd7545d13d2c7fb65ab691530a802dafefd638596501
 ADD --chmod=644 --checksum=sha256:63a04a823e6e589a6dd4384e2c175a8e6f70c313f6f58aa88fd92e436ced55fe \
     https://cdn.jsdelivr.net/npm/agora-rtc-sdk-ng@4.24.9/AgoraRTC_N-production.js \
     /app/web/vendor/AgoraRTC_N-production.js
-COPY --chmod=644 THIRD_PARTY_NOTICES.md /app/web/vendor/THIRD_PARTY_NOTICES.md
+COPY --chmod=644 THIRD_PARTY_NOTICES.md LICENSE /app/web/vendor/
 
 COPY app /app/app
 COPY catalog /app/catalog
