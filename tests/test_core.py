@@ -99,6 +99,9 @@ def test_extract_tolerates_a_missing_or_odd_system_info():
         assert t["cpu_usage"] is None and t["mem_free_kb"] is None and t["disk_used_b"] is None
         assert t["mem_cached_kb"] is None or math.isnan(t["mem_cached_kb"])
     assert telemetry.extract({})["cpu_usage"] is None
+    flags = telemetry.extract({"system_info": {"cpu.Usage": True, "mem.MemFree": True,
+                                               "userdata.disk.usedSize": False}})
+    assert flags["cpu_usage"] is None and flags["mem_free_kb"] is None and flags["disk_used_b"] is None
 
 
 def test_labels():

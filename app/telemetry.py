@@ -158,8 +158,15 @@ def _number(value):
     return None
 
 
+# A boolean is a flag for the state fields but never a reading for these, so it is left out, not turned into 1.
+MEASURED = ("cpu_usage", "mem_available_kb", "mem_free_kb", "mem_cached_kb", "disk_available_b", "disk_used_b")
+
+
 def extract(snapshot: dict) -> dict:
     out = {col: _number(get(snapshot, path)) for col, path in FIELDS.items()}
+    for col in MEASURED:
+        if isinstance(get(snapshot, FIELDS[col]), bool):
+            out[col] = None
     if out.get("odom_ts") is not None and out["odom_ts"] > 1e11:    # milliseconds, as CombinedOdom sends it
         out["odom_ts"] = out["odom_ts"] / 1000
     temps = [_number(get(snapshot, f"BatteryMSG.temperature{i}")) for i in range(1, 7)]
