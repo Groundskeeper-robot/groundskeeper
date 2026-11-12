@@ -41,7 +41,7 @@ class CloudTransport:
         # Set by Ops: where the kept serial came from ("account", "heart_beat", "settings"; None to skip the check, as
         # during a run), and what to do when a serial kept from another account is dropped.
         self.sn_source: Callable[[], str | None] | None = None
-        self.on_forget: Callable[[], None] | None = None
+        self.on_forget: Callable[[str], None] | None = None
         self._check_sn = False           # after a sign-in: is the kept serial on this account?
         self._devices_at = 0.0
         self.state = "signed out"
@@ -247,17 +247,27 @@ class CloudTransport:
 
     def _kept_sn_elsewhere(self, stop: threading.Event) -> list | None:
         """After a sign-in: when the kept serial came from an account and this account doesn't list it, drop it and
-        return this account's robots (to choose from). None when it stays (or can't be checked now)."""
-        self._check_sn = False
-        if not (self.sn and self.sn_source and self.sn_source() == "account"):
-            return None                         # from the robot itself (or none): not an account's to drop
+        return this account's robots (to choose from). None when it stays, or can't be checked now (a run is open,
+        the lookup failed): then the check stays pending and is tried again."""
+        if not self.sn:
+            self._check_sn = False
+            return None
+        source = self.sn_source() if self.sn_source else None
+        if source is None:
+            return None                         # a run is open: checked once it has ended
+        if source != "account":
+            self._check_sn = False              # from the robot itself: not an account's to drop
+            return None
         robots = self._list_robots(stop, force=True)
-        if robots is None or any(d.sn == self.sn for d in robots):
+        if robots is None:
+            return None                         # the lookup failed: still pending
+        self._check_sn = False
+        if any(d.sn == self.sn for d in robots):
             return None
         log.info("the signed-in Yarbo account has no robot with the kept serial: finding the robot again")
-        self.sn = None
+        dropped, self.sn = self.sn, None
         if self.on_forget:
-            self.on_forget()
+            self.on_forget(dropped)
         return robots
 
     def _run(self, stop: threading.Event) -> None:
@@ -301,6 +311,11 @@ class CloudTransport:
                 while not stop.wait(60):
                     if not self.connected:
                         break
+                    if self._check_sn:          # still pending after a sign-in (a run was open, or the lookup failed)
+                        listed = self._kept_sn_elsewhere(stop)
+                        if listed is not None:  # not this account's robot: drop the connection and choose again
+                            self._close_client()
+                            break
                     if time.time() - self._last_refresh > 12 * 3600:
                         if not self._refresh():
                             self._close_client()

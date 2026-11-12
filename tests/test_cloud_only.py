@@ -384,17 +384,17 @@ def test_a_serial_from_another_account_is_dropped_after_a_sign_in(tmp_path):
     forgot = []
     stop = CountingStop(2)
     c = cloud(tmp_path, FakeSDK([SN2, "YB0000DEMO0003"]), sn=SN)
-    c.sn_source, c.on_forget, c._check_sn = (lambda: "account"), (lambda: forgot.append(True)), True
+    c.sn_source, c.on_forget, c._check_sn = (lambda: "account"), forgot.append, True
     c._refresh = lambda: True
     c._run(stop)
-    assert c.sn is None and forgot == [True]
+    assert c.sn is None and forgot == [SN]
     assert [d["sn"] for d in c.status()["devices"]] == [SN2, "YB0000DEMO0003"]     # this account's robots to choose
 
 
 def test_a_serial_the_new_account_also_has_is_kept(tmp_path):
     sdk = FakeSDK([SN, SN2])
     c = cloud(tmp_path, sdk, sn=SN)
-    c.sn_source, c.on_forget = (lambda: "account"), (lambda: (_ for _ in ()).throw(AssertionError("dropped")))
+    c.sn_source, c.on_forget = (lambda: "account"), (lambda sn: (_ for _ in ()).throw(AssertionError("dropped")))
     c._check_sn = True
     assert c._kept_sn_elsewhere(threading.Event()) is None and c.sn == SN and sdk.listed == 1
 
@@ -411,7 +411,7 @@ def test_the_recorder_forgets_a_serial_from_another_account(tmp_path, monkeypatc
     o, env, store = _ops(tmp_path, monkeypatch)
     assert o.rec.use_found_sn(SN)
     o.rec.snapshot_at, o.rec.t = time.time(), {"battery": 80}
-    o.rec.forget_account_sn()
+    o.rec.forget_account_sn(SN)
     assert o.rec.sn is None and _kept(store) == {} and o.rec.snapshot_at == 0.0 and o.rec.t == {}
 
 
@@ -454,3 +454,63 @@ def test_a_person_can_choose_a_robot_and_an_api_token_cannot(tmp_path, monkeypat
     finally:
         for k, v in old.items():
             setattr(main.app.state, k, v)
+
+
+# -- round 4: pending checks, restored state, queued messages, runs across a switch -------------------------------
+def test_the_check_after_a_sign_in_stays_pending_until_it_can_run(tmp_path):
+    sdk = FakeSDK(fail=ConnectionError("offline"))
+    c = cloud(tmp_path, sdk, sn=SN)
+    c.sn_source, c._check_sn = (lambda: None), True              # a run is open
+    assert c._kept_sn_elsewhere(threading.Event()) is None and c._check_sn and sdk.listed == 0
+    c.sn_source = lambda: "account"                              # the run ended; the account doesn't answer
+    assert c._kept_sn_elsewhere(threading.Event()) is None and c._check_sn and sdk.listed == 1
+    sdk.fail, sdk.robots = None, [SN]                             # it answers, and has the robot
+    assert c._kept_sn_elsewhere(threading.Event()) is None and not c._check_sn and c.sn == SN
+
+
+def test_a_map_restored_with_no_serial_kept_is_not_another_robots(tmp_path, monkeypatch):
+    """A serial was forgotten (another account) and the panel restarted: what _restore loaded belongs to the old
+    robot, so the first robot followed starts clean."""
+    o, env, store = _ops(tmp_path, monkeypatch)
+    r = o.rec
+    assert r.sn is None
+    r.map_raw, r.map_geojson, r.plans = {"areas": []}, {"type": "FeatureCollection", "features": []}, [{"id": 1}]
+    assert r.use_found_sn(SN2)
+    assert (r.map_raw, r.map_geojson, r.plans) == (None, None, []) and r._map_wake.is_set()
+
+
+def test_a_message_queued_for_the_last_robot_is_dropped(tmp_path, monkeypatch):
+    o, env, store = _ops(tmp_path, monkeypatch)
+    r = o.rec
+    assert r.use_found_sn(SN2)
+    r._handle(f"snowbot/{SN}/device/DeviceMSG", {"BatteryMSG": {"capacity": 80}}, time.time())
+    r._handle(f"snowbot/{SN}/device/heart_beat", {"working_state": 1}, time.time())
+    assert r.snapshot == {} and r.t == {} and r.heartbeat_at == 0.0
+
+
+def test_a_switch_closes_the_last_robots_open_run(tmp_path, monkeypatch):
+    o, env, store = _ops(tmp_path, monkeypatch)
+    r = o.rec
+    r._follow(SN)
+    now = time.time()
+    r.run_id = store.start_run(now - 600, 1, None)
+    r.run_stats, r.run_started = recmod_runstats(), now - 600
+    r._follow(SN2)                                               # a heart_beat names another robot
+    assert r.run_id is None and r.run_stats is None
+    assert store.runs()[0]["ended"] is not None
+    assert any(e["kind"] == "run_ended" and "robot changed" in e["detail"] for e in store.events(10))
+
+
+def test_a_late_forget_leaves_a_newer_serial_alone(tmp_path, monkeypatch):
+    from app.runtime import FOUND_SN
+    o, env, store = _ops(tmp_path, monkeypatch)
+    r = o.rec
+    r._follow(SN2)                                               # a heart_beat found B ...
+    store.set_setting(FOUND_SN, {"sn": SN2, "from": "heart_beat"})
+    r.forget_account_sn(SN)                                      # ... before the account's "drop A" arrived
+    assert r.sn == SN2 and _kept(store) == {"sn": SN2, "from": "heart_beat"}
+
+
+def recmod_runstats():
+    from app.runs import RunStats
+    return RunStats()

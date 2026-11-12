@@ -122,6 +122,8 @@ FIRMWARE_SETTLE_S = 60    # a new firmware version counts once it has been repor
 
 
 class Recorder:
+    sn: str | None = None            # the robot followed (set in __init__; the class default keeps bare test objects valid)
+
     def __init__(self, cfg: Config, store: Store, imagery: Imagery, sn: str):
         self.cfg, self.store, self.imagery, self.sn = cfg, store, imagery, sn
         self.loop: asyncio.AbstractEventLoop | None = None
@@ -137,6 +139,7 @@ class Recorder:
         self._heard: tuple | None = None                 # (host, port, serial) last heard on a heart_beat
         self._robot_task: asyncio.Task | None = None
         self._map_wake = asyncio.Event()                 # read the map now (another robot), not at the next refresh
+        self._state_sn = sn              # the robot the live state belongs to (what _restore loads is the kept one's)
         self.started_at = time.time()
 
         self.snapshot: dict = {}
@@ -548,6 +551,8 @@ class Recorder:
         parts = topic.split("/", 3)
         if len(parts) < 4:
             return
+        if self.sn and parts[1] != self.sn:
+            return                       # another robot's (queued before a switch): never this one's state or reply
         channel, name = parts[2], parts[3]
         if channel == "app":
             if ours is None:
@@ -925,15 +930,23 @@ class Recorder:
 
     def _follow(self, sn: str | None) -> None:
         if sn and sn != self.sn:
-            if self.sn:
+            # Another robot's state, or state of unknown origin (restored at start with no serial kept), never stands
+            # for this one.
+            if self._state_sn != sn and (self._state_sn or self.map_raw is not None or self.snapshot):
                 self._forget_robot_state()
-            self.sn = sn
+            self.sn, self._state_sn = sn, sn
             if self.on_sn:
                 self.on_sn(sn)
 
     def _forget_robot_state(self) -> None:
-        """Another robot from now on: nothing the last one reported may stand for it. The checks before a command
-        see no snapshot (unknown state blocks) until the new robot reports, and its map is read at once."""
+        """Another robot from now on: nothing the last one reported may stand for it. Its open run is closed, the
+        checks before a command see no snapshot (unknown state blocks) until the new robot reports, and its map is
+        read at once."""
+        if self.run_id is not None:
+            finished, stats = self.run_id, self.run_stats or RunStats()
+            self.store.end_run(finished, max(self.detector.last_moving, self.run_started), "robot changed", stats)
+            self.store.event("run_ended", f"run {finished}: robot changed, {stats.distance_m:.0f} m")
+            self.run_id, self.run_stats, self.run_plan = None, None, None
         self.snapshot, self.snapshot_at, self.update_at, self.t = {}, 0.0, 0.0, {}
         self.heartbeat, self.heartbeat_at = {}, 0.0
         self.poses.clear()
@@ -946,15 +959,16 @@ class Recorder:
         self.app_stream_at, self._stall_anchor = 0.0, None
         self._map_wake.set()
 
-    def forget_account_sn(self) -> None:
-        """The signed-in Yarbo account has no robot with the serial kept from an account: forget it (and the robot's
-        state); the cloud finds the robot on this account again."""
-        if found_sn(self.store).get("from") == "account":
+    def forget_account_sn(self, sn: str) -> None:
+        """The signed-in Yarbo account has no robot with serial `sn` (kept from an account): forget it and its state;
+        the cloud finds the robot on this account again. A serial found since (a heart_beat) is left alone."""
+        kept = found_sn(self.store)
+        if kept.get("sn") == sn and kept.get("from") == "account":
             self.store.delete_setting(FOUND_SN)
             self.store.event("robot_found", "robot serial forgotten: not on the signed-in Yarbo account")
-        if self.sn:
+        if self.sn == sn:
             self._forget_robot_state()
-            self.sn = None
+            self.sn, self._state_sn = None, None
 
     def keep_sn(self, sn: str, source: str) -> bool:
         """Keep a found serial so a restart while the local broker is closed still knows the robot. One heard on the

@@ -174,10 +174,10 @@ class Ops:
         if self.cloud._thread and self.cloud._thread.is_alive():
             asyncio.get_running_loop().run_in_executor(None, self.cloud.restart)
 
-    def _cloud_forgot_sn(self) -> None:
-        """From the cloud worker thread: the signed-in account has no robot with the kept serial."""
+    def _cloud_forgot_sn(self, sn: str) -> None:
+        """From the cloud worker thread: the signed-in account has no robot with serial `sn`."""
         if self._loop:
-            self._loop.call_soon_threadsafe(self.rec.forget_account_sn)
+            self._loop.call_soon_threadsafe(self.rec.forget_account_sn, sn)
 
     def _cloud_found_sn(self, sn: str) -> None:
         """From the cloud worker thread: the account's only robot gave the serial. Kept on the event loop."""
