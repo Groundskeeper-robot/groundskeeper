@@ -47,7 +47,7 @@ holds a real robot's data.
 DATA_DIR=./data .venv/bin/python -m app
 ```
 
-Then open Settings → Robot and give it the robot's address. `./data` holds your yard's location and your cloud
+Then open Settings → Robot and sign in to the Yarbo cloud. `./data` holds your yard's location and your cloud
 session. It is git-ignored; keep it that way.
 
 ## Checks
@@ -112,7 +112,7 @@ What we ask:
 
 The panel learns new robot commands only from the official app, never by guessing. To record one:
 
-1. Run the panel against your robot. It must be connected to the robot's local broker.
+1. Run the panel against your robot, signed in to the Yarbo cloud (Settings → Robot).
 2. Open Map Studio → More → **Record an app edit** and start a recording.
 3. Make one change in the Yarbo app, such as one setting on one area, and write down exactly what you changed.
 4. Stop the recording and open **Captured writes**. Passwords, tokens and email addresses are masked before

@@ -1,6 +1,6 @@
-"""Robots the panel can only reach through the Yarbo cloud (the local broker refuses connections): the serial comes
-from the account's robot list, a found serial is kept across restarts, the wait is said plainly, and the cloud
-worker survives a fresh sign-in. No network, no robot: the SDK client is a fake."""
+"""The robot's serial with only the Yarbo cloud to go by: it comes from the account's robot list, a found serial is
+kept across restarts, the wait is said plainly, and the cloud worker survives a fresh sign-in. No network, no robot:
+the SDK client is a fake."""
 import asyncio
 import logging
 import threading
@@ -9,7 +9,6 @@ import time
 import pytest
 from types import SimpleNamespace
 
-from app import recorder as recmod
 from app.cloud import CloudTransport
 
 SN = "YB0000DEMO0001"
@@ -201,42 +200,15 @@ def _ops(tmp_path, monkeypatch):
 
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     monkeypatch.delenv("YARBO_SN", raising=False)
-    monkeypatch.delenv("YARBO_HOST", raising=False)
     env = config.load()
     store = Store(env.data_dir)
     cfg = Runtime(env, store)
     return Ops(cfg, Recorder(cfg, store, Imagery(env.data_dir), None)), env, store
 
 
-class QuietTransport:
-    def __init__(self, host, port, sn, on_message):
-        self.host, self.port, self.sn, self.connected = host, port, sn, False
-        self.last_message_at, self.received, self.published, self.last_error = 0.0, 0, 0, ""
-
-    def start(self):
-        pass
-
-    def stop(self):
-        pass
-
-
 def _kept(store):
     from app.runtime import found_sn
     return found_sn(store)
-
-
-def _hears(monkeypatch, by_host):
-    monkeypatch.setattr(recmod, "discover_sn", lambda host, port, timeout: by_host[host])
-    monkeypatch.setattr(recmod, "LocalTransport", QuietTransport)
-
-
-def test_a_serial_from_the_heart_beat_survives_a_restart(tmp_path, monkeypatch):
-    o, env, store = _ops(tmp_path, monkeypatch)
-    o.cfg.set("robot", {"host": "192.0.2.50"})
-    _hears(monkeypatch, {"192.0.2.50": SN})
-    run(o.rec.apply_robot())
-    assert o.rec.sn == SN and o.cloud.sn == SN
-    assert _kept(store) == {"sn": SN, "from": "heart_beat"}       # a restart reads it back (app/main.py)
 
 
 def test_a_serial_from_the_account_is_kept_and_followed(tmp_path, monkeypatch):
@@ -251,50 +223,34 @@ def test_a_serial_from_the_account_is_kept_and_followed(tmp_path, monkeypatch):
     assert o.rec.sn == SN and _kept(store) == {"sn": SN, "from": "account"}
 
 
-def test_the_heart_beat_wins_over_the_account(tmp_path, monkeypatch):
-    o, env, store = _ops(tmp_path, monkeypatch)
-    assert o.rec.use_found_sn(SN2)               # the account spoke first
-    o.cfg.set("robot", {"host": "192.0.2.50"})
-    _hears(monkeypatch, {"192.0.2.50": SN})
-    run(o.rec.apply_robot())
-    assert o.rec.sn == SN and o.cloud.sn == SN and _kept(store) == {"sn": SN, "from": "heart_beat"}
-    assert not o.rec.use_found_sn(SN2)           # and the account never takes it back
-    assert o.rec.sn == SN and _kept(store)["sn"] == SN
-
-
-def test_another_robot_at_a_new_address_is_found_again(tmp_path, monkeypatch):
-    o, env, store = _ops(tmp_path, monkeypatch)
-    _hears(monkeypatch, {"192.0.2.50": SN, "192.0.2.60": SN2})
-    o.cfg.set("robot", {"host": "192.0.2.50"})
-    run(o.rec.apply_robot())
-    o.cfg.set("robot", {"host": "192.0.2.60"})
-    run(o.rec.apply_robot())
-    assert o.rec.sn == SN2 and o.rec.transport.sn == SN2 and _kept(store)["sn"] == SN2
-
-
-def test_a_closed_local_broker_still_gives_the_cloud_the_kept_serial(tmp_path, monkeypatch):
+def test_the_account_replaces_a_serial_kept_from_the_heart_beat(tmp_path, monkeypatch):
+    """Before firmware V3.14.4x closed the local broker the serial came from heart_beat. The account is the only source
+    now: a robot chosen there is followed, not refused."""
     from app.runtime import FOUND_SN
     o, env, store = _ops(tmp_path, monkeypatch)
     store.set_setting(FOUND_SN, {"sn": SN, "from": "heart_beat"})
-    o.cfg.set("robot", {"host": "192.0.2.50"})
-
-    def refused(host, port, timeout):
-        raise ConnectionRefusedError("refused")
-    monkeypatch.setattr(recmod, "discover_sn", refused)
     run(o.rec.apply_robot())
-    assert o.rec.transport is None and o.rec.sn == SN and o.cloud.sn == SN
+    assert o.rec.sn == SN and o.cloud.sn == SN                   # an older install still knows its robot
+    assert o.rec.use_found_sn(SN2)                                # chosen in Settings → Robot
+    assert o.rec.sn == SN2 and _kept(store) == {"sn": SN2, "from": "account"}
+
+
+def test_the_lookup_never_replaces_a_robot_already_followed(tmp_path, monkeypatch):
+    o, env, store = _ops(tmp_path, monkeypatch)
+    assert o.rec.use_found_sn(SN2)                                # a person chose SN2 while the lookup ran
+    assert not o.rec.use_found_sn(SN, chosen=False)               # the lookup's answer arrives late
+    assert o.rec.sn == SN2 and _kept(store)["sn"] == SN2
 
 
 def test_a_serial_once_typed_in_settings_is_moved_and_never_typed_again(tmp_path, monkeypatch):
     import pytest
     from app.runtime import Runtime
     o, env, store = _ops(tmp_path, monkeypatch)
-    store.set_setting("integrations", {"robot": {"host": "192.0.2.50", "sn": SN}})
+    store.set_setting("integrations", {"robot": {"host": "192.0.2.50", "port": 1883, "sn": SN}})
     cfg = Runtime(env, store)
     assert _kept(store) == {"sn": SN, "from": "settings"}
-    assert store.setting("integrations") == {"robot": {"host": "192.0.2.50"}} and cfg.yarbo_host == "192.0.2.50"
-    assert "sn" not in cfg.describe()["robot"]
-    with pytest.raises(ValueError):
+    assert store.setting("integrations") == {} and "robot" not in cfg.describe()     # address and port go too
+    with pytest.raises(KeyError):
         cfg.set("robot", {"sn": SN2})
 
 
@@ -399,12 +355,20 @@ def test_a_serial_the_new_account_also_has_is_kept(tmp_path):
     assert c._kept_sn_elsewhere(threading.Event()) is None and c.sn == SN and sdk.listed == 1
 
 
-@pytest.mark.parametrize("source", ["heart_beat", "settings", None])
-def test_only_a_serial_from_an_account_is_checked(tmp_path, source):
+def test_no_serial_is_checked_during_a_run(tmp_path):
     sdk = FakeSDK([SN2])
     c = cloud(tmp_path, sdk, sn=SN)
-    c.sn_source, c._check_sn = (lambda: source), True        # None: a run is open
+    c.sn_source, c._check_sn = (lambda: None), True          # Ops answers None while a run is open
     assert c._kept_sn_elsewhere(threading.Event()) is None and c.sn == SN and sdk.listed == 0
+
+
+@pytest.mark.parametrize("source", ["heart_beat", "settings"])
+def test_an_older_installs_serial_is_checked_too(tmp_path, source):
+    """The cloud is the only route: a robot the signed-in account doesn't list can't be reached, whatever gave its
+    serial before."""
+    c = cloud(tmp_path, FakeSDK([SN2]), sn=SN)
+    c.sn_source, c._check_sn = (lambda: source), True
+    assert c._kept_sn_elsewhere(threading.Event()) is not None and c.sn is None
 
 
 def test_the_recorder_forgets_a_serial_from_another_account(tmp_path, monkeypatch):
@@ -549,15 +513,6 @@ def test_no_robot_switch_while_a_plan_is_going(tmp_path, monkeypatch):
         assert exc.status_code == 409 and o.rec.sn == SN
 
 
-def test_a_robot_the_panel_hears_itself_is_never_forgotten(tmp_path, monkeypatch):
-    o, env, store = _ops(tmp_path, monkeypatch)
-    r = o.rec
-    r._follow(SN)
-    r._heard = ("192.0.2.50", 1883, SN)                           # its heart_beat on the local broker
-    r.forget_account_sn(SN)
-    assert r.sn == SN
-
-
 def test_a_switch_drops_the_last_robots_lists_and_survey(tmp_path, monkeypatch):
     o, env, store = _ops(tmp_path, monkeypatch)
     r = o.rec
@@ -625,3 +580,66 @@ def test_no_robot_switch_during_a_write(tmp_path, monkeypatch):
             except HTTPException as exc:
                 return exc.status_code
     assert run(go()) == 409 and o.rec.sn == SN
+
+
+def test_the_robot_counts_as_connected_only_once_it_has_been_heard(tmp_path, monkeypatch):
+    """The cloud can be up while the robot is off: /health and the setup guide need a message from the robot."""
+    o, env, store = _ops(tmp_path, monkeypatch)
+    r = o.rec
+    o.cloud.state, o.cloud.connected = "connected", True
+    assert r.robot_status()["connected"] and not r.robot_status()["heard"]
+    r.last_message_at = time.time() - 5
+    assert r.robot_status()["heard"]
+    r.last_message_at = time.time() - 3600                       # an hour of silence
+    assert not r.robot_status()["heard"]
+
+
+def test_a_message_for_the_last_robot_does_not_count_as_hearing_the_next(tmp_path, monkeypatch):
+    o, env, store = _ops(tmp_path, monkeypatch)
+    r = o.rec
+    r._follow(SN)
+    r._handle(f"snowbot/{SN}/device/heart_beat", {"working_state": 1}, time.time())
+    assert r.received == 1 and r.last_message_at
+    r._follow(SN2)
+    assert r.received == 0 and r.last_message_at == 0.0              # nothing from SN2 yet
+    r._handle(f"snowbot/{SN}/device/heart_beat", {"working_state": 1}, time.time())   # queued before the switch
+    assert r.received == 0 and r.last_message_at == 0.0
+
+
+def test_a_read_is_marked_before_it_goes_and_unmarked_if_it_fails(tmp_path):
+    from app.link import RobotLink
+    seen, marks = [], []
+
+    class Cloud:
+        state, connected = "connected", True
+
+        def __init__(self, fail):
+            self.fail = fail
+
+        def publish(self, cmd, payload):
+            seen.append(list(marks))                             # what an echo handled now would find
+            if self.fail:
+                raise ConnectionError("refused")
+
+    def mark(cmd):
+        marks.append(cmd)
+        return lambda: marks.remove(cmd)
+    RobotLink(None, Cloud(False), None, mark_sent=mark).read("get_map")
+    assert seen == [["get_map"]] and marks == ["get_map"]
+    marks.clear()
+    with pytest.raises(ConnectionError):
+        RobotLink(None, Cloud(True), None, mark_sent=mark).read("get_map")
+    assert marks == []
+
+
+def test_an_echo_of_a_request_is_not_hearing_the_robot(tmp_path, monkeypatch):
+    """The cloud also delivers app/ topics (the panel's own read requests come back): only the robot's device/
+    messages count towards "heard"."""
+    o, env, store = _ops(tmp_path, monkeypatch)
+    r = o.rec
+    r._follow(SN)
+    o.cloud.state, o.cloud.connected = "connected", True
+    r._handle(f"snowbot/{SN}/app/get_device_msg", {}, time.time())
+    assert r.last_message_at == 0.0 and not r.robot_status()["heard"]
+    r._handle(f"snowbot/{SN}/device/heart_beat", {"working_state": 1}, time.time())
+    assert r.robot_status()["heard"]
