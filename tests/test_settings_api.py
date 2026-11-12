@@ -58,7 +58,7 @@ class FakeOps:
 
 
 def env(tmp_path, **over):
-    cfg = Config(yarbo_host="192.0.2.10", yarbo_port=1883, yarbo_sn=None, data_dir=str(tmp_path), port=8425, poll_idle_s=60,
+    cfg = Config(yarbo_host="192.0.2.10", yarbo_port=1883, data_dir=str(tmp_path), port=8425, poll_idle_s=60,
                  poll_active_s=2, map_refresh_s=21600, raw_every_s=60, raw_keep_days=90, run_idle_end_s=300, tempest_port=50222,
                  ha_url=None, ha_token=None, demo=False, frigate_url=None, panel_url=None)
     return Config(**{**cfg.__dict__, **over})
@@ -87,14 +87,14 @@ def test_runtime_reads_settings_over_the_environment(tmp_path):
     assert rt.set("frigate", {"url": None}) == ["url"]
     assert rt.frigate_url == "http://env-frigate:5000"               # cleared: the environment applies again
     assert store.setting("integrations") == {}
-    rt.set("robot", {"host": "robot.local", "port": 1884, "sn": "YB0000DEMO0001"})
+    rt.set("robot", {"host": "robot.local", "port": 1884})
     again = Runtime(env(tmp_path), store)                             # survives a restart
-    assert (again.yarbo_host, again.yarbo_port, again.yarbo_sn) == ("robot.local", 1884, "YB0000DEMO0001")
+    assert (again.yarbo_host, again.yarbo_port) == ("robot.local", 1884)
 
 
 @pytest.mark.parametrize("group,bad", [
     ("robot", {"host": ""}), ("robot", {"host": "http://robot"}), ("robot", {"port": 70000}), ("robot", {"port": "1883"}),
-    ("robot", {"sn": "x"}), ("frigate", {"url": "frigate:5000"}), ("home_assistant", {"token": ""}),
+    ("robot", {"sn": "YB0000DEMO0001"}), ("frigate", {"url": "frigate:5000"}), ("home_assistant", {"token": ""}),
     ("weather", {"tempest_port": 1.5}), ("panel", {"poll_idle_s": 1}), ("panel", {"raw_keep_days": True}),
     ("panel", {"nonsense": 1}),
 ])
@@ -139,9 +139,9 @@ def test_stored_rows_are_checked_on_load_and_restore_puts_a_group_back(tmp_path)
     assert rt.yarbo_port == 1883 and rt.yarbo_host == "robot.local"      # the bad port and the junk were dropped
     assert rt.describe()["robot"]["port"]["source"] == "default"
     before = rt.snapshot("robot")
-    rt.set("robot", {"host": "other.local", "sn": "YB0000DEMO0002"})
+    rt.set("robot", {"host": "other.local", "port": 1884})
     rt.restore("robot", before)
-    assert rt.yarbo_host == "robot.local" and rt.yarbo_sn is None
+    assert rt.yarbo_host == "robot.local" and rt.yarbo_port == 1883
     assert Runtime(env(tmp_path), store).yarbo_host == "robot.local"
 
 

@@ -138,7 +138,7 @@ docker compose up -d
 ```
 
 Open `http://<host>:8425` and set the admin password. The setup code it asks for is in the log:
-`docker logs groundskeeper`. Then the setup guide walks you through the robot's address and serial, the Yarbo cloud
+`docker logs groundskeeper`. Then the setup guide walks you through the robot's address, the Yarbo cloud
 sign-in (optional: a fallback route), the imagery, cameras, Home Assistant and safety settings. All data stays in
 `./data`. It includes your yard's location, so back it up and keep it private.
 

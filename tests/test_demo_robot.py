@@ -17,7 +17,7 @@ from app.transport_local import READ_ONLY_COMMANDS, ReadOnlyViolation
 
 
 def _cfg(tmp_path, **over) -> Config:
-    base = dict(yarbo_host=None, yarbo_port=1883, yarbo_sn=None, data_dir=str(tmp_path), port=8425, poll_idle_s=60,
+    base = dict(yarbo_host=None, yarbo_port=1883, data_dir=str(tmp_path), port=8425, poll_idle_s=60,
                 poll_active_s=2, map_refresh_s=21600, raw_every_s=60, raw_keep_days=90, run_idle_end_s=300,
                 tempest_port=0, ha_url=None, ha_token=None, demo=True, frigate_url=None, panel_url=None)
     return Config(**{**base, **over})
@@ -174,7 +174,7 @@ def test_demo_mode_never_builds_a_local_transport(tmp_path, monkeypatch):
         raise AssertionError("DEMO=1 must never contact a robot")
     monkeypatch.setattr(recmod, "LocalTransport", boom)
     monkeypatch.setattr(recmod, "discover_sn", boom)
-    r = _recorder(tmp_path, yarbo_host="192.0.2.10", yarbo_sn="YB0000DEMO0009")    # even with an address given
+    r = _recorder(tmp_path, yarbo_host="192.0.2.10")    # even with an address given
     status = asyncio.run(r.apply_robot())
     try:
         assert isinstance(r.transport, dr.DemoTransport) and status["connected"] and r.sn == dr.DEMO_SN
@@ -206,11 +206,11 @@ def test_the_robot_service_address_is_built_in_and_the_environment_replaces_it(m
 
 
 def test_demo_config_drops_the_real_robot_and_integrations(tmp_path, monkeypatch):
-    for k, v in {"DEMO": "1", "YARBO_HOST": "192.0.2.10", "YARBO_SN": "YB0000DEMO0009", "HA_URL": "http://ha.local",
+    for k, v in {"DEMO": "1", "YARBO_HOST": "192.0.2.10", "HA_URL": "http://ha.local",
                  "HA_TOKEN": "x", "FRIGATE_URL": "http://frigate.local", "TEMPEST_PORT": "50222"}.items():
         monkeypatch.setenv(k, v)
     c = config.load()
-    assert c.demo and c.yarbo_host is None and c.yarbo_sn is None and c.ha_url is None and c.frigate_url is None
+    assert c.demo and c.yarbo_host is None and c.ha_url is None and c.frigate_url is None
     assert c.tempest_port == 0
     monkeypatch.delenv("DEMO")
     monkeypatch.setenv("DEMO_SEED", "1")                                  # the older name

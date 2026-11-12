@@ -30,6 +30,7 @@ from .ha import HAPublisher, entities_from
 from .imagery import Imagery
 from .runs import (ACTIVITY_LABELS, HELD, PAUSE_CAP_S, PROGRESSING, PlanStatus, RunDetector, RunStats, activity,
                    end_reason, is_moving, parse_plan_feedback, plan_flags_active, progressing)
+from .runtime import FOUND_SN, found_sn, valid_sn
 from .store import Store
 from .tempest import TempestListener
 from . import weather as weather_mod
@@ -121,6 +122,8 @@ FIRMWARE_SETTLE_S = 60    # a new firmware version counts once it has been repor
 
 
 class Recorder:
+    sn: str | None = None            # the robot followed (set in __init__; a bare object made in a test has none)
+
     def __init__(self, cfg: Config, store: Store, imagery: Imagery, sn: str):
         self.cfg, self.store, self.imagery, self.sn = cfg, store, imagery, sn
         self.loop: asyncio.AbstractEventLoop | None = None
@@ -133,8 +136,10 @@ class Recorder:
         self.on_sn: Callable[[str], None] | None = None  # told when the serial is found or changed (Ops follows)
         self._robot_lock = asyncio.Lock()
         self._discover_at = 0.0
-        self._applied: tuple | None = None               # (host, port) the current serial was found on
+        self._heard: tuple | None = None                 # (host, port, serial) last heard on a heart_beat
         self._robot_task: asyncio.Task | None = None
+        self._map_wake = asyncio.Event()                 # read the map now (another robot), not at the next refresh
+        self._state_sn = sn              # the robot the live state belongs to (what _restore loads is the kept one's)
         self.started_at = time.time()
 
         self.snapshot: dict = {}
@@ -303,19 +308,24 @@ class Recorder:
             self.store.event("cloud_echo_seen", "the panel's own commands are echoed back again, so they no longer "
                              "count as the phone app's")
 
-    def mark_sent(self, cmd: str) -> None:
-        """The panel has just sent `cmd` (RobotLink calls this after every send): its echo is ours."""
+    def mark_sent(self, cmd: str) -> Callable[[], None]:
+        """The panel is about to send `cmd` (RobotLink calls this before every send): its echo is ours. Returns an undo
+        for a send that fails: it puts back what this call changed, including the credit of a COUNTED_OWN command."""
         now = time.time()
+        before = self._sent.get(cmd)
         self._sent[cmd] = now
+        was = after = None
         if cmd in COUNTED_OWN:
             with self.__dict__.setdefault("_own_lock", threading.Lock()):
                 st = self._own()
                 self._own_expire(st, cmd, now - OWN_ECHO_COUNTED_S)
+                was = (st["last"], list(st["hist"]), st["trusted"])
                 if now - st["last"] > OWN_FRESH_S:
                     # A new session: trust earned earlier says nothing about the cloud now, so it is earned again
                     # (quietly: this is not the cloud failing).
                     st["hist"].clear()
                     st["trusted"] = False
+                    after = (list(st["hist"]), st["trusted"])
                 st["last"] = now
                 st["n"] += 1
                 st["beats"].setdefault(cmd, deque(maxlen=16)).append(now)
@@ -323,6 +333,27 @@ class Recorder:
             if periodic:
                 log.info("own-echo matching: %s", self.own_echo_stats())
             self._own_flush()
+
+        def undo() -> None:
+            if before is None:
+                self._sent.pop(cmd, None)
+            else:
+                self._sent[cmd] = before
+            if was is None:
+                return
+            with self._own_lock:
+                q = st["beats"].get(cmd)
+                if not q or now not in q:
+                    return                    # an echo (or expiry) already took the credit: nothing of ours is left
+                q.remove(now)
+                st["n"] -= 1
+                if st["last"] == now:         # no later send: the session clock goes back
+                    st["last"] = was[0]
+                if after is not None and (list(st["hist"]), st["trusted"]) == after:
+                    st["hist"].clear()        # nothing has judged since: the trust the reset threw away comes back
+                    st["hist"].extend(was[1])
+                    st["trusted"] = was[2]
+        return undo
 
     def own_echo(self, name: str, ts: float, data) -> bool:
         """Is the message `name` that arrived at `ts` the echo of something this panel sent? Decided once per message
@@ -546,6 +577,8 @@ class Recorder:
         parts = topic.split("/", 3)
         if len(parts) < 4:
             return
+        if self.sn and parts[1] != self.sn:
+            return                       # another robot's (queued before a switch): never this one's state or reply
         channel, name = parts[2], parts[3]
         if channel == "app":
             if ours is None:
@@ -888,10 +921,10 @@ class Recorder:
 
     # -- the robot connection (Settings → Robot, else the environment) -----------------------------------------
     async def apply_robot(self) -> dict:
-        """(Re)connect to the robot's local broker at the address in effect, finding the serial from heart_beat when
-        none is configured. Safe to call again: the previous connection is dropped first."""
+        """(Re)connect to the robot's local broker at the address in effect. The serial is never typed in: it is read
+        from heart_beat (once per broker) and kept. Safe to call again: the previous connection is dropped first."""
         async with self._robot_lock:
-            host, port, sn = self.cfg.yarbo_host, self.cfg.yarbo_port, self.cfg.yarbo_sn
+            host, port = self.cfg.yarbo_host, self.cfg.yarbo_port
             old, self.transport = self.transport, None
             if old:
                 await asyncio.to_thread(old.stop)        # joins paho's thread: not on the loop
@@ -899,31 +932,109 @@ class Recorder:
             if getattr(self.cfg, "demo", False):
                 return self._apply_demo_robot()
             if not host:
-                if sn and sn != self.sn:                 # cloud-only: the cloud client still needs the serial
-                    self.sn = sn
-                    if self.on_sn:
-                        self.on_sn(sn)
+                self._follow(found_sn(self.store).get("sn"))     # cloud-only: the cloud client still needs the serial
                 self.robot_error = "no robot address yet: set it in Settings → Robot"
                 return self.local_status()
-            if not sn and self.sn and self._applied == (host, port):
-                sn = self.sn                             # found earlier on this very broker
+            heard = self._heard
+            sn = heard[2] if heard and heard[:2] == (host, port) else None   # heard earlier on this very broker
             if not sn:
                 try:
                     sn = await asyncio.to_thread(discover_sn, host, port, 20)
                 except Exception as exc:
                     self.robot_error = f"no robot found at {host}:{port} ({exc})"
                     log.warning(self.robot_error)
+                    self._follow(found_sn(self.store).get("sn"))  # the local broker is closed: the cloud still can
                     return self.local_status()
-            self._applied = (host, port)
-            if sn != self.sn:
-                self.sn = sn
-                if self.on_sn:
-                    self.on_sn(sn)
+            self._heard = (host, port, sn)
+            self.keep_sn(sn, "heart_beat")
+            self._follow(sn)
             self.transport = LocalTransport(host, port, sn, self._from_thread)
             self.transport.start()
             self.robot_error = ""
             self.store.event("recorder_started", f"robot {sn} at {host}:{port}")
             return self.local_status()
+
+    def _follow(self, sn: str | None) -> None:
+        if sn and sn != self.sn:
+            # Another robot's state, or state of unknown origin (restored at start with no serial kept), never stands
+            # for this one.
+            if self._state_sn != sn and (self._state_sn or self.map_raw is not None or self.snapshot):
+                self._forget_robot_state()
+            self.sn, self._state_sn = sn, sn
+            if self.on_sn:
+                self.on_sn(sn)
+
+    def _forget_robot_state(self) -> None:
+        """Another robot from now on: nothing the last one reported may stand for it. Its open run is closed, the
+        checks before a command see no snapshot (unknown state blocks) until the new robot reports, and its map is
+        read at once."""
+        if self.run_id is not None:
+            finished, stats = self.run_id, self.run_stats or RunStats()
+            self.store.end_run(finished, max(self.detector.last_moving, self.run_started), "robot changed", stats)
+            self.store.event("run_ended", f"run {finished}: robot changed, {stats.distance_m:.0f} m")
+            self.run_id, self.run_stats, self.run_plan = None, None, None
+            try:
+                self._finish_wifi_survey(finished)
+            except Exception:
+                log.exception("Wi-Fi survey wrap-up failed")
+        self.wifi_survey, self._wifi_waiting = None, None
+        self.replies = {}                # its map backups and Wi-Fi lists are not the next robot's
+        self.snapshot, self.snapshot_at, self.update_at, self.t = {}, 0.0, 0.0, {}
+        self.heartbeat, self.heartbeat_at = {}, 0.0
+        self.poses.clear()
+        self._pose_rt, self._pose_at = None, 0.0
+        self.gps_ref, self.map_raw, self.map_geojson, self.map_fetched = None, None, None, 0.0
+        self.plans, self.cfd, self.robot_schedules = [], None, None
+        self.activity, self.activity_at = "idle", 0.0
+        self.plan, self.plan_at, self.run_plan = None, 0.0, None
+        self.detector = RunDetector(self.cfg.run_idle_end_s)
+        self.app_stream_at, self._stall_anchor = 0.0, None
+        self._map_wake.set()
+
+    def forget_account_sn(self, sn: str) -> None:
+        """The signed-in Yarbo account has no robot with serial `sn` (kept from an account): forget it and its state;
+        the cloud finds the robot on this account again. A serial found since (a heart_beat) is left alone."""
+        if self.sn == sn and (self.run_id or self.plan_active() is True):
+            # It started mowing after the cloud's check: keep it (the guards must go on watching) and send the
+            # cloud back to it.
+            if self.on_sn:
+                self.on_sn(sn)
+            return
+        kept = found_sn(self.store)
+        if kept.get("sn") == sn and kept.get("from") == "account":
+            self.store.delete_setting(FOUND_SN)
+            self.store.event("robot_found", "robot serial forgotten: not on the signed-in Yarbo account")
+        if self.sn == sn and not (self._heard and self._heard[2] == sn):     # heard locally: the robot itself
+            self._forget_robot_state()
+            self.sn, self._state_sn = None, None
+
+    def keep_sn(self, sn: str, source: str) -> bool:
+        """Keep a found serial so a restart while the local broker is closed still knows the robot. One heard on the
+        robot's heart_beat always wins: the account (or a serial once typed in Settings) never replaces it. Returns
+        whether `sn` is now the kept serial."""
+        if getattr(self.cfg, "demo", False) or not valid_sn(sn):
+            return False
+        kept = found_sn(self.store)
+        if kept.get("sn") == sn and (kept.get("from") == "heart_beat" or source != "heart_beat"):
+            return True
+        if source != "heart_beat" and kept.get("from") == "heart_beat":
+            return False
+        self.store.set_setting(FOUND_SN, {"sn": sn, "from": source})
+        self.store.event("robot_found", f"robot serial kept (from the {source.replace('_', ' ')})")   # no value
+        return True
+
+    def use_found_sn(self, sn: str) -> bool:
+        """The Yarbo account gave the serial (its only robot, or the one chosen in Settings → Robot): keep it and
+        follow it, unless the robot's own heart_beat already named another. Never while a run is open: the new
+        robot's telemetry would be recorded into the old robot's run."""
+        if self._heard and self._heard[2] != sn:
+            return False
+        if self.sn and self.sn != sn and self.run_id:
+            return False
+        if not self.keep_sn(sn, "account"):
+            return False
+        self._follow(sn)
+        return True
 
     def _apply_demo_robot(self) -> dict:
         """DEMO=1: the made-up robot (app/demo_robot.py) instead of any broker. It carries on the mow the demo history
@@ -1196,7 +1307,11 @@ class Recorder:
             if self.can_read():
                 try:
                     await self.refresh_map()
-                    await asyncio.sleep(self.cfg.map_refresh_s)
+                    try:
+                        await asyncio.wait_for(self._map_wake.wait(), self.cfg.map_refresh_s)
+                    except asyncio.TimeoutError:
+                        pass
+                    self._map_wake.clear()
                     continue
                 except Exception as exc:
                     log.warning("map refresh failed: %s", exc)

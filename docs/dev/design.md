@@ -130,7 +130,12 @@ cloud: after two unanswered local reads in a row they go through the cloud for 5
 The rotated refresh token is persisted after **every** refresh. A failed refresh means **needs sign-in**: stop
 reconnecting, raise a UI banner and a notification, and never connect with an expired JWT. Reconnects back off
 exponentially from 5 s to 5 min. Sign-in is interactive and the password is never stored; the session lives in
-`DATA_DIR` with owner-only permissions.
+`DATA_DIR` with owner-only permissions. The robot's serial is never typed in. It is read from the local
+`heart_beat` (once per broker address); with none heard, the account's robot list (SDK `get_devices()`, an account
+lookup, nothing sent to a robot) supplies it: one robot is used, several are offered in Settings → Robot. The serial
+found is kept in the `robot_sn` setting with its source, apart from the Settings values; a `heart_beat` serial always
+replaces an account one and is never replaced by one. The lookup runs under the refresh lock after a refresh, and a
+session the SDK refreshes on its own during it is saved.
 
 ### 5.4 Keep-awake
 The phone app sends `set_working_state {"state":1}` about every 4 s while it is open. Local reads are answered

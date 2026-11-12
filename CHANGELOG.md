@@ -67,14 +67,29 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   samples the robot moves smoothly, so a replay, and Follow in 3D, can be watched at a real pace. The 3D map's 1×–3×
   menu is now labelled Height: it draws the ground taller, it is not a speed.
 
+- **Robots reached only through the Yarbo cloud** (the robot's local broker refuses connections, as after some
+  firmware updates): with no serial known, the panel reads it from your Yarbo account's robot list (one robot: used;
+  several: Settings → Robot lists them to choose from). The serial found is kept, so a restart while local access is
+  closed still knows the robot; the one the robot announces on your network always wins over the account's.
+
 ### Changed
 
+- **The robot's serial is never typed in.** The panel always finds it: on the robot's heartbeat, or from your Yarbo
+  account. The serial field is gone from Settings → Robot and `YARBO_SN` is no longer read (the log says so if it is
+  still set). A serial typed in before is kept as a found one until the robot's heartbeat names it, and a new robot at
+  a new address is found again instead of keeping the old serial.
 - **Yarbo's SDK 0.3.0** (was 0.2.1). The code is the same; Yarbo changed its licence from MIT to PolyForm
   Noncommercial, so the Docker image, which includes it, is for noncommercial use. The panel's own code stays MIT.
   See THIRD_PARTY_NOTICES.md.
 
 ### Fixed
 
+- **Yarbo cloud stuck on "connecting".** While it has no serial it now says "waiting for the robot's serial
+  (Settings → Robot)", in Settings and once in the log. A session that disappears shows "needs login" with a reason
+  instead of "connecting" (signing out still shows signed out), and an expired session found while looking up the
+  account's robots says so. Signing in again while the old connection was still winding down no longer leaves the
+  cloud with no connection, and no longer waits for it. A session the Yarbo SDK refreshes during the robot lookup is
+  now saved, so it survives a restart.
 - **A stray shape far from the yard no longer moves the yard.** The panel worked out where the yard is from the outline
   of every shape on the robot's map, so one far away (for example a charging point with an empty location) made the map
   open zoomed out to half the world and imagery sources say they do not cover the yard. Shapes more than 2 km from the
@@ -86,10 +101,14 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 - **The phone header**: the robot's state ("docked, charging") is no longer cut short with large text, and some
   Android browsers no longer leave an empty band above the title. An installed app still keeps clear of the status
   bar.
+- **Cloud commands: a send the cloud connection refuses is now an error, and the panel's own send is marked before it
+  goes.** A command the MQTT client did not take (for example while it was reconnecting) was counted as sent and the
+  panel carried on as if it had gone. It now raises. The panel also notes its own command before sending it, so the
+  robot's echo, which can arrive before the send call returns, is not mistaken for the phone app or another person.
 
 ### Fixed
 
-- **Cloud-only: a serial saved in Settings → Robot reaches the cloud connection at once** (#91). With no robot address
+- **Cloud-only: a serial the panel already knows reaches the cloud connection at once** (#91). With no robot address
   set, the card kept saying "waiting for the robot's serial" until the panel restarted.
 
 ## 0.19.6 — 2026-11-09
