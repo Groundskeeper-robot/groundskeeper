@@ -3,7 +3,9 @@
 
    What opening it does, in this order: ask the controller to switch the cameras on (smart_vision_control, which needs
    Control on), ask the panel for the camera's join details (POST /api/video/token), load Agora's Web SDK from this
-   panel (web/vendor/, never a CDN), then join the robot's channel as an audience member and play uid 1's video.
+   panel (web/vendor/, never a CDN), then join the robot's channel as a host that publishes nothing and play uid
+   1's video. Host, not audience: the robot publishes only while another broadcaster is in its channel (an audience
+   member is invisible to it), and it stops when the last one leaves (docs/dev/protocol.md, Robot video).
    The video goes from Agora's network to this browser; none of it passes through the panel.
 
    Rules this file keeps (tests/test_cameras_js.py checks the ones a test can):
@@ -34,6 +36,10 @@ const CAM_SETTINGS_MS = 20000;                     // how long a read of the vid
 const CAM_SDK_TIMEOUT_MS = 20000;                  // a script load that hangs gives up, so the next try loads again
 const CAM_BEAT_MS = 4000;                          // the official app keeps the robot awake about this often while open
 const CAM_JOIN_TIMEOUT_MS = 30000;                 // a join that never settles gives up, so the swap cannot linger
+// After leaving a channel the tile was watching, wait this long before camera-on and the next join: the robot stops
+// its video a moment after the last viewer leaves, and a camera-on sent straight away was lost to that (a camera
+// change then waited for video for good; with 3 s it played within seconds).
+const CAM_REJOIN_GAP_MS = 3000;
 const CAM_CONTROL_OFF_HINT = "Control is off.";                // short on screen; CAM_HELP says the rest
 const CAM_ENDED = "Stopped. Open to watch again.";             // the panel's time limit, or the robot went offline
 // STOPGAP (AgoraIO/agora-rtc-web#15). The Web SDK wraps the stream's secret with a built-in 1024-bit RSA key, which
@@ -157,7 +163,7 @@ function camerasPick(camera) {
   if (camera === cams.camera && cams.phase !== "error") return;
   cams.camera = camera;
   try { localStorage.setItem("yarbo.robotCamera", camera); } catch { /* no storage */ }
-  camerasStart({ on: false });                      // the cameras are already on: nothing to send
+  camerasStart({ on: true });                       // leaving stopped the robot's video: switch it on again
 }
 
 // Leaves the channel and forgets everything about the stream. Sends nothing to the robot.
@@ -300,6 +306,30 @@ function camerasAgoraUrl(url) {
   }
 }
 
+// Plain http (not a secure context): the browser has no crypto.subtle, and the SDK's join wraps the placeholder secret
+// with RSA-OAEP before it sends anything, so join() threw "Cannot read properties of undefined (reading 'importKey')".
+// The wrapped placeholder never matters: camerasSwapBody writes the real secret in its place. So while the swap is in,
+// and only where the browser has no Web Crypto of its own, a stand-in answers exactly that wrap (an RSA-OAEP public
+// key, then encrypt with it) with filler bytes and refuses every other call. It goes with the swap (camerasLeave).
+const CAM_RSA_BYTES = 128;                          // what a 1024-bit RSA-OAEP key gives, as the SDK's built-in one is
+const CAM_SUBTLE_CALLS = ["decrypt", "deriveBits", "deriveKey", "digest", "exportKey", "generateKey", "sign",
+  "unwrapKey", "verify", "wrapKey"];
+function camerasStandInCrypto() {
+  const c = globalThis.crypto;
+  if (!c || c.subtle) return () => {};              // the browser's own (https, localhost): never replaced
+  const refuse = () => Promise.reject(new Error("This needs the panel over https."));
+  const rsa = (alg) => alg === "RSA-OAEP" || (!!alg && alg.name === "RSA-OAEP");
+  const standInKey = Object.freeze({ standIn: true });
+  const subtle = {
+    importKey: (format, _data, alg) => (format === "spki" && rsa(alg) ? Promise.resolve(standInKey) : refuse()),
+    encrypt: (alg, key) => (rsa(alg) && key === standInKey
+      ? Promise.resolve(new Uint8Array(CAM_RSA_BYTES).buffer) : refuse()),
+  };
+  for (const name of CAM_SUBTLE_CALLS) subtle[name] = refuse;
+  Object.defineProperty(c, "subtle", { configurable: true, value: subtle });
+  return () => { if (c.subtle === subtle) delete c.subtle; };
+}
+
 let camSwapRemove = null;
 function camerasSwapInstall(secret) {
   if (camSwapRemove) camSwapRemove();
@@ -332,8 +362,10 @@ function camerasSwapInstall(secret) {
       return super.send(active && this.#agora ? camerasSwapBody(data, secret).body : data);
     }
   }
+  const removeCrypto = camerasStandInCrypto();
   const remove = () => {
     active = false;                                 // instances made meanwhile go back to plain sends
+    removeCrypto();
     if (globalThis.WebSocket === AgoraSocket) globalThis.WebSocket = WS;
     if (globalThis.XMLHttpRequest === AgoraRequest) globalThis.XMLHttpRequest = XHR;
     if (camSwapRemove === remove) camSwapRemove = null;
@@ -392,6 +424,7 @@ function camerasWhy(e, step) {
 }
 
 async function camerasStart({ on, fresh = true }) {
+  const rejoin = !!cams.client;                   // replacing a client in a channel: a camera change or renewal
   camerasLeave();
   const ticket = cams.ticket;
   const live = () => ticket === cams.ticket && cams.open;
@@ -402,6 +435,10 @@ async function camerasStart({ on, fresh = true }) {
   try {
     await cams.leaving;                           // never two live clients: wait out any leave still in flight
     if (!live()) return;
+    if (rejoin) {
+      await new Promise((r) => { setTimeout(r, CAM_REJOIN_GAP_MS); });
+      if (!live()) return;
+    }
     camerasBeats(ticket, fresh);                  // keep the robot awake from now on: it streams only while kept so
     if (on) hint = await camerasSwitchOn();
     if (!live()) return;
@@ -419,7 +456,9 @@ async function camerasStart({ on, fresh = true }) {
     camerasQuietSdk(AgoraRTC);
     const client = AgoraRTC.createClient({ mode: "live", codec: "h264" });
     cams.client = client;
-    await client.setClientRole("audience");
+    // Host, so the robot sees a viewer and publishes. Nothing is ever published from here: the tile makes no
+    // microphone or camera track and never calls publish (tests/test_cameras_js.py checks).
+    await client.setClientRole("host");
     if (!live()) return;
     // The placeholder, not the key: camerasJoin puts the real one in (see camerasSwapInstall).
     client.setEncryptionConfig("aes-128-gcm2", CAM_PLACEHOLDER_SECRET, camerasBytes(join.salt));
@@ -485,9 +524,9 @@ function camerasListen(client, ticket) {
       camerasSet("waiting", "The robot stopped sending video.", "Cameras off, or asleep.");
     }
   });
-  // A new token needs a new viewer uid, which only a new request gives, so renewing is a quick rejoin.
-  const renew = () => { if (live()) camerasStart({ on: false, fresh: false }); };    // not a press: same window
-  client.on("token-privilege-will-expire", renew);
+  // A new token needs a new viewer uid, which only a new request gives, so renewing is a quick rejoin. Leaving stops
+  // the robot's video, so the rejoin switches the cameras on again; it is not a press, so no new keep-awake window.
+  const renew = () => { if (live()) camerasStart({ on: true, fresh: false }); };  client.on("token-privilege-will-expire", renew);
   client.on("token-privilege-did-expire", renew);
   client.on("crypt-error", () => {
     if (live()) { camerasLeave(); camerasSet("error", "Could not decrypt the stream."); }

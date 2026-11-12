@@ -57,7 +57,7 @@ def test_opening_switches_on_then_joins_with_the_sdk_quietened_and_encryption_se
     assert last_param < names.index("setLogLevel") < names.index("createClient")   # all before the client exists
     enc = next(c for c in seg if c[0] == "setEncryptionConfig")
     assert enc[1:] == ["aes-128-gcm2", "groundskeeper-placeholder", "1,2,3"]   # the placeholder; the salt as bytes
-    assert ["setClientRole", "audience"] in seg
+    assert ["setClientRole", "host"] in seg
     assert "enableLogUpload" not in names
 
 
@@ -74,11 +74,22 @@ def test_the_robots_video_is_subscribed_to():
 
 
 @needs_node
-def test_changing_camera_leaves_the_channel_and_does_not_send_a_command_again():
+def test_changing_camera_leaves_the_channel_and_switches_the_cameras_on_again():
+    # The robot stops publishing when the last broadcaster leaves, so the new channel needs camera-on again.
     seg = segment(run_flow(), "pick-left")
     assert "leave" in [c[0] for c in seg]
     posts = [c for c in seg if c[0] == "post"]
-    assert [p[1] for p in posts] == ["/api/video/token"] and json.loads(posts[0][2]) == {"camera": "left"}
+    assert [p[1] for p in posts] == ["/api/control/send", "/api/video/token"]
+    assert json.loads(posts[0][2]) == {"cmd": "smart_vision_control", "args": {}, "confirm": True}
+    assert json.loads(posts[1][2]) == {"camera": "left"}
+    names = [c[0] for c in seg]
+    # The robot stops a moment after the last viewer leaves: camera-on waits out a gap after the leave, or it is lost.
+    assert names.index("leave") < names.index("rejoin-gap") < names.index("post")
+
+
+@needs_node
+def test_a_first_open_does_not_wait_for_the_rejoin_gap():
+    assert "rejoin-gap" not in [c[0] for c in segment(run_flow(), "open")]
 
 
 @needs_node
@@ -167,11 +178,12 @@ def test_control_switched_on_after_the_last_render_still_sends_the_command():
 
 
 @needs_node
-def test_renewing_the_token_never_sends_camera_on_even_with_control_on():
+def test_renewing_the_token_rejoins_with_camera_on_again():
+    # The rejoin leaves the channel, which stops the robot's video, so camera-on goes with it (Control on).
     calls = run_flow()
     for name in ("renew-will-expire", "renew-did-expire"):                # both events rejoin with a new token
         seg = segment(calls, name)
-        assert [c[1] for c in seg if c[0] == "post"] == ["/api/video/token"], name
+        assert [c[1] for c in seg if c[0] == "post"] == ["/api/control/send", "/api/video/token"], name
         assert [c[0] for c in seg].count("createClient") == 1, name
 
 
@@ -500,3 +512,32 @@ def test_a_wrapper_that_cannot_be_restored_goes_quiet_once_removed():
     seg = segment(calls, "direct-wrapped-over")
     frames = [c for c in seg if c[0] == "ws-send"]
     assert len(frames) == 1 and "WRAPPED-BY-THE-SDK" in frames[0][1] and "OVERSECRET" not in frames[0][1]
+
+
+@needs_node
+def test_over_plain_http_the_sdks_wrap_gets_a_stand_in_only_while_the_client_lives():
+    calls = run_flow()
+    seg = segment(calls, "http-join")
+    assert ["wrapped", 128] in seg                                       # the join got past the wrap
+    assert ["subtle-while-joined", "object"] in seg
+    refused = [c for c in seg if c[0] == "crypto-call"]
+    assert refused == [["crypto-call", n, "This needs the panel over https."]
+                       for n in ("digest", "aes-import", "rsa-encrypt-other-key")]   # nothing but the wrap
+    assert ["subtle-after-leave", "undefined", False] in segment(calls, "http-left")
+
+
+@needs_node
+def test_over_https_the_browsers_own_web_crypto_is_used_and_never_replaced():
+    seg = segment(run_flow(), "https-join")
+    names = [c[0] for c in seg]
+    assert "browser-importKey" in names and "browser-encrypt" in names
+    assert seg.count(["subtle-is-browsers", True]) == 2                  # while joined, and after leaving
+
+
+def test_the_tile_joins_as_host_but_never_publishes_anything():
+    # Host so the robot sees a viewer; nothing from this browser ever goes into the channel.
+    assert 'setClientRole("host")' in CODE and 'setClientRole("audience")' not in CODE
+    for call in ("publish(", "createMicrophoneAudioTrack", "createCameraVideoTrack", "createScreenVideoTrack",
+                 "createCustomAudioTrack", "createCustomVideoTrack", "createBufferSourceAudioTrack", "getUserMedia"):
+        assert call not in CODE, call
+

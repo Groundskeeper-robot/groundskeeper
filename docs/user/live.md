@@ -57,7 +57,8 @@ are pink, edge passes violet.
 - **Cameras:** the robot's own cameras (front, left, right, back), not the yard cameras of the follow-cam. The tile
   is there only when [Settings → Robot → Robot video](#settings/robot) is on. **Open**
   switches the robot's cameras on (needs Control on) and shows one camera at a time: pick Front, Left, Right or
-  Back. The state beside the title is *Connecting*, *Waiting for the robot*, *Live* or an error with **Try again**.
+  Back (each pick switches the cameras on again: the robot stops its video when the last viewer leaves a camera).
+  The state beside the title is *Connecting*, *Waiting for the robot*, *Live* or an error with **Try again**.
   An error says which step failed and a short reason, such as "Joining failed: OperationError".
   - The tile works with the panel opened over plain http at its LAN address (`http://<server>:8427`) as well as
     over https: it only watches, so it never asks for the browser's camera or microphone, which browsers allow

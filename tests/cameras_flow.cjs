@@ -37,7 +37,7 @@ const joinMessage = (inner) =>
 const knobs = { beatFail: false, beatReply: { sent: true }, beatGate: null, joinMsg: "default", leaveGate: null,
                 roleGate: null, joinGate: null, joinEmit: false, refuseToken: false, remote: [],
                 subscribeFail: false, joinFail: null, tokenFail: null, tokenGate: null, writeOnLeave: false,
-                sdkPresent: true, fastSdk: false, videoOff: false, scripts: [] };
+                sdkPresent: true, fastSdk: false, videoOff: false, scripts: [], wrap: false };
 const storage = {};
 const AgoraRTC = {
   checkSystemRequirements: (...a) => { log("checkSystemRequirements", ...a); return true; },
@@ -56,6 +56,12 @@ const AgoraRTC = {
       setEncryptionConfig: (mode, key, salt) => log("setEncryptionConfig", mode, key, Array.from(salt).join(",")),
       join: async (app, channel, token, uid) => {
         log("join", app, channel, token, uid);
+        if (knobs.wrap) {                            // as the real SDK wraps the (placeholder) secret first
+          const key = await sandbox.crypto.subtle.importKey("spki", new Uint8Array(4), { name: "RSA-OAEP",
+            hash: "SHA-256" }, true, ["encrypt"]);
+          const out = await sandbox.crypto.subtle.encrypt({ name: "RSA-OAEP" }, key, new Uint8Array(2));
+          log("wrapped", new Uint8Array(out).length);
+        }
         if (knobs.joinMsg !== "none") {              // what the real SDK sends while it joins
           const ws = agoraWs(), xhr = agoraXhr();
           ws.send("ping"); ws.send(new Uint8Array(2)); ws.send('{"x":1}');
@@ -102,7 +108,7 @@ const sandbox = {
   getJSON: async () => ({ robot_video_enabled: !knobs.videoOff, robot_video_configured: true }),
   setInterval: (fn, ms) => { const id = nextInterval++; intervals.set(id, fn); log("interval", ms); return id; },
   clearInterval: (id) => { if (intervals.delete(id)) log("clear-interval"); },
-  WebSocket: FakeWS, XMLHttpRequest: FakeXHR, location: { href: "https://panel.test/#live" }, URL,
+  crypto: {}, WebSocket: FakeWS, XMLHttpRequest: FakeXHR, location: { href: "https://panel.test/#live" }, URL,
   postJSON: async (url, body) => {
     if (url === "/api/video/keepalive") {
       beats++; log("beat", JSON.stringify(body));
@@ -123,6 +129,8 @@ const sandbox = {
   },
   // The script-load timeout (20 s) is shortened when a test wants to see it fire; no other timer is touched.
   setTimeout: (fn, ms) => {
+    // The rejoin gap (3 s) passes on the next tick, and is logged so a test can see it was asked for.
+    if (ms === 3000) { log("rejoin-gap"); return setImmediate(fn); }
     const t = setTimeout(fn, (knobs.fastSdk && ms === 20000) || (knobs.fastJoin && ms === 30000) ? 5 : ms);
     if (ms === 30000) t.unref();
     return t;
@@ -438,5 +446,26 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   sandbox.camerasLeave();
   sends();                                                             // must go out as the SDK made it
   sandbox.WebSocket = FakeWS;
+  // 20. Over plain http there is no crypto.subtle: the SDK's wrap of the placeholder gets the stand-in, only while the
+  // client lives, and every other call is refused. Over https the browser's own is used and never replaced.
+  knobs.wrap = true;
+  const tryCall = async (name, fn) => {
+    try { await fn(); calls.push(["crypto-call", name, "ok"]); } catch (e) { calls.push(["crypto-call", name, e.message]); }
+  };
+  mark("http-join"); sandbox.camerasOpen(); await settle(); phase();
+  calls.push(["subtle-while-joined", typeof sandbox.crypto.subtle]);
+  await tryCall("digest", () => sandbox.crypto.subtle.digest("SHA-256", new Uint8Array(1)));
+  await tryCall("aes-import", () => sandbox.crypto.subtle.importKey("raw", new Uint8Array(16), "AES-GCM", true, []));
+  await tryCall("rsa-encrypt-other-key", () => sandbox.crypto.subtle.encrypt({ name: "RSA-OAEP" }, {}, new Uint8Array(1)));
+  mark("http-left"); sandbox.camerasStop(); await settle();
+  calls.push(["subtle-after-leave", typeof sandbox.crypto.subtle, "subtle" in sandbox.crypto]);
+  const own = { importKey: async () => { log("browser-importKey"); return {}; },
+                encrypt: async () => { log("browser-encrypt"); return new ArrayBuffer(128); } };
+  sandbox.crypto = { subtle: own };
+  mark("https-join"); sandbox.camerasOpen(); await settle(); phase();
+  calls.push(["subtle-is-browsers", sandbox.crypto.subtle === own]);
+  sandbox.camerasStop(); await settle();
+  calls.push(["subtle-is-browsers", sandbox.crypto.subtle === own]);
+  sandbox.crypto = {}; knobs.wrap = false;
   console.log(JSON.stringify(calls));
 })();
