@@ -301,7 +301,8 @@ def test_another_press_starts_the_window_again(t):
     assert beat(t).json()["sent"] is True
 
 
-@pytest.mark.parametrize("change", [{"snapshot_age_s": 500}, {"snapshot_age_s": None}, {"route_state": "offline"}])
+@pytest.mark.parametrize("change", [{"snapshot_age_s": 500}, {"snapshot_age_s": None}, {"route_state": "offline"},
+                                    {"cloud_route": False}])
 def test_the_robot_going_offline_ends_the_window(t, change):
     ready(t)
     assert play(t).json()["sent"] is True

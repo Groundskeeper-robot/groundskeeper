@@ -45,8 +45,8 @@ KEEP_AWAKE_MIN_S = 3.0        # at most one beat this often from the panel, whoe
 KEEP_AWAKE_GAP_S = 15.0       # no beat this long = the watching has stopped; the next beat is a new start
 KEEP_AWAKE_MAX_S = 15 * 60    # one press of play keeps the robot awake at most this long; then a person presses again
 KEEP_AWAKE_JITTER_S = 1.0     # each beat waits a random 0..this first, so the app's beats cannot stay in step (§13)
-# A refusal on one of these ends the window: the robot went offline or out of reach, or the time is up.
-KEEP_AWAKE_ENDS_ON = ("Robot online", "Route to the robot", "Within the time limit")
+# A refusal on one of these ends the window: the robot went offline or out of reach (the cloud too), or the time is up.
+KEEP_AWAKE_ENDS_ON = ("Robot online", "Route to the robot", "Cloud route", "Within the time limit")
 # Set only while Controller.keep_awake is sending (per task): a keep-awake from anywhere else (/api/control/send, say)
 # has no window, so it is refused, and every beat gets the rate limit and the jitter.
 _IN_BEAT = contextvars.ContextVar("keep_awake_beat", default=False)
