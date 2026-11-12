@@ -580,3 +580,15 @@ def test_no_robot_switch_during_a_write(tmp_path, monkeypatch):
             except HTTPException as exc:
                 return exc.status_code
     assert run(go()) == 409 and o.rec.sn == SN
+
+
+def test_the_robot_counts_as_connected_only_once_it_has_been_heard(tmp_path, monkeypatch):
+    """The cloud can be up while the robot is off: /health and the setup guide need a message from the robot."""
+    o, env, store = _ops(tmp_path, monkeypatch)
+    r = o.rec
+    o.cloud.state, o.cloud.connected = "connected", True
+    assert r.robot_status()["connected"] and not r.robot_status()["heard"]
+    r.last_message_at = time.time() - 5
+    assert r.robot_status()["heard"]
+    r.last_message_at = time.time() - 3600                       # an hour of silence
+    assert not r.robot_status()["heard"]

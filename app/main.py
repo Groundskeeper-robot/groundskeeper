@@ -171,7 +171,7 @@ async def health(request: Request):
     r = rec(request)
     s = r.status()
     # Open to anyone (Docker's health check, uptime monitors, scripts/deploy.sh's "not mid-mow" check): no data.
-    return {"ok": True, **version_info(), "robot_connected": r.robot_status()["connected"],
+    return {"ok": True, **version_info(), "robot_connected": bool(r.robot_status().get("heard")),
             "snapshot_age_s": s["snapshot_age_s"], "busy": bool(s.get("run") or (s.get("plan") or {}).get("active"))}
 
 
@@ -1185,8 +1185,9 @@ async def setup_status(request: Request):
         return {"id": id_, "title": title, "done": bool(done), "detail": detail, "optional": optional}
 
     steps = [
-        step("robot", "Robot", robot.get("connected") and r.map_geojson,
-             "connected, map read" if robot.get("connected") and r.map_geojson else "connected, waiting for the map"
+        step("robot", "Robot", robot.get("heard") and r.map_geojson,
+             "connected, map read" if robot.get("heard") and r.map_geojson else "connected, waiting for the map"
+             if robot.get("heard") else "Yarbo cloud connected, waiting to hear from the robot"
              if robot.get("connected") else robot.get("error") or f"Yarbo cloud {cloud or 'signed out'}"),
         step("imagery", "Map imagery", src, (src or {}).get("name", "picked") if src else "no imagery yet"),
         step("cameras", "Cameras", o.frigate.enabled and yard and all(c in polys for c in yard),

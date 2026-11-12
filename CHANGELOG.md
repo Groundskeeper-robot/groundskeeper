@@ -80,8 +80,9 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   map write, goes through the Yarbo cloud, as the Yarbo app's do. **Signing in to the Yarbo cloud (Settings → Robot)
   is now required.** Gone with it: the robot address and port, Find it on my network, the Route to the robot setting,
   the Broker chip in the header, the repeat of a Pause, Stop or Return to dock by the other route, and the
-  `YARBO_HOST` and `YARBO_PORT` environment variables (both ignored if set). `/health` reports `robot_connected` in
-  place of `local_connected`. The setup guide's first step is the Yarbo cloud sign-in.
+  `YARBO_HOST` and `YARBO_PORT` environment variables (both ignored if set). `/health` reports `robot_connected`
+  (the robot answered through the cloud lately) in place of `local_connected`. The setup guide's first step is the
+  Yarbo cloud sign-in.
 
 ### Fixed
 

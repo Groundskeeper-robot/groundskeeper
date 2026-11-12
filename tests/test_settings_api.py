@@ -139,26 +139,42 @@ def test_false_switches_an_integration_off_over_the_environment(tmp_path):
     assert rt.set("frigate", {"url": None}) == ["url"] and rt.frigate_url == "http://env-frigate:5000"
 
 
-def test_stored_rows_are_checked_on_load_and_restore_puts_a_group_back(tmp_path):
+def test_a_legacy_robot_group_moves_its_serial_and_is_dropped(tmp_path):
+    """Settings → Robot from before the panel went cloud-only: a typed serial is kept as a found one, the address and
+    port go with the group, once."""
+    from app.runtime import found_sn
+    store = Store(str(tmp_path))
+    store.set_setting("integrations", {"robot": {"port": 1883, "host": "192.0.2.10", "sn": "YB0000DEMO0001"}})
+    Runtime(env(tmp_path), store)
+    assert "robot" not in store.setting("integrations")
+    assert found_sn(store) == {"sn": "YB0000DEMO0001", "from": "settings"}
+
+
+def test_a_found_serial_is_not_replaced_by_a_typed_one(tmp_path):
     from app.runtime import FOUND_SN, found_sn
     store = Store(str(tmp_path))
-    # Settings → Robot from before the panel went cloud-only: a typed serial is kept as a found one, the address and
-    # port are dropped with the group, once.
-    store.set_setting("integrations", {"robot": {"port": 1883, "host": "192.0.2.10", "sn": "YB0000DEMO0001"},
-                                       "frigate": "junk", "unknown": {"x": 1}})
-    rt = Runtime(env(tmp_path), store)
-    assert "robot" not in store.setting("integrations") and rt.frigate_url is None
-    assert found_sn(store) == {"sn": "YB0000DEMO0001", "from": "settings"}
     store.set_setting(FOUND_SN, {"sn": "YB0000DEMO0002", "from": "account"})
     store.set_setting("integrations", {"robot": {"sn": "YB0000DEMO0001"}})
     Runtime(env(tmp_path), store)
-    assert found_sn(store)["sn"] == "YB0000DEMO0002"              # a found serial is not replaced by a typed one
+    assert found_sn(store)["sn"] == "YB0000DEMO0002"
+
+
+def test_stored_junk_rows_are_dropped_on_load(tmp_path):
+    store = Store(str(tmp_path))
+    store.set_setting("integrations", {"frigate": "junk", "unknown": {"x": 1}, "panel": {"poll_idle_s": 1}})
+    rt = Runtime(env(tmp_path), store)
+    assert rt.frigate_url is None and rt.poll_idle_s == 60 and rt.snapshot("panel") == {}
+
+
+def test_restore_puts_a_group_back(tmp_path):
+    store = Store(str(tmp_path))
     rt = Runtime(env(tmp_path), store)
     rt.set("frigate", {"url": "http://kept:5000"})
     before = rt.snapshot("frigate")
     rt.set("frigate", {"url": "http://other:5000"})
     rt.restore("frigate", before)
     assert rt.frigate_url == "http://kept:5000" and Runtime(env(tmp_path), store).frigate_url == "http://kept:5000"
+
 
 # -- the API -----------------------------------------------------------------------------------------------------
 def test_settings_lists_switches_groups_and_integrations(tmp_path):
@@ -303,9 +319,12 @@ def test_setup_status_reads_what_the_panel_knows(tmp_path):
     assert steps["robot"]["detail"] == "Yarbo cloud signed out" and not steps["robot"]["done"]
     assert "cloud" not in steps                                       # the cloud is the robot step now
     assert steps["safety"]["done"] and not steps["weather"]["done"]
-    r.robot_status = lambda: {"connected": True, "error": ""}
+    r.robot_status = lambda: {"connected": True, "heard": False, "error": ""}
     o.cloud = SimpleNamespace(status=lambda: {"state": "connected"})
-    r.map_geojson = {"type": "FeatureCollection", "features": []}
+    r.map_geojson = {"type": "FeatureCollection", "features": []}    # restored from the store at start
+    steps = {s["id"]: s for s in run(main.setup_status(req))["steps"]}
+    assert not steps["robot"]["done"] and "waiting to hear" in steps["robot"]["detail"]   # the cloud alone is not it
+    r.robot_status = lambda: {"connected": True, "heard": True, "error": ""}
     r.store.set_setting("weather_sources", {"ha": {"temp": "sensor.out_temp"}})
     r.store.set_setting("gates", {"guard_resume": True})
     out = run(main.setup_status(req))

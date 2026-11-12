@@ -1029,8 +1029,13 @@ class Recorder:
             error = "" if connected else "not set up"
         if not self.sn and not demo:
             error = error or "waiting for the robot's serial"
+        # The cloud can be up while the robot is not: "heard" needs a message from the robot itself lately (the panel
+        # asks for its state every poll_idle_s, so twice that, and at least two minutes).
+        window = max(120.0, 2 * float(getattr(self.cfg, "poll_idle_s", 60) or 60))
+        heard = bool(connected and self.last_message_at and now - self.last_message_at < window)
         return {
-            "connected": connected,
+            "connected": connected,      # a route to the robot is up (reads can go out)
+            "heard": heard,              # and the robot itself has answered lately
             "via": "demo robot" if demo else "Yarbo cloud",
             "last_message_age_s": round(now - self.last_message_at, 1) if self.last_message_at else None,
             "received": self.received,
