@@ -89,6 +89,10 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ### Fixed
 
+- **The imagery credit no longer covers the map legend** (#122). With Signal or Problem areas on, the legend's
+  extra row slid under the credit and hid the Signal menu; the credit now sits just above the legend however tall it
+  is. Phones show the credit too (it was hidden there), above the legend's row, so **Align** is reachable on a phone;
+  there the Problems and Signal boxes now stay one line each in the legend's row instead of wrapping onto two.
 - **The Cameras tile plays over plain http.** Opened at the panel's LAN address (`http://<server>:8427`), it
   stopped at "Loading the video library failed: This browser cannot play the robot's video.": browsers hide the
   camera and microphone API on a page that is not https, and the video library's check asked for it though the
