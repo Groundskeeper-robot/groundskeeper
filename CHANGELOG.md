@@ -67,17 +67,21 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   samples the robot moves smoothly, so a replay, and Follow in 3D, can be watched at a real pace. The 3D map's 1×–3×
   menu is now labelled Height: it draws the ground taller, it is not a speed.
 
-- **Robots reached only through the Yarbo cloud** (the robot's local broker refuses connections, as after some
-  firmware updates): with no serial known, the panel reads it from your Yarbo account's robot list (one robot: used;
-  several: Settings → Robot lists them to choose from). The serial found is kept, so a restart while local access is
-  closed still knows the robot; the one the robot announces on your network always wins over the account's.
+- **The robot's serial from your Yarbo account.** The panel reads it from your account's robot list (one robot: used;
+  several: Settings → Robot lists them to choose from) and keeps it, so a restart still knows the robot.
 
 ### Changed
 
-- **The robot's serial is never typed in.** The panel always finds it: on the robot's heartbeat, or from your Yarbo
-  account. The serial field is gone from Settings → Robot and `YARBO_SN` is no longer read (the log says so if it is
-  still set). A serial typed in before is kept as a found one until the robot's heartbeat names it, and a new robot at
-  a new address is found again instead of keeping the old serial.
+- **The robot's serial is never typed in.** The serial field is gone from Settings → Robot and `YARBO_SN` is no longer
+  read (the log says so if it is still set). A serial typed in before is kept as a found one until the account names
+  another.
+- **The panel reaches the robot only through the Yarbo cloud.** Yarbo firmware V3.14.4x closes the robot's own
+  broker on the home network (#91), so the local route is gone: everything the panel reads, and every command and
+  map write, goes through the Yarbo cloud, as the Yarbo app's do. **Signing in to the Yarbo cloud (Settings → Robot)
+  is now required.** Gone with it: the robot address and port, Find it on my network, the Route to the robot setting,
+  the Broker chip in the header, the repeat of a Pause, Stop or Return to dock by the other route, and the
+  `YARBO_HOST` and `YARBO_PORT` environment variables (both ignored if set). `/health` reports `robot_connected` in
+  place of `local_connected`. The setup guide's first step is the Yarbo cloud sign-in.
 
 ### Fixed
 

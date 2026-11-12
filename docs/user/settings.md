@@ -10,7 +10,7 @@ It is open when you go to Settings and closes once you choose a section.
 | Section | What it holds |
 |---|---|
 | [Set up](#settings/setup) | The first-run guide: every step below in order, with what each is for ([more](#help/setup)) |
-| [Robot](#settings/robot) | The robot's address and port; the Yarbo cloud sign-in; the Wi-Fi survey |
+| [Robot](#settings/robot) | The Yarbo cloud sign-in and the robot's serial; deck width; the Wi-Fi survey |
 | [Safety](#settings/safety) | The control and map writing switches ([more](#help/safety)) |
 | [Run rules](#settings/rules) | What must be true to start, and what each guard does during a run |
 | [Lawn conditions](#settings/lawn) | Weather from the Tempest and/or Home Assistant, soil moisture, units, the dry / damp / wet rules and the last 24 h |
@@ -126,15 +126,13 @@ answer that takes more than 12 seconds is counted but not put on the map: the ro
 ## Yarbo cloud sign-in
 
 You type your Yarbo password in Settings → Robot. It goes straight to Yarbo's own SDK and is never stored or
-logged; only the session is kept on the server. It is optional: the panel reads and commands the robot over your
-network, and uses the cloud only as a fallback when the robot can't be reached there (Settings → Robot → Route to
-the robot shows which way each goes).
+logged; only the session is kept on the server. The panel needs it: it reads and commands the robot only through
+the Yarbo cloud, as the official app does. (Firmware V3.14.4x closed the robot's own broker on your network.)
 
-The cloud needs the robot's serial. You never type it: it is read from the robot on your network, and when that is
-closed the panel asks your Yarbo account which robots it has and uses the only one (several: the card lists them,
-press **Use this** on yours). The serial found is kept, so a restart still knows the robot. The one the robot itself
-announces on your network always wins over the account's. While none is known the card says **waiting for the
-robot's serial**: give the panel the robot's address, or sign in to the Yarbo account the robot is on.
+The cloud needs the robot's serial. You never type it: the panel asks your Yarbo account which robots it has and
+uses the only one (several: the card lists them, press **Use this** on yours). The serial found is kept, so a restart
+still knows the robot. While none is known the card says **waiting for the robot's serial**: sign in to the Yarbo
+account the robot is on.
 
 ### Robot video
 

@@ -4,14 +4,14 @@ What the robot exposes over MQTT, locally and through Yarbo's cloud, as observed
 in autumn 2026. Write commands are in [`map-writes.md`](map-writes.md); state and error codes in
 [`robot-states.md`](robot-states.md).
 
-Tools in `tools/`: `yarbo_local.py` (local broker, read-only, standard library only) and `yarbo_cloud.py` (a cloud
-diagnostic on Yarbo's SDK).
+Tools in `tools/`: `yarbo_cloud.py` (a cloud diagnostic on Yarbo's SDK) and `yarbo_capture.py` (records the cloud
+broker). Firmware V3.14.4x closes the local broker (see Access control).
 
 ## Brokers
 
 | Thing | Value |
 |---|---|
-| Robot (rover) | `<robot-ip>`, EMQX on **1883 plain, anonymous**. Open TCP ports: 22, 1883, 8083 (EMQX WebSocket), 8084 (TLS), 8088, 8089, 8090, 8883 |
+| Robot (rover) | `<robot-ip>`, EMQX on **1883 plain, anonymous** (closed from firmware V3.14.4x). Open TCP ports: 22, 1883, 8083 (EMQX WebSocket), 8084 (TLS), 8088, 8089, 8090, 8883 |
 | Data Center (base station) | No open ports. The rover talks to it over HaLow. |
 | Serial in topics | `{SN}`, the robot's serial, e.g. `YB0000DEMO0001` (uppercase works; lowercase is also granted) |
 
@@ -46,18 +46,21 @@ no manual drive.** Those are learned by watching the official app on `snowbot/{S
 
 ## Access control (after the September 2026 "cleaning up MQTT" firmware)
 
+Firmware V3.14.4x closes the local broker: connections to 1883 are refused. The panel is cloud only since then (#91).
+The local rows below are what earlier firmware showed.
+
 | Operation | Result |
 |---|---|
 | CONNECT, no credentials | **accepted** |
 | SUBSCRIBE `#`, `$SYS/#` | **refused** (128) |
 | SUBSCRIBE `snowbot/{SN}/device/#`, `snowbot/{SN}/app/#`, `snowbot/{SN}/#` | **granted** |
-| SUBSCRIBE `snowbot/+/device/heart_beat` (serial unknown) | **granted**; heartbeats arrive every few seconds with the serial in the topic (checked 2026-10-20). Robot discovery (`app/robotscan.py`) and `discover_sn` rely on it |
+| SUBSCRIBE `snowbot/+/device/heart_beat` (serial unknown) | **granted**; heartbeats arrive every few seconds with the serial in the topic (checked 2026-10-20). The panel's robot discovery relied on it before it went cloud only |
 | PUBLISH read requests (`get_device_msg`, `get_map`, `read_gps_ref`, `read_all_plan`, …) | **answered** |
 | Action commands, locally | **accepted** for `set_sound_param` (2026-10-21): published on the local broker with no cloud and no handshake, it answered "Sound settings updated successfully." (state 0) on `device/data_feedback` and `StateMSG.enable_sound` followed, both ways. **Run commands too** (2026-10-21, docked, plan "Mow Side"): `start_plan {"id": 2}`, `pause`, `stop` and `cmd_recharge {"cmd": 2}` on the local broker each showed in the robot's state within about 2 s (planning 2 and off the dock; `planning_paused` 1; planning 0 with "no plan working"; `on_going_recharging` 2, then docked and charging). Still no reply to run commands: confirm by state |
 | `light_ctrl` from the official app | **ignored** on the dock and when off it (2026-10-21): `LedInfoMSG` never showed the sent values; the lights seen while driving are the robot's own (head 50, sides 150) |
 | **Cloud broker** (account session): SUBSCRIBE `snowbot/{SN}/#`, `/app/#`, `/device/#` | **granted for the account's own robot**; `snowbot/#` and `#` refused. The phone app's commands are visible here. |
 
-Re-check after any firmware update: `python tools/yarbo_local.py acl '#' 'snowbot/<SN>/app/#'`.
+Re-check after any firmware update whether the local broker accepts a connection on 1883.
 
 **The phone app talks to the robot through the cloud broker, even on the home Wi-Fi.**
 
@@ -187,8 +190,8 @@ untested]**: whether it changes anything during a run besides the live view (obs
 That is why a client sends only `{"state":1}`: the panel's controller refuses any other state (`control.check`,
 "Cameras on only") and leaves switching off to the robot or the app. `{"state":1}` is allowed idle or during a run,
 with the same robot-online and route checks as pause, stop and dock. Only a person at the panel can send it (not
-tokens, the MCP server, the scheduler or the guards), and only through the cloud broker, the one route observed
-(`LOCAL_VISION_PROVED` in `app/link.py`, off until a local send is observed).
+tokens, the MCP server, the scheduler or the guards), and only through the cloud broker, the panel's only route
+(`ON_ONLY` in `app/link.py`).
 
 **Token request.** An authenticated POST to the cloud's *robot service*, a different host from the `data-api.yarbo.ai`
 used for sign-in and broker discovery: an AWS API Gateway stage,

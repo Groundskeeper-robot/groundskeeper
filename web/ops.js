@@ -85,7 +85,7 @@ function opsSwitches(s) {
   ];
 }
 
-// Grouped with the other connection chips (local broker, RTK) in the top bar: "Cloud" while connected, else its state.
+// Grouped with the other connection chips (HaLow, Wi-Fi, RTK) in the top bar: "Cloud" while connected, else its state.
 function cloudChip(s) {
   const c = s.ops && s.ops.cloud;
   if (!c) return null;
@@ -236,10 +236,10 @@ function drawCamStage(d, s) {
 /* The emergency block: one big button that pauses a running plan or resumes a paused one (the robot's own
    planning_paused decides which, through its activity), with Stop and Return to dock under it. The same command
    path and checks as the Control card; the confirmation is a second tap within 4 s instead of a dialog. */
-// Some route carries commands (the robot's broker on the home network, or the Yarbo cloud); the reason when none does.
+// The Yarbo cloud carries commands; the reason when it doesn't.
 const routeOk = (o) => (o.link ? !!o.link.commands : !!(o.cloud && o.cloud.state === "connected"));
-const noRouteWhy = (o) => [o.link ? "No route to the robot: neither its broker on your network nor the Yarbo cloud is connected. "
-  : `Yarbo cloud is ${(o.cloud || {}).state}. `, h("a", { href: "#settings/robot" }, "Settings → Robot"), "."];
+const noRouteWhy = (o) => [`No route to the robot: the Yarbo cloud is ${(o.cloud || {}).state || "not set up"}. `,
+  h("a", { href: "#settings/robot" }, "Settings → Robot"), "."];
 
 function emergencyCard(s) {
   const o = s.ops || {}, on = o.control_enabled;

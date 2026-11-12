@@ -30,7 +30,6 @@ from . import auth as auth_mod
 from . import oidc as oidc_mod
 from . import backups as backups_mod
 from . import corrections
-from . import robotscan
 from . import config, control, coverage, geo, insights, mapstudio, mapwrite, telemetry
 from . import ha as ha_mod
 from . import help as help_mod
@@ -51,7 +50,6 @@ from .ops import Ops
 from .recorder import Recorder
 from .runtime import GROUPS, Runtime, found_sn
 from .store import Store
-from .transport_local import discover_sn
 
 log = logging.getLogger("yarbo_panel")
 WEB = Path(__file__).resolve().parent.parent / "web"
@@ -89,7 +87,7 @@ async def lifespan(app: FastAPI):
         from . import demo
         demo.prepare(store)
     cfg = Runtime(env, store)                    # Settings → integrations over the environment
-    # Never typed in: the serial the panel found before (heart_beat or Yarbo account), else it is found again.
+    # Never typed in: the serial the panel found before on the Yarbo account, else it is found again.
     sn = None if env.demo else found_sn(store).get("sn")
     if os.environ.get("YARBO_SN", "").strip():
         log.warning("YARBO_SN is no longer used: the panel finds the robot's serial itself")
@@ -173,7 +171,7 @@ async def health(request: Request):
     r = rec(request)
     s = r.status()
     # Open to anyone (Docker's health check, uptime monitors, scripts/deploy.sh's "not mid-mow" check): no data.
-    return {"ok": True, **version_info(), "local_connected": r.local_status()["connected"],
+    return {"ok": True, **version_info(), "robot_connected": r.robot_status()["connected"],
             "snapshot_age_s": s["snapshot_age_s"], "busy": bool(s.get("run") or (s.get("plan") or {}).get("active"))}
 
 
@@ -737,7 +735,7 @@ async def replies(request: Request):
 
 @app.get("/api/commands")
 async def commands(request: Request):
-    """Commands other clients have published on the local broker (we only ever listen to these)."""
+    """Commands other clients have sent the robot, as the cloud broker shows them (we only listen to these)."""
     return {"commands": rec(request).store.commands_seen()}
 
 
@@ -800,8 +798,8 @@ def _pathway_write_block(request: Request) -> str | None:
         return "a plan is running; change settings while the robot is idle"
     if active is None:
         return "the robot's plan state is unknown"
-    if o.cloud.state != "connected":
-        return f"the Yarbo cloud is {o.cloud.state}"
+    if o.link.why_no_writes():
+        return o.link.why_no_writes()
     return o.controller.start_settling()
 
 
@@ -1169,9 +1167,10 @@ async def conditions(request: Request):
 @app.get("/api/setup/status")
 async def setup_status(request: Request):
     """Which first-run steps are done (Settings → Set up). Read from the state the panel already keeps; nothing is
-    stored for the wizard. `first_run` (no robot address or no map yet) is when the panel opens the wizard itself."""
+    stored for the wizard. `first_run` (not signed in to the Yarbo cloud, or no map yet) is when the panel opens the
+    wizard itself."""
     r, o, cfg, store = rec(request), ops(request), request.app.state.cfg, rec(request).store
-    local = r.local_status()
+    robot = r.robot_status()
     cloud = o.cloud.status().get("state")
     g = control.gates(store)
     yard = store.setting("yard_cameras", []) or []
@@ -1186,10 +1185,9 @@ async def setup_status(request: Request):
         return {"id": id_, "title": title, "done": bool(done), "detail": detail, "optional": optional}
 
     steps = [
-        step("robot", "Robot", local.get("connected") and r.map_geojson,
-             "connected, map read" if local.get("connected") and r.map_geojson else "connected, waiting for the map"
-             if local.get("connected") else "no address yet" if not cfg.yarbo_host else "not found at its address"),
-        step("cloud", "Yarbo cloud", cloud == "connected", f"cloud {cloud or 'signed out'} (optional: a fallback route)", True),
+        step("robot", "Robot", robot.get("connected") and r.map_geojson,
+             "connected, map read" if robot.get("connected") and r.map_geojson else "connected, waiting for the map"
+             if robot.get("connected") else robot.get("error") or f"Yarbo cloud {cloud or 'signed out'}"),
         step("imagery", "Map imagery", src, (src or {}).get("name", "picked") if src else "no imagery yet"),
         step("cameras", "Cameras", o.frigate.enabled and yard and all(c in polys for c in yard),
              "Frigate not set up" if not o.frigate.enabled else f"{len(yard)} yard cameras, {sum(1 for c in yard if c in polys)} with coverage", True),
@@ -1205,7 +1203,8 @@ async def setup_status(request: Request):
         step("assistant", "AI assistant", mcp_server.token_status(store)["enabled"], "token made" if mcp_server.token_status(store)["enabled"] else "no token", True),
     ]
     need = [s for s in steps if not s["optional"]]
-    return {"first_run": not getattr(cfg, "demo", False) and (not cfg.yarbo_host or not r.map_geojson), "steps": steps,
+    return {"first_run": not getattr(cfg, "demo", False) and (cloud in (None, "signed out") or not r.map_geojson),
+            "steps": steps,
             "done": sum(s["done"] for s in steps), "required_done": all(s["done"] for s in need)}
 
 
@@ -1290,7 +1289,6 @@ SETTINGS_DEFAULTS = {
     "webhook_url": None,
     "wifi_survey": "off",
     "robot_video_enabled": False,    # §13: the viewer's browser joins Agora; people only (POST /api/video/token)
-    "robot_route": "auto",           # app/link.py: local first with the cloud as a fallback, or one route only
 }
 
 
@@ -1370,15 +1368,7 @@ async def put_integration(request: Request, group: str, value: dict = Body(...))
     if changed:
         r.store.event("settings_changed", f"{group}: {', '.join(changed)}")      # names only, never values
         try:
-            if group == "robot":
-                task = asyncio.ensure_future(r.apply_robot())
-                task.add_done_callback(lambda t: log.warning("robot reconnect failed: %s", t.exception())
-                                       if not t.cancelled() and t.exception() else None)
-                try:
-                    await asyncio.wait_for(asyncio.shield(task), 25)
-                except asyncio.TimeoutError:
-                    note = "still looking for the robot; the Robot section updates when it answers"
-            elif group == "frigate":
+            if group == "frigate":
                 await o.apply_frigate()
             elif group == "home_assistant":
                 await o.apply_home_assistant()
@@ -1390,9 +1380,6 @@ async def put_integration(request: Request, group: str, value: dict = Body(...))
             cfg.restore(group, before)                   # not kept: it could not be put into effect
             raise HTTPException(502, f"could not apply the change, so it was not kept: {exc}")
     return {"group": group, "changed": changed, "note": note, "fields": cfg.describe()[group]}
-
-
-_SCAN_LOCK = asyncio.Lock()
 
 
 @app.post("/api/robot/account")
@@ -1408,27 +1395,8 @@ async def robot_from_account(request: Request, body: dict = Body(...)):
     if ops(request).map_writer.lock.locked() and rec(request).sn not in (None, sn):
         raise HTTPException(409, "a write to the robot is in progress; switch when it has finished")
     if not rec(request).use_found_sn(sn):
-        raise HTTPException(409, "the panel already hears another robot on its local network")
+        raise HTTPException(400, "that robot's serial could not be kept")
     return {"ok": True}
-
-
-@app.post("/api/robot/discover")
-async def robot_discover(request: Request, body: dict = Body(None)):
-    """Look for the robot on the local network (Settings → Robot → Find it on my network): the panel's own /24, or a
-    home-network (RFC 1918) /24 the user names. Connects and subscribes only; nothing is sent to anything it finds.
-    One at a time; about 20 s."""
-    cfg = request.app.state.cfg
-    if cfg.demo:
-        return {"network": "demo", "brokers": 1, "found": [{"host": "demo", "port": 1883, "sn": rec(request).sn}], "note": None}
-    if _SCAN_LOCK.locked():
-        raise HTTPException(409, "a search is already running")
-    network = (body or {}).get("network")
-    network = None if network in (None, "") else network
-    async with _SCAN_LOCK:
-        try:
-            return await robotscan.scan(int(cfg.yarbo_port or 1883), network)
-        except ValueError as exc:
-            raise HTTPException(400, str(exc))
 
 
 @app.post("/api/integrations/{group}/test")
@@ -1437,15 +1405,6 @@ async def test_integration(request: Request, group: str, body: dict = Body(None)
     the address the user typed or already set."""
     body, cfg = body or {}, request.app.state.cfg
     try:
-        if group == "robot" and cfg.demo:
-            return {"ok": True, "detail": f"demo robot {rec(request).sn} (synthetic, no network)", "sn": rec(request).sn}
-        if group == "robot":
-            host = (body.get("host") or cfg.yarbo_host or "").strip()
-            port = int(body.get("port") or cfg.yarbo_port)
-            if not host:
-                raise HTTPException(400, "no robot address")
-            sn = await asyncio.to_thread(discover_sn, host, port, 12)
-            return {"ok": True, "detail": f"robot {sn} is broadcasting on {host}:{port}", "sn": sn}
         if group == "frigate":
             url = (body.get("url") or cfg.frigate_url or "").rstrip("/")
             if not url:
@@ -1563,15 +1522,6 @@ async def put_setting(request: Request, key: str, value: Any = Body(None)):
             raise HTTPException(400, "true or false")
         r.store.set_setting(key, value)
         r.store.event("robot_video_switched", "robot video switched ON" if value else "robot video switched off")
-        return {key: value}
-    if key == "robot_route":
-        from .link import ROUTE_MODES
-        if value not in ROUTE_MODES:
-            raise HTTPException(400, f"one of {', '.join(ROUTE_MODES)}")
-        before = r.store.setting("robot_route") or "auto"
-        r.store.set_setting(key, value)
-        if before != value:
-            r.store.event("route_setting_changed", f"route to the robot: {before} → {value}")
         return {key: value}
     if key == "wifi_survey":
         from .recorder import WIFI_MODES
@@ -1970,11 +1920,11 @@ def _write_checks(request: Request, d: dict, issues: list, plan: dict) -> list[d
     snap_age = round(time.time() - r.snapshot_at, 1) if r.snapshot_at else None
     errors = [i for i in issues if i["level"] == "error"]
     on = bool(r.store.setting("map_write_enabled", False))
-    cloud = ops(request).cloud.state
+    cloud, no_write = ops(request).cloud.state, ops(request).link.why_no_writes()
     starting = ops(request).controller.start_settling()
     checks = [
         ("Map writing switched on", on, "on" if on else "off (switch it on below)"),
-        ("Yarbo cloud connected", cloud == "connected", cloud),
+        ("Yarbo cloud connected", not no_write, no_write or cloud),
         ("Robot online", snap_age is not None and snap_age < 120, f"last snapshot {snap_age} s ago" if snap_age else "no data"),
         ("Docked", (t.get("charging") or 0) > 0, "on the charger" if (t.get("charging") or 0) > 0 else "not on the charger"),
         ("Idle", not (r.run_id or t.get("planning")), "a plan is running" if (r.run_id or t.get("planning")) else "idle"),
@@ -2109,8 +2059,8 @@ def _backup_block(request: Request, restore: bool) -> str | None:
     r, t = rec(request), rec(request).t
     if not r.store.setting("map_write_enabled", False):
         return "map writing is switched off (Map Studio → Yard, or Settings → Safety)"
-    if ops(request).cloud.state != "connected":
-        return f"the Yarbo cloud is {ops(request).cloud.state}"
+    if ops(request).link.why_no_writes():
+        return ops(request).link.why_no_writes()
     if restore:
         age = time.time() - r.snapshot_at if r.snapshot_at else None
         if age is None or age > 120:
@@ -2216,8 +2166,8 @@ def _network_write_block(request: Request, held: bool = False) -> str | None:
     r, t = rec(request), rec(request).t
     if not r.store.setting("map_write_enabled", False):
         return "robot writes are switched off (Settings → Safety → Map writing)"
-    if ops(request).cloud.state != "connected":
-        return f"the Yarbo cloud is {ops(request).cloud.state}"
+    if ops(request).link.why_no_writes():
+        return ops(request).link.why_no_writes()
     age = time.time() - r.snapshot_at if r.snapshot_at else None
     if age is None or age > 120:
         return "no recent data from the robot"

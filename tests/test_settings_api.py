@@ -58,7 +58,7 @@ class FakeOps:
 
 
 def env(tmp_path, **over):
-    cfg = Config(yarbo_host="192.0.2.10", yarbo_port=1883, data_dir=str(tmp_path), port=8425, poll_idle_s=60,
+    cfg = Config(data_dir=str(tmp_path), port=8425, poll_idle_s=60,
                  poll_active_s=2, map_refresh_s=21600, raw_every_s=60, raw_keep_days=90, run_idle_end_s=300, tempest_port=50222,
                  ha_url=None, ha_token=None, demo=False, frigate_url=None, panel_url=None)
     return Config(**{**cfg.__dict__, **over})
@@ -80,21 +80,29 @@ def run(coro):
 def test_runtime_reads_settings_over_the_environment(tmp_path):
     store = Store(str(tmp_path))
     rt = Runtime(env(tmp_path, frigate_url="http://env-frigate:5000"), store)
-    assert rt.frigate_url == "http://env-frigate:5000" and rt.yarbo_host == "192.0.2.10" and rt.data_dir == str(tmp_path)
+    assert rt.frigate_url == "http://env-frigate:5000" and rt.data_dir == str(tmp_path)
     assert rt.set("frigate", {"url": "http://other:5000/"}) == ["url"]
     assert rt.frigate_url == "http://other:5000"                     # trailing slash dropped
     assert rt.set("frigate", {"url": "http://other:5000"}) == []     # same value: nothing changed
     assert rt.set("frigate", {"url": None}) == ["url"]
     assert rt.frigate_url == "http://env-frigate:5000"               # cleared: the environment applies again
     assert store.setting("integrations") == {}
-    rt.set("robot", {"host": "robot.local", "port": 1884})
+    rt.set("frigate", {"url": "http://kept:5000"})
     again = Runtime(env(tmp_path), store)                             # survives a restart
-    assert (again.yarbo_host, again.yarbo_port) == ("robot.local", 1884)
+    assert again.frigate_url == "http://kept:5000"
+
+
+def test_there_is_no_robot_group_any_more(tmp_path):
+    """The robot is reached through the Yarbo cloud and its serial is found: nothing to set in Settings → Robot."""
+    rt = Runtime(env(tmp_path), Store(str(tmp_path)))
+    for values in ({"host": "192.0.2.10"}, {"port": 1883}, {"sn": "YB0000DEMO0001"}):
+        with pytest.raises(KeyError):
+            rt.set("robot", values)
+    assert "robot" not in rt.describe() and rt.store.setting("integrations") is None
 
 
 @pytest.mark.parametrize("group,bad", [
-    ("robot", {"host": ""}), ("robot", {"host": "http://robot"}), ("robot", {"port": 70000}), ("robot", {"port": "1883"}),
-    ("robot", {"sn": "YB0000DEMO0001"}), ("frigate", {"url": "frigate:5000"}), ("home_assistant", {"token": ""}),
+    ("frigate", {"url": "frigate:5000"}), ("home_assistant", {"token": ""}),
     ("weather", {"tempest_port": 1.5}), ("panel", {"poll_idle_s": 1}), ("panel", {"raw_keep_days": True}),
     ("panel", {"nonsense": 1}),
 ])
@@ -132,18 +140,25 @@ def test_false_switches_an_integration_off_over_the_environment(tmp_path):
 
 
 def test_stored_rows_are_checked_on_load_and_restore_puts_a_group_back(tmp_path):
+    from app.runtime import FOUND_SN, found_sn
     store = Store(str(tmp_path))
-    store.set_setting("integrations", {"robot": {"port": "1883", "host": "robot.local", "nonsense": 1},
+    # Settings → Robot from before the panel went cloud-only: a typed serial is kept as a found one, the address and
+    # port are dropped with the group, once.
+    store.set_setting("integrations", {"robot": {"port": 1883, "host": "192.0.2.10", "sn": "YB0000DEMO0001"},
                                        "frigate": "junk", "unknown": {"x": 1}})
     rt = Runtime(env(tmp_path), store)
-    assert rt.yarbo_port == 1883 and rt.yarbo_host == "robot.local"      # the bad port and the junk were dropped
-    assert rt.describe()["robot"]["port"]["source"] == "default"
-    before = rt.snapshot("robot")
-    rt.set("robot", {"host": "other.local", "port": 1884})
-    rt.restore("robot", before)
-    assert rt.yarbo_host == "robot.local" and rt.yarbo_port == 1883
-    assert Runtime(env(tmp_path), store).yarbo_host == "robot.local"
-
+    assert "robot" not in store.setting("integrations") and rt.frigate_url is None
+    assert found_sn(store) == {"sn": "YB0000DEMO0001", "from": "settings"}
+    store.set_setting(FOUND_SN, {"sn": "YB0000DEMO0002", "from": "account"})
+    store.set_setting("integrations", {"robot": {"sn": "YB0000DEMO0001"}})
+    Runtime(env(tmp_path), store)
+    assert found_sn(store)["sn"] == "YB0000DEMO0002"              # a found serial is not replaced by a typed one
+    rt = Runtime(env(tmp_path), store)
+    rt.set("frigate", {"url": "http://kept:5000"})
+    before = rt.snapshot("frigate")
+    rt.set("frigate", {"url": "http://other:5000"})
+    rt.restore("frigate", before)
+    assert rt.frigate_url == "http://kept:5000" and Runtime(env(tmp_path), store).frigate_url == "http://kept:5000"
 
 # -- the API -----------------------------------------------------------------------------------------------------
 def test_settings_lists_switches_groups_and_integrations(tmp_path):
@@ -152,7 +167,7 @@ def test_settings_lists_switches_groups_and_integrations(tmp_path):
     assert out["control_enabled"] is False and out["map_write_enabled"] is False
     assert set(out["conditions"]) == set(ConditionsConfig.__dataclass_fields__)
     assert out["gates"]["min_battery_pct"] == 30
-    assert set(out["integrations"]) == {"robot", "frigate", "home_assistant", "weather", "panel"}
+    assert set(out["integrations"]) == {"frigate", "home_assistant", "weather", "panel"}
     run(main.put_setting(req, "map_write_enabled", True))
     assert run(main.settings(req))["map_write_enabled"] is True
 
@@ -164,10 +179,9 @@ def test_put_integration_applies_live_and_logs_names_only(tmp_path):
     assert o.applied == [("frigate", "http://frigate:5000")]
     run(main.put_integration(req, "home_assistant", {"url": "http://ha:8123", "token": "s3cret"}))
     assert r.applied[-1] == ("ha", "http://ha:8123", "s3cret")
-    run(main.put_integration(req, "robot", {"host": "robot.local"}))
     run(main.put_integration(req, "weather", {"tempest_port": 0}))
     run(main.put_integration(req, "panel", {"run_idle_end_s": 120}))
-    assert [a[0] for a in r.applied] == ["ha", "robot", "weather", "panel"]
+    assert [a[0] for a in r.applied] == ["ha", "weather", "panel"]
     events = " ".join(e["detail"] for e in r.store.events() if e["kind"] == "settings_changed")
     assert "home_assistant: url, token" in events and "s3cret" not in events
     assert run(main.put_integration(req, "frigate", {"url": "http://frigate:5000"}))["changed"] == []   # no re-apply
@@ -275,8 +289,8 @@ def test_ha_notify_services_lists_phones_first(tmp_path):
 
 
 def test_setup_status_reads_what_the_panel_knows(tmp_path):
-    req, r, o = fake_request(tmp_path, yarbo_host=None)
-    r.local_status = lambda: {"connected": False}
+    req, r, o = fake_request(tmp_path)
+    r.robot_status = lambda: {"connected": False, "error": "Yarbo cloud signed out"}
     r.map_geojson, r.tempest, r.yard = None, None, None
     r.ha = SimpleNamespace(enabled=False, error="")
     o.cloud = SimpleNamespace(status=lambda: {"state": "signed out"})
@@ -286,12 +300,12 @@ def test_setup_status_reads_what_the_panel_knows(tmp_path):
     out = run(main.setup_status(req))
     steps = {s["id"]: s for s in out["steps"]}
     assert out["first_run"] and not out["required_done"]
-    assert steps["robot"]["detail"] == "no address yet" and not steps["robot"]["done"]
-    assert steps["safety"]["done"] and steps["cloud"]["optional"] and not steps["weather"]["done"]
-    r.local_status = lambda: {"connected": True}
+    assert steps["robot"]["detail"] == "Yarbo cloud signed out" and not steps["robot"]["done"]
+    assert "cloud" not in steps                                       # the cloud is the robot step now
+    assert steps["safety"]["done"] and not steps["weather"]["done"]
+    r.robot_status = lambda: {"connected": True, "error": ""}
+    o.cloud = SimpleNamespace(status=lambda: {"state": "connected"})
     r.map_geojson = {"type": "FeatureCollection", "features": []}
-    r.store.set_setting("integrations", {"robot": {"host": "192.0.2.10"}})
-    req.app.state.cfg = Runtime(env(tmp_path), r.store)
     r.store.set_setting("weather_sources", {"ha": {"temp": "sensor.out_temp"}})
     r.store.set_setting("gates", {"guard_resume": True})
     out = run(main.setup_status(req))

@@ -18,7 +18,7 @@ class FakeRec:
     def status(self):
         return {"snapshot_age_s": 3, "run": None, "plan": {"active": True}}
 
-    def local_status(self):
+    def robot_status(self):
         return {"connected": True}
 
 
@@ -118,8 +118,8 @@ CLOSED_TO_TOKENS = [
     ("PUT", "/api/settings/map_write_enabled", True),
     ("PUT", "/api/settings/mcp_control_enabled", True),
     ("PUT", "/api/settings/gates", {"guard_resume": True}),
-    ("PUT", "/api/settings/robot_route", "cloud"),
-    ("PUT", "/api/integrations/robot", {"host": "192.0.2.20"}),
+    ("PUT", "/api/settings/wifi_survey", "on"),
+    ("POST", "/api/robot/account", {"sn": "YB0000DEMO0002"}),
     ("POST", "/api/mcp/token", None),
     ("POST", "/api/cloud/login", {"username": "a", "password": "b"}),
     ("POST", "/api/robot/account", {"sn": "YB0000DEMO0002"}),

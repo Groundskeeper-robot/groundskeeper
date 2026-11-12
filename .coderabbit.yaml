@@ -44,17 +44,18 @@ reviews:
         - A new dependency without a reason; anything loaded from a CDN at runtime.
         Do not comment on code that was only moved or re-indented. Do not suggest weakening a check, an assertion
         or an allowlist to make something pass.
-    - path: "app/{control,link,transport_local,cloud,mapwrite,areasettings}.py"
+    - path: "app/{control,link,commands,cloud,mapwrite,areasettings}.py"
       instructions: |
         Robot safety (AGENTS.md -> Rules -> Safety). Flag:
-        - Anything that reaches LocalTransport.command or CloudTransport.publish other than through
+        - Anything that reaches CloudTransport.publish other than through
           app.link.RobotLink, called from Controller.send() (run commands) or MapWriter (writes).
         - A command sent without control.CATALOGUE and control.check, or without a log_control audit row.
         - A new command or payload not documented in docs/dev/protocol.md or docs/dev/map-writes.md. A capture of the
           official app is the rule; for a feature the official app does not have, a maintainer may accept an
           "observed" basis, so flag it and ask, do not assume.
-        - A widened READ_ONLY_COMMANDS, COMPUTE_ONLY or check_command allowlist; cmd_vel reachable on any route.
-        - A start or resume in SAFE_TO_REPEAT; an interlock that passes on an unknown state (they fail closed).
+        - A widened READ_ONLY_COMMANDS, COMPUTE_ONLY or check_command allowlist; cmd_vel reachable anywhere.
+        - A command sent more than once (no repeat or reroute); an interlock that passes on an unknown state (they
+          fail closed).
         - A loosened default: control, map writing, guard auto-resume, assistant commands and MCP stay off.
         - A map or settings write that is not serialised, read back, compared and put back on a mismatch.
     - path: "app/{auth,main,runtime}.py"

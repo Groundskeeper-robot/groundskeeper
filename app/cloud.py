@@ -8,7 +8,7 @@
 * Reconnects back off from 5 s to 5 min.
 * One worker at a time. Each has its own stop event; a stopped worker that is still winding down (a connect can take
   20 s) never installs its connection or writes the status, so a sign-in or restart starts the next one at once.
-* With no serial known (the robot's local broker is closed, nothing set in Settings → Robot), the account's own robot
+* With no serial known (none found before), the account's own robot
   list (the SDK's get_devices(), an account lookup that sends the robot nothing) fills it: one robot is used, several
   are offered in Settings → Robot. While it waits the status says so, and the log says so once.
 
@@ -39,8 +39,8 @@ class CloudTransport:
         self._on_message = on_message
         self.on_sn = on_sn           # told (on the worker thread) when the account's only robot gave the serial
         self.devices: list[dict] = []    # the account's robots, while there are several and none is chosen
-        # Set by Ops: where the kept serial came from ("account", "heart_beat", "settings"; None to skip the check, as
-        # during a run), and what to do when a serial kept from another account is dropped.
+        # Set by Ops: where the kept serial came from ("account"; older installs "heart_beat" or "settings"; None to
+        # skip the check, as during a run), and what to do when a serial the signed-in account lacks is dropped.
         self.sn_source: Callable[[], str | None] | None = None
         self.on_forget: Callable[[str], None] | None = None
         self._check_sn = False           # after a sign-in: is the kept serial on this account?
@@ -248,18 +248,15 @@ class CloudTransport:
         return [d for d in found if valid_sn(getattr(d, "sn", None))]   # it goes into MQTT topics: no + # /
 
     def _kept_sn_elsewhere(self, stop: threading.Event) -> list | None:
-        """After a sign-in: when the kept serial came from an account and this account doesn't list it, drop it and
-        return this account's robots (to choose from). None when it stays, or can't be checked now (a run is open,
-        the lookup failed): then the check stays pending and is tried again."""
+        """After a sign-in: when this account doesn't list the kept serial, drop it and return this account's robots
+        (to choose from); the cloud can't reach a robot the account doesn't have. None when it stays, or can't be
+        checked now (a run is open, the lookup failed): then the check stays pending and is tried again."""
         if not self.sn:
             self._check_sn = False
             return None
         source = self.sn_source() if self.sn_source else None
         if source is None:
             return None                         # a run is open: checked once it has ended
-        if source != "account":
-            self._check_sn = False              # from the robot itself: not an account's to drop
-            return None
         if time.time() - self._check_tried_at < 600:
             return None                         # asked recently and it failed: try again later, not every minute
         self._check_tried_at = time.time()
@@ -297,7 +294,7 @@ class CloudTransport:
                 sn, listed = (self._pick(listed) if listed is not None else self._find_sn(stop)), None
                 if stop.is_set() or self.state == "needs login":
                     return
-                if sn and not stop.is_set() and not self.sn:     # not if one came from the heart_beat meanwhile
+                if sn and not stop.is_set() and not self.sn:     # not if one was chosen meanwhile
                     self.sn = sn
                     log.info("Yarbo cloud: using the account's only robot")
                     if self.on_sn:

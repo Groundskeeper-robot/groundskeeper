@@ -5,7 +5,6 @@
 class FakeLink:
     def __init__(self, transport, route: str = "cloud"):
         self.t, self.route = transport, route
-        self.outcomes = []
 
     @property
     def state(self):
@@ -15,12 +14,6 @@ class FakeLink:
     def sent(self):
         return self.t.sent
 
-    def command(self, cmd, payload, route=None):
+    def command(self, cmd, payload):
         self.t.publish(cmd, payload)
-        return route or self.route
-
-    def other_route(self, route):
-        return None
-
-    def note_command(self, route, seen):
-        self.outcomes.append((route, seen))
+        return self.route
