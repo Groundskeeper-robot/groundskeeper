@@ -12,7 +12,8 @@ Stale data: the robot's values are left out once the snapshot is older than STAL
 look healthy. `yarbo_snapshot_age_seconds` and `yarbo_data_fresh` are always there to alert on.
 
 Units: wheel speed in m/s, wheel current in A and wheel distance in m, as the rest of the panel reads them
-(app/problems.py, app/main.py)."""
+(app/problems.py, app/main.py). The robot's memory comes in kB (as /proc/meminfo) and is shown in bytes; its CPU use
+is a percent, shown as a ratio; its disk is in bytes. The robot's process list (`topProc`) is never read."""
 import math
 
 from . import telemetry
@@ -44,6 +45,11 @@ def _label(value) -> str:
 def _scaled(value, divisor):
     value = _num(value)
     return None if value is None else value / divisor
+
+
+def _kb_to_bytes(value):
+    value = _num(value)
+    return None if value is None else value * 1024
 
 
 class _Out:
@@ -130,6 +136,16 @@ def render(status: dict, t: dict, cloud_state: str | None, guards: list[dict], l
               _scaled(t.get("current_ma"), 1000))
     out.gauge("yarbo_battery_temperature_celsius", "Hottest battery cell.", t.get("cell_temp_max"))
     out.gauge("yarbo_cpu_temperature_celsius", "The robot's onboard CPU.", t.get("cpu_temp"))
+    out.gauge("yarbo_cpu_usage_ratio", "The robot's onboard CPU use, 0 to 1, as it reports it.",
+              _scaled(t.get("cpu_usage"), 100))
+    out.gauge("yarbo_memory_available_bytes", "Memory the robot's computer can still use.",
+              _kb_to_bytes(t.get("mem_available_kb")))
+    out.gauge("yarbo_memory_free_bytes", "Memory the robot's computer has not used at all.",
+              _kb_to_bytes(t.get("mem_free_kb")))
+    out.gauge("yarbo_memory_cached_bytes", "Memory the robot's computer holds as cache.",
+              _kb_to_bytes(t.get("mem_cached_kb")))
+    out.gauge("yarbo_disk_available_bytes", "Free space on the robot's user-data disk.", t.get("disk_available_b"))
+    out.gauge("yarbo_disk_used_bytes", "Used space on the robot's user-data disk.", t.get("disk_used_b"))
     rtk = _num(t.get("rtk_status"))
     out.one_hot("yarbo_rtk_fix", "RTK fix quality (one of a fixed set).", "quality",
                 None if rtk is None else RTK_STATES.get(int(rtk)), RTK_STATES.values())

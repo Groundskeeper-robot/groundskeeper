@@ -45,6 +45,8 @@ All optional. Each is set in Settings and has a Test button.
   `_battery_temperature_celsius`, `_cpu_temperature_celsius`, `_charging`, `_error_code`, `_working_state`,
   `_activity{state}`, `_rtk_fix{quality}`, `_rtk_satellites`, `_odometry_confidence_ratio`, `_heading_degrees`,
   `_wheel_speed_metres_per_second{side}`, `_wheel_current_amperes{side}`, `_wheel_distance_metres_total{side}`,
+  `_cpu_usage_ratio`, `_memory_available_bytes`, `_memory_free_bytes`, `_memory_cached_bytes`,
+  `_disk_available_bytes`, `_disk_used_bytes` (the robot's computer; its process list is never read),
   `_halow_signal_dbm`, `_plan_active`, `_plan_progress_ratio` and `_plan_time_left_seconds` (the plan's own progress),
   and `_heartbeat_age_seconds`. A robot that goes quiet would leave a flat battery line, so once its last snapshot is
   older than 5 minutes the panel **drops the `yarbo_*` values** and keeps `yarbo_snapshot_age_seconds` and

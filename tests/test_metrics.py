@@ -37,7 +37,9 @@ def telemetry_row():
             "rtk_status": 4, "sats": 31, "heading_dop": 0.8, "odom_conf": 0.9, "battery": 82, "voltage_mv": 26500,
             "current_ma": -1500, "charging": 0, "working_state": 1, "error_code": 0, "speed_l": 0.5, "speed_r": 0.55,
             "wheel_cur_l": 1.4, "wheel_cur_r": 1.6, "odo_l": 1000.5, "odo_r": 1001.5, "halow": -60, "cpu_temp": 44.5,
-            "cell_temp_max": 31.0}
+            "cell_temp_max": 31.0, "cpu_usage": 43.8,
+            "mem_available_kb": 5895624, "mem_free_kb": 748496, "mem_cached_kb": 4704332,
+            "disk_available_b": 17685383168, "disk_used_b": 22105933824}
 
 
 def render(st=None, t=None, cloud="connected", guards=None, last=None, now=1000.0):
@@ -67,6 +69,32 @@ def test_robot_and_panel_values_come_out_in_prometheus_units():
     assert s["yarbo_plan_progress_ratio"] == 0.4 and s["yarbo_plan_time_left_seconds"] == 900
     assert s['yarbo_activity{state="mowing"}'] == 1 and s['yarbo_activity{state="docked"}'] == 0
     assert s["yarbo_heading_degrees"] == telemetry.heading_deg(0.0)       # heading is allowed; position is not
+
+
+def test_the_robot_computer_comes_out_in_ratios_and_bytes():
+    s = samples(render())
+    assert s["yarbo_cpu_usage_ratio"] == pytest.approx(0.438)
+    assert s["yarbo_memory_available_bytes"] == 5895624 * 1024 and s["yarbo_memory_free_bytes"] == 748496 * 1024
+    assert s["yarbo_memory_cached_bytes"] == 4704332 * 1024
+    assert s["yarbo_disk_available_bytes"] == 17685383168 and s["yarbo_disk_used_bytes"] == 22105933824
+
+
+def test_the_robot_computer_is_left_out_when_missing_or_odd():
+    odd = {**telemetry_row(), "cpu_usage": float("nan"), "mem_available_kb": "n/a", "mem_free_kb": None,
+           "mem_cached_kb": True, "disk_available_b": float("inf")}
+    s = samples(render(t=odd))
+    gone = {"yarbo_cpu_usage_ratio", "yarbo_memory_available_bytes", "yarbo_memory_free_bytes",
+            "yarbo_memory_cached_bytes", "yarbo_disk_available_bytes"}
+    assert not gone & set(s) and s["yarbo_disk_used_bytes"] == 22105933824
+    assert not [k for k in samples(render(t={})) if "cpu_usage" in k or "memory" in k or "disk" in k]
+
+
+def test_the_robot_computer_goes_when_the_snapshot_is_old():
+    names = ("cpu_usage_ratio", "memory_available_bytes", "memory_free_bytes", "memory_cached_bytes",
+             "disk_available_bytes", "disk_used_bytes")
+    assert all(f"yarbo_{n}" in samples(render()) for n in names)
+    stale = samples(render(st=status(age=metrics.STALE_S + 1)))
+    assert not [n for n in names if f"yarbo_{n}" in stale]
 
 
 def test_the_text_is_well_formed():
@@ -137,6 +165,8 @@ def test_the_demo_robot_through_the_recorder_prints_no_position(tmp_path):
     for v in secrets_:
         assert f"{v:.2f}" not in text and str(v) not in text, v
     assert dr.DEMO_SN not in text
+    assert 0 < s["yarbo_cpu_usage_ratio"] < 1 and s["yarbo_memory_available_bytes"] > 1e9
+    assert s["yarbo_disk_used_bytes"] > 0 and "topProc" not in text and "demo_proc" not in text
 
 
 # -- stale data --------------------------------------------------------------------------------------------------

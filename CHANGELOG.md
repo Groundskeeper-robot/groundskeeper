@@ -12,6 +12,11 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   browser and nothing is sent anywhere. It says **weak link** when loss is 5% or more, the picture froze for 10% of
   the time or the library rates the robot's upload poor, and **slow to draw** when this browser shows far fewer
   frames than arrive. The demo shows a made-up line.
+- **Prometheus metrics** (3 of 3 for #95): the robot's computer, as `yarbo_cpu_usage_ratio`,
+  `yarbo_memory_available_bytes`, `_memory_free_bytes`, `_memory_cached_bytes`, `yarbo_disk_available_bytes` and
+  `_disk_used_bytes`, dropped with the other `yarbo_*` values when the snapshot is old. The robot's process list
+  is not read. The panel now also reads the robot's flat `system_info` keys, so the CPU temperature shows on a
+  real robot too. See Integrations.
 - **Prometheus metrics** (2 of 3 for #95): `GET /api/metrics` in the Prometheus text format, **off** until
   Settings → Access → **Metrics** is switched on, scraped with a metrics-only API token. `yarbo_*` for the robot's
   values (battery, RTK, wheels, signal, plan progress, errors) and `groundskeeper_*` for the panel's own state (cloud
