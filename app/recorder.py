@@ -303,19 +303,24 @@ class Recorder:
             self.store.event("cloud_echo_seen", "the panel's own commands are echoed back again, so they no longer "
                              "count as the phone app's")
 
-    def mark_sent(self, cmd: str) -> None:
-        """The panel has just sent `cmd` (RobotLink calls this after every send): its echo is ours."""
+    def mark_sent(self, cmd: str) -> Callable[[], None]:
+        """The panel is about to send `cmd` (RobotLink calls this before every send): its echo is ours. Returns an undo
+        for a send that fails: it puts back what this call changed, including the credit of a COUNTED_OWN command."""
         now = time.time()
+        before = self._sent.get(cmd)
         self._sent[cmd] = now
+        was = after = None
         if cmd in COUNTED_OWN:
             with self.__dict__.setdefault("_own_lock", threading.Lock()):
                 st = self._own()
                 self._own_expire(st, cmd, now - OWN_ECHO_COUNTED_S)
+                was = (st["last"], list(st["hist"]), st["trusted"])
                 if now - st["last"] > OWN_FRESH_S:
                     # A new session: trust earned earlier says nothing about the cloud now, so it is earned again
                     # (quietly: this is not the cloud failing).
                     st["hist"].clear()
                     st["trusted"] = False
+                    after = (list(st["hist"]), st["trusted"])
                 st["last"] = now
                 st["n"] += 1
                 st["beats"].setdefault(cmd, deque(maxlen=16)).append(now)
@@ -323,6 +328,27 @@ class Recorder:
             if periodic:
                 log.info("own-echo matching: %s", self.own_echo_stats())
             self._own_flush()
+
+        def undo() -> None:
+            if before is None:
+                self._sent.pop(cmd, None)
+            else:
+                self._sent[cmd] = before
+            if was is None:
+                return
+            with self._own_lock:
+                q = st["beats"].get(cmd)
+                if not q or now not in q:
+                    return                    # an echo (or expiry) already took the credit: nothing of ours is left
+                q.remove(now)
+                st["n"] -= 1
+                if st["last"] == now:         # no later send: the session clock goes back
+                    st["last"] = was[0]
+                if after is not None and (list(st["hist"]), st["trusted"]) == after:
+                    st["hist"].clear()        # nothing has judged since: the trust the reset threw away comes back
+                    st["hist"].extend(was[1])
+                    st["trusted"] = was[2]
+        return undo
 
     def own_echo(self, name: str, ts: float, data) -> bool:
         """Is the message `name` that arrived at `ts` the echo of something this panel sent? Decided once per message

@@ -264,7 +264,12 @@ class CloudTransport:
             client = self._mqtt
         if not (client and self.connected):
             raise ConnectionError(f"cloud is {self.state}")
-        client.publish(f"snowbot/{self.sn}/app/{cmd}", encode(payload))
+        # QoS 0 (paho's default) on purpose: at QoS 1 or 2 paho queues the message even when it returns NO_CONN, so
+        # raising on rc != 0 below would report a failed send that is then delivered anyway.
+        info = client.publish(f"snowbot/{self.sn}/app/{cmd}", encode(payload))
+        rc = getattr(info, "rc", 0)      # paho: non-zero when the client did not take the message (4 = not connected)
+        if rc != 0:
+            raise ConnectionError(f"the cloud did not take the message (MQTT error {rc})")
         self.published += 1
 
     def status(self) -> dict:
