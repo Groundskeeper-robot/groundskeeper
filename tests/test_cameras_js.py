@@ -62,6 +62,13 @@ def test_opening_switches_on_then_joins_with_the_sdk_quietened_and_encryption_se
 
 
 @needs_node
+def test_the_system_check_skips_the_camera_and_microphone_check():
+    # Over plain http (not a secure context) the browser hides navigator.mediaDevices, so the SDK's full check fails
+    # though watching works. The tile asks without the device check.
+    assert ["checkSystemRequirements", False] in segment(run_flow(), "open")
+
+
+@needs_node
 def test_the_robots_video_is_subscribed_to():
     assert ["subscribe", 1, "video"] in run_flow()
 

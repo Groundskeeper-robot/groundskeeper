@@ -410,7 +410,9 @@ async function camerasStart({ on, fresh = true }) {
     step = "Loading the video library";
     const AgoraRTC = await camerasLoadSdk();      // only after the panel has given a token
     if (!live()) return;
-    if (AgoraRTC.checkSystemRequirements && !AgoraRTC.checkSystemRequirements()) {
+    // false: skip the camera and microphone check. The tile only watches, and a browser hides navigator.mediaDevices
+    // on a page that is not a secure context (the panel over plain http on the LAN), which fails the full check.
+    if (AgoraRTC.checkSystemRequirements && !AgoraRTC.checkSystemRequirements(false)) {
       throw new Error("This browser cannot play the robot's video.");
     }
     step = "Setting up";
