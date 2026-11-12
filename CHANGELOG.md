@@ -67,6 +67,12 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   samples the robot moves smoothly, so a replay, and Follow in 3D, can be watched at a real pace. The 3D map's 1×–3×
   menu is now labelled Height: it draws the ground taller, it is not a speed.
 
+### Changed
+
+- **Yarbo's SDK 0.3.0** (was 0.2.1). The code is the same; Yarbo changed its licence from MIT to PolyForm
+  Noncommercial, so the Docker image, which includes it, is for noncommercial use. The panel's own code stays MIT.
+  See THIRD_PARTY_NOTICES.md.
+
 ### Fixed
 
 - **A stray shape far from the yard no longer moves the yard.** The panel worked out where the yard is from the outline
