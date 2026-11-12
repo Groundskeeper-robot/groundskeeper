@@ -191,9 +191,11 @@ tokens, the MCP server, the scheduler or the guards), and only through the cloud
 (`LOCAL_VISION_PROVED` in `app/link.py`, off until a local send is observed).
 
 **Token request.** An authenticated POST to the cloud's *robot service*, a different host from the `data-api.yarbo.ai`
-used for sign-in and broker discovery (an AWS API Gateway stage; the host is not recorded in this document). The
-sign-in JWT, as `Authorization: Bearer <jwt>`, is accepted by it **[observed]**. How the app discovers the host is
-**[unconfirmed]**.
+used for sign-in and broker discovery: an AWS API Gateway stage,
+`https://4zx17x5q7l.execute-api.us-east-1.amazonaws.com/Stage` (`video.DEFAULT_SERVICE_URL`). The address is a fixed
+string in the official Android app's package **[observed]**; without a sign-in the route answers code `A0230`
+**[observed]**. The sign-in JWT, as `Authorization: Bearer <jwt>`, is accepted by it **[observed]**. Whether other
+regions or accounts use another address is **[unconfirmed]**.
 
 ```
 POST <robot-service>/yarbo/robot-service/robot/commonUser/getAgoraToken
