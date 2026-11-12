@@ -40,7 +40,7 @@ const knobs = { beatFail: false, beatReply: { sent: true }, beatGate: null, join
                 sdkPresent: true, fastSdk: false, videoOff: false, scripts: [] };
 const storage = {};
 const AgoraRTC = {
-  checkSystemRequirements: () => true,
+  checkSystemRequirements: (...a) => { log("checkSystemRequirements", ...a); return true; },
   // The device id is random, so only its being set (and non-empty) is logged.
   setParameter: (k, v, force) => log("setParameter", k, k === "INSTALL_ID" ? String(v).length > 0 : v, !!force),
   setLogLevel: (n) => log("setLogLevel", n),
