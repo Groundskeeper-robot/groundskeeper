@@ -122,6 +122,7 @@ CLOSED_TO_TOKENS = [
     ("PUT", "/api/integrations/robot", {"host": "192.0.2.20"}),
     ("POST", "/api/mcp/token", None),
     ("POST", "/api/cloud/login", {"username": "a", "password": "b"}),
+    ("POST", "/api/robot/account", {"sn": "YB0000DEMO0002"}),
     ("POST", "/api/studio/draft/apply", {}),
     ("POST", "/api/schedule/pending/confirm", None),
     ("DELETE", "/api/studio/overlay", None),

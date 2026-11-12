@@ -38,6 +38,11 @@ class CloudTransport:
         self._on_message = on_message
         self.on_sn = on_sn           # told (on the worker thread) when the account's only robot gave the serial
         self.devices: list[dict] = []    # the account's robots, while there are several and none is chosen
+        # Set by Ops: where the kept serial came from ("account", "heart_beat", "settings"; None to skip the check, as
+        # during a run), and what to do when a serial kept from another account is dropped.
+        self.sn_source: Callable[[], str | None] | None = None
+        self.on_forget: Callable[[], None] | None = None
+        self._check_sn = False           # after a sign-in: is the kept serial on this account?
         self._devices_at = 0.0
         self.state = "signed out"
         self.username: str | None = None
@@ -95,6 +100,7 @@ class CloudTransport:
             self.username = email.lower()
             self._save()
         self.error, self.devices, self._devices_at = "", [], 0.0     # another account may have other robots
+        self._check_sn = True            # a serial kept from another account must not be followed on this one
         self.start()
 
     def logout(self) -> None:
@@ -194,10 +200,26 @@ class CloudTransport:
     def _find_sn(self, stop: threading.Event | None = None) -> str | None:
         """Ask the account which robots it has (an account lookup; nothing is sent to a robot). One robot: its
         serial. Several: none, and Settings → Robot offers them. Asked again after 10 minutes, so a robot added to
-        the account turns up. Runs under the refresh lock: on a 401 the SDK refreshes the session by itself, and a
-        rotated refresh token must be saved, not lost at the next restart. A dead session means "needs login"."""
+        the account turns up."""
+        robots = self._list_robots(stop)
+        return None if robots is None else self._pick(robots)
+
+    def _pick(self, robots: list) -> str | None:
+        if len(robots) == 1:
+            self.devices = []
+            return robots[0].sn
+        self.devices = [{"sn": d.sn, "name": getattr(d, "name", "") or "", "model": getattr(d, "model", "") or ""}
+                        for d in robots]
+        if robots:
+            log.info("the Yarbo account has %d robots: choose one in Settings → Robot", len(robots))
+        return None
+
+    def _list_robots(self, stop: threading.Event | None = None, force: bool = False) -> list | None:
+        """The account's robots, or None when the lookup failed, was stopped or isn't due (`force` asks anyway). Runs
+        under the refresh lock: on a 401 the SDK refreshes the session by itself, and a rotated refresh token must be
+        saved, not lost at the next restart. A dead session means "needs login"."""
         from yarbo_robot_sdk.exceptions import TokenExpiredError
-        if not self._lookup_due():
+        if not (force and self._client is not None) and not self._lookup_due():
             return None
         self._devices_at = time.time()
         with self._refresh_lock:
@@ -221,25 +243,39 @@ class CloudTransport:
                     self._save_rotated()        # the SDK refreshed (and rotated) the session on a 401
         if stop is not None and stop.is_set():
             return None                         # stopped while asking: the next worker owns the status
-        robots = [d for d in found if getattr(d, "sn", "")]
-        if len(robots) == 1:
-            self.devices = []
-            return robots[0].sn
-        self.devices = [{"sn": d.sn, "name": getattr(d, "name", "") or "", "model": getattr(d, "model", "") or ""}
-                        for d in robots]
-        if robots:
-            log.info("the Yarbo account has %d robots: choose one in Settings → Robot", len(robots))
-        return None
+        return [d for d in found if getattr(d, "sn", "")]
+
+    def _kept_sn_elsewhere(self, stop: threading.Event) -> list | None:
+        """After a sign-in: when the kept serial came from an account and this account doesn't list it, drop it and
+        return this account's robots (to choose from). None when it stays (or can't be checked now)."""
+        self._check_sn = False
+        if not (self.sn and self.sn_source and self.sn_source() == "account"):
+            return None                         # from the robot itself (or none): not an account's to drop
+        robots = self._list_robots(stop, force=True)
+        if robots is None or any(d.sn == self.sn for d in robots):
+            return None
+        log.info("the signed-in Yarbo account has no robot with the kept serial: finding the robot again")
+        self.sn = None
+        if self.on_forget:
+            self.on_forget()
+        return robots
 
     def _run(self, stop: threading.Event) -> None:
         delay = 5
         waiting_said = False
+        listed = None                       # this account's robots, when a check after sign-in already asked
         while not stop.is_set():
             self.state = "connecting"
-            if not self.sn:
-                if self._lookup_due() and not self._refresh():   # a fresh session first, as for a connect
+            if self.sn and self._check_sn:
+                if not self._refresh():
                     return
-                sn = self._find_sn(stop)
+                listed = self._kept_sn_elsewhere(stop)
+                if stop.is_set() or self.state == "needs login":
+                    return
+            if not self.sn:
+                if listed is None and self._lookup_due() and not self._refresh():   # a fresh session first
+                    return
+                sn, listed = (self._pick(listed) if listed is not None else self._find_sn(stop)), None
                 if stop.is_set() or self.state == "needs login":
                     return
                 if sn and not stop.is_set() and not self.sn:     # not if one came from the heart_beat meanwhile

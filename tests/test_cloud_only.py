@@ -5,6 +5,8 @@ import asyncio
 import logging
 import threading
 import time
+
+import pytest
 from types import SimpleNamespace
 
 from app import recorder as recmod
@@ -375,3 +377,80 @@ def test_a_demo_leaves_a_real_installs_typed_serial_alone(tmp_path, monkeypatch)
     store.set_setting("integrations", {"robot": {"host": "192.0.2.50", "sn": SN}})
     Runtime(replace(config.load(), demo=True), store)
     assert store.setting("integrations") == {"robot": {"host": "192.0.2.50", "sn": SN}} and _kept(store) == {}
+
+
+# -- another account, another robot ---------------------------------------------------------------------------------
+def test_a_serial_from_another_account_is_dropped_after_a_sign_in(tmp_path):
+    forgot = []
+    stop = CountingStop(2)
+    c = cloud(tmp_path, FakeSDK([SN2, "YB0000DEMO0003"]), sn=SN)
+    c.sn_source, c.on_forget, c._check_sn = (lambda: "account"), (lambda: forgot.append(True)), True
+    c._refresh = lambda: True
+    c._run(stop)
+    assert c.sn is None and forgot == [True]
+    assert [d["sn"] for d in c.status()["devices"]] == [SN2, "YB0000DEMO0003"]     # this account's robots to choose
+
+
+def test_a_serial_the_new_account_also_has_is_kept(tmp_path):
+    sdk = FakeSDK([SN, SN2])
+    c = cloud(tmp_path, sdk, sn=SN)
+    c.sn_source, c.on_forget = (lambda: "account"), (lambda: (_ for _ in ()).throw(AssertionError("dropped")))
+    c._check_sn = True
+    assert c._kept_sn_elsewhere(threading.Event()) is None and c.sn == SN and sdk.listed == 1
+
+
+@pytest.mark.parametrize("source", ["heart_beat", "settings", None])
+def test_only_a_serial_from_an_account_is_checked(tmp_path, source):
+    sdk = FakeSDK([SN2])
+    c = cloud(tmp_path, sdk, sn=SN)
+    c.sn_source, c._check_sn = (lambda: source), True        # None: a run is open
+    assert c._kept_sn_elsewhere(threading.Event()) is None and c.sn == SN and sdk.listed == 0
+
+
+def test_the_recorder_forgets_a_serial_from_another_account(tmp_path, monkeypatch):
+    o, env, store = _ops(tmp_path, monkeypatch)
+    assert o.rec.use_found_sn(SN)
+    o.rec.snapshot_at, o.rec.t = time.time(), {"battery": 80}
+    o.rec.forget_account_sn()
+    assert o.rec.sn is None and _kept(store) == {} and o.rec.snapshot_at == 0.0 and o.rec.t == {}
+
+
+def test_another_robot_starts_with_none_of_the_last_ones_state(tmp_path, monkeypatch):
+    """Checks before a command must see robot B's state, not A's: unknown until B reports."""
+    o, env, store = _ops(tmp_path, monkeypatch)
+    r = o.rec
+    assert r.use_found_sn(SN)
+    r.snapshot, r.snapshot_at, r.t = {"x": 1}, time.time(), {"battery": 80, "planning": 0}
+    r.map_geojson, r.plans, r.gps_ref = {"type": "FeatureCollection", "features": []}, [{"id": 1}], (38.9, -76.5)
+    assert r.use_found_sn(SN2)
+    assert (r.snapshot, r.snapshot_at, r.t, r.map_geojson, r.plans, r.gps_ref) == ({}, 0.0, {}, None, [], None)
+    assert r._map_wake.is_set()                              # B's map is read now, not at the next refresh
+    assert r.status()["snapshot_age_s"] is None              # "Robot online" stays closed until B reports
+
+
+# -- the picker's route through the whole HTTP stack ----------------------------------------------------------------
+def test_a_person_can_choose_a_robot_and_an_api_token_cannot(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+    from app import auth, main
+    monkeypatch.delenv("PANEL_AUTH", raising=False)
+    o, env, store = _ops(tmp_path, monkeypatch)
+    o.cloud.devices = [{"sn": SN, "name": "", "model": ""}, {"sn": SN2, "name": "", "model": ""}]
+    gate = auth.Auth(store)
+    gate.announce()
+    old = {k: getattr(main.app.state, k, None) for k in ("auth", "rec", "ops")}
+    main.app.state.auth, main.app.state.rec, main.app.state.ops = gate, o.rec, o
+    try:
+        person = TestClient(main.app, base_url="http://panel.test")
+        setup = person.post("/api/auth/setup", json={"code": gate.setup_code, "password": "correct horse"})
+        assert setup.status_code == 200
+        token = person.post("/api/auth/tokens", json={"name": "script"}).json()["token"]
+        bot = TestClient(main.app, base_url="http://panel.test", headers={"Authorization": f"Bearer {token}"})
+        r = bot.post("/api/robot/account", json={"sn": SN2}, headers={"X-Panel-Request": "1"})
+        assert r.status_code == 403 and o.rec.sn is None and _kept(store) == {}
+        r = person.post("/api/robot/account", json={"sn": SN2}, headers={"X-Panel-Request": "1"})
+        assert r.status_code == 200 and o.rec.sn == SN2 and _kept(store)["sn"] == SN2
+        r = person.post("/api/robot/account", json={"sn": "YB0000DEMO0099"}, headers={"X-Panel-Request": "1"})
+        assert r.status_code == 400 and o.rec.sn == SN2      # only a robot the account listed
+    finally:
+        for k, v in old.items():
+            setattr(main.app.state, k, v)

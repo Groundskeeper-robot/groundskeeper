@@ -136,6 +136,7 @@ class Recorder:
         self._discover_at = 0.0
         self._heard: tuple | None = None                 # (host, port, serial) last heard on a heart_beat
         self._robot_task: asyncio.Task | None = None
+        self._map_wake = asyncio.Event()                 # read the map now (another robot), not at the next refresh
         self.started_at = time.time()
 
         self.snapshot: dict = {}
@@ -924,9 +925,36 @@ class Recorder:
 
     def _follow(self, sn: str | None) -> None:
         if sn and sn != self.sn:
+            if self.sn:
+                self._forget_robot_state()
             self.sn = sn
             if self.on_sn:
                 self.on_sn(sn)
+
+    def _forget_robot_state(self) -> None:
+        """Another robot from now on: nothing the last one reported may stand for it. The checks before a command
+        see no snapshot (unknown state blocks) until the new robot reports, and its map is read at once."""
+        self.snapshot, self.snapshot_at, self.update_at, self.t = {}, 0.0, 0.0, {}
+        self.heartbeat, self.heartbeat_at = {}, 0.0
+        self.poses.clear()
+        self._pose_rt, self._pose_at = None, 0.0
+        self.gps_ref, self.map_raw, self.map_geojson, self.map_fetched = None, None, None, 0.0
+        self.plans, self.cfd, self.robot_schedules = [], None, None
+        self.activity, self.activity_at = "idle", 0.0
+        self.plan, self.plan_at, self.run_plan = None, 0.0, None
+        self.detector = RunDetector(self.cfg.run_idle_end_s)
+        self.app_stream_at, self._stall_anchor = 0.0, None
+        self._map_wake.set()
+
+    def forget_account_sn(self) -> None:
+        """The signed-in Yarbo account has no robot with the serial kept from an account: forget it (and the robot's
+        state); the cloud finds the robot on this account again."""
+        if found_sn(self.store).get("from") == "account":
+            self.store.delete_setting(FOUND_SN)
+            self.store.event("robot_found", "robot serial forgotten: not on the signed-in Yarbo account")
+        if self.sn:
+            self._forget_robot_state()
+            self.sn = None
 
     def keep_sn(self, sn: str, source: str) -> bool:
         """Keep a found serial so a restart while the local broker is closed still knows the robot. One heard on the
@@ -1227,7 +1255,11 @@ class Recorder:
             if self.can_read():
                 try:
                     await self.refresh_map()
-                    await asyncio.sleep(self.cfg.map_refresh_s)
+                    try:
+                        await asyncio.wait_for(self._map_wake.wait(), self.cfg.map_refresh_s)
+                    except asyncio.TimeoutError:
+                        pass
+                    self._map_wake.clear()
                     continue
                 except Exception as exc:
                     log.warning("map refresh failed: %s", exc)
