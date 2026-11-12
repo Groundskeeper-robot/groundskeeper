@@ -519,7 +519,7 @@ function robotCards(d) {
         sstate(cloudColor, cloud.state || "unknown")),
       cloud.username ? srow("Account", null, cloud.username) : null,
       cloud.broker ? srow("Broker", null, mono(cloud.broker)) : null,
-      cloud.commands_sent ? srow("Commands sent", "Through this session.", String(cloud.commands_sent)) : null,
+      cloud.commands_sent ? srow("Messages sent", "Reads and commands through this session.", String(cloud.commands_sent)) : null,
       cloud.error ? srow("Last error", null, colored(CORAL, cloud.error)) : null,
       ...serialRows(d, cloud),
       srow("Video service", ["The Yarbo cloud's robot service. It receives your Yarbo session, so its address is ",

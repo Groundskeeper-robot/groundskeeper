@@ -347,3 +347,15 @@ def test_the_after_dark_guard_takes_dock_notify_or_ignore_but_not_pause(tmp_path
         run(main.put_setting(req, "gates", {"guard_after_dark": "pause"}))
     run(main.put_setting(req, "gates", {"guard_after_dark": "notify"}))
     assert control.gates(r.store)["guard_after_dark"] == "notify"
+
+
+def test_the_setup_guide_opens_itself_when_the_saved_session_expired(tmp_path):
+    req, r, o = fake_request(tmp_path)
+    r.robot_status = lambda: {"connected": False, "heard": False, "error": "Yarbo cloud needs login"}
+    r.map_geojson, r.tempest, r.yard = {"type": "FeatureCollection", "features": []}, None, None
+    r.ha = SimpleNamespace(enabled=False, error="")
+    o.cloud = SimpleNamespace(status=lambda: {"state": "needs login"})
+    o.frigate = SimpleNamespace(enabled=False)
+    o.notifier = SimpleNamespace(channels=lambda: {"ha": False, "webhook": False})
+    o.controller = SimpleNamespace(enabled=lambda: False)
+    assert run(main.setup_status(req))["first_run"]          # an upgrader whose session expired is guided back in

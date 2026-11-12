@@ -86,6 +86,12 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ### Fixed
 
+- **Home Assistant's link sensor** (`sensor.yarbo_panel_local_link`, and `local_link` in the summary the HA integration
+  reads) is "connected" only while the robot itself has answered lately, as `/health`'s `robot_connected` is, not
+  whenever the Yarbo cloud session is up. A robot switched off or out of range now shows "down".
+- After an upgrade, the setup guide opens by itself when the saved Yarbo session has expired, and the log says when
+  `YARBO_HOST` or `YARBO_PORT` is still set (both are ignored now). Settings → Robot's counter is "Messages sent":
+  reads go through the cloud too.
 - **Yarbo cloud stuck on "connecting".** While it has no serial it now says "waiting for the robot's serial
   (Settings → Robot)", in Settings and once in the log. A session that disappears shows "needs login" with a reason
   instead of "connecting" (signing out still shows signed out), and an expired session found while looking up the
