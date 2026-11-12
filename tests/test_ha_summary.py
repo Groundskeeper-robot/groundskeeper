@@ -15,7 +15,7 @@ def robot_status(run=None, battery=82):
     return {
         "sn": "YB0000DEMO0001", "state": "docked", "activity": "idle", "pause_reason": None, "plan_error": None,
         "snapshot_age_s": 2.0, "run": run, "conditions": {"state": "Dry", "dry_by": None},
-        "transport": {"robot": {"connected": True}},
+        "transport": {"robot": {"connected": True, "heard": True}},
         "robot": {"battery": battery, "charging_status": 1, "error_code": 0, "head": "Mower",
                   "position": {"lon": -76.49, "lat": 38.98, "x": 1.0, "y": 2.0, "heading": 90, "t": 1},
                   "rtk": {"label": "RTK fixed", "sats": 31}},
@@ -74,7 +74,7 @@ class FakeRec:
         return robot_status()
 
     def robot_status(self):
-        return {"connected": True}
+        return {"connected": True, "heard": True}
 
 
 class FakeController:
@@ -208,6 +208,9 @@ def test_what_goes_to_home_assistant_reads_the_recorders_own_status(tmp_path):
     r = _recorder(tmp_path)
     asyncio.run(r.apply_robot())
     try:
+        import time
+        r.transport._on_message = r._handle                     # straight in, no event loop needed
+        r.transport.tick(time.time() + 30)                      # its next heartbeat is due: now it is heard
         status = r.status()
         ents = ha.entities_from(status, None, None)
         assert ents[f"sensor.{ha.PREFIX}_local_link"]["state"] == "connected"
@@ -215,3 +218,12 @@ def test_what_goes_to_home_assistant_reads_the_recorders_own_status(tmp_path):
         assert s["local_link"] is True
     finally:
         r.transport.stop()
+
+
+def test_the_link_entity_needs_the_robot_heard_not_only_the_cloud():
+    """With the cloud up and the robot off (or out of range), Home Assistant must see the link down, as /health does."""
+    status = robot_status()
+    status["transport"] = {"robot": {"connected": True, "heard": False}}
+    assert ha.entities_from(status, None, None)[f"sensor.{ha.PREFIX}_local_link"]["state"] == "down"
+    s = ha.summary(status, ops_status(), None, [], PLANS, None, {"version": "0.0.0", "build": None})
+    assert s["local_link"] is False

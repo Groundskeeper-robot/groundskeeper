@@ -347,3 +347,27 @@ def test_the_after_dark_guard_takes_dock_notify_or_ignore_but_not_pause(tmp_path
         run(main.put_setting(req, "gates", {"guard_after_dark": "pause"}))
     run(main.put_setting(req, "gates", {"guard_after_dark": "notify"}))
     assert control.gates(r.store)["guard_after_dark"] == "notify"
+
+
+def test_the_setup_guide_opens_itself_when_the_saved_session_expired(tmp_path):
+    req, r, o = fake_request(tmp_path)
+    r.robot_status = lambda: {"connected": False, "heard": False, "error": "Yarbo cloud needs login"}
+    r.map_geojson, r.tempest, r.yard = {"type": "FeatureCollection", "features": []}, None, None
+    r.ha = SimpleNamespace(enabled=False, error="")
+    o.cloud = SimpleNamespace(status=lambda: {"state": "needs login"})
+    o.frigate = SimpleNamespace(enabled=False)
+    o.notifier = SimpleNamespace(channels=lambda: {"ha": False, "webhook": False})
+    o.controller = SimpleNamespace(enabled=lambda: False)
+    assert run(main.setup_status(req))["first_run"]          # an upgrader whose session expired is guided back in
+
+
+def test_old_robot_variables_in_the_environment_are_named_in_the_log(caplog):
+    import logging
+    with caplog.at_level(logging.WARNING, logger=main.log.name):
+        found = main.warn_obsolete_env({"YARBO_HOST": "192.0.2.10", "YARBO_PORT": "1883", "YARBO_SN": "  ",
+                                        "HA_URL": "http://ha.local"})
+    assert found == ["YARBO_HOST", "YARBO_PORT"]                  # a blank YARBO_SN counts as unset
+    text = " ".join(r.getMessage() for r in caplog.records)
+    assert "YARBO_HOST is no longer used" in text and "YARBO_PORT is no longer used" in text and "YARBO_SN" not in text
+    assert "192.0.2.10" not in text                               # the value is never logged
+    assert main.warn_obsolete_env({}) == []

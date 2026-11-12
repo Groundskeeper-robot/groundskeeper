@@ -77,6 +77,22 @@ def stamp(html: str) -> str:
     return html.replace("<head>", f'<head>\n<meta name="ui-version" content="{UI_VERSION}">', 1)
 
 
+OBSOLETE_ENV = {
+    "YARBO_SN": "the panel finds the robot's serial itself",
+    "YARBO_HOST": "the panel reaches the robot only through the Yarbo cloud (sign in under Settings → Robot)",
+    "YARBO_PORT": "the panel reaches the robot only through the Yarbo cloud (sign in under Settings → Robot)",
+}
+
+
+def warn_obsolete_env(environ) -> list[str]:
+    """Log each environment variable an older install may still set that the panel no longer reads; returns their
+    names. A blank value is not "set", and a value is never logged."""
+    found = [name for name in OBSOLETE_ENV if (environ.get(name) or "").strip()]
+    for name in found:
+        log.warning("%s is no longer used: %s", name, OBSOLETE_ENV[name])
+    return found
+
+
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
     env = config.load()
@@ -89,8 +105,7 @@ async def lifespan(app: FastAPI):
     cfg = Runtime(env, store)                    # Settings → integrations over the environment
     # Never typed in: the serial the panel found before on the Yarbo account, else it is found again.
     sn = None if env.demo else found_sn(store).get("sn")
-    if os.environ.get("YARBO_SN", "").strip():
-        log.warning("YARBO_SN is no longer used: the panel finds the robot's serial itself")
+    warn_obsolete_env(os.environ)
     imagery = Imagery(env.data_dir)
     imagery.adopt_custom((store.setting("imagery_source") or {}).get("custom"))
     imagery.configure(store.setting("imagery_source"), store.setting("imagery_keys"), store.setting("imagery_context") or {})
@@ -1204,7 +1219,8 @@ async def setup_status(request: Request):
         step("assistant", "AI assistant", mcp_server.token_status(store)["enabled"], "token made" if mcp_server.token_status(store)["enabled"] else "no token", True),
     ]
     need = [s for s in steps if not s["optional"]]
-    return {"first_run": not getattr(cfg, "demo", False) and (cloud in (None, "signed out") or not r.map_geojson),
+    return {"first_run": not getattr(cfg, "demo", False)
+            and (cloud in (None, "signed out", "needs login") or not r.map_geojson),
             "steps": steps,
             "done": sum(s["done"] for s in steps), "required_done": all(s["done"] for s in need)}
 
