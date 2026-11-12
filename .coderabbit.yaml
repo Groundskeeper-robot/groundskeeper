@@ -44,6 +44,13 @@ reviews:
         - A new dependency without a reason; anything loaded from a CDN at runtime.
         Do not comment on code that was only moved or re-indented. Do not suggest weakening a check, an assertion
         or an allowlist to make something pass.
+        Which findings to raise: bugs on a normal path, crashes, data loss, and privacy or access problems. Skip a
+        finding that only matters after two or more unlikely events in a row (a restart, a robot switch or a sign-in
+        landing inside a short window; a state change between two awaits): each fix adds code that raises the next
+        such finding, and the PR waits. Robot safety is the exception: anything that could send a command, move the
+        robot or pass an interlock it shouldn't is always raised. Label a finding Major only if it can happen in
+        normal use. Ask for regenerated screenshots only when an image that scripts/screenshots.py makes shows the
+        screen the PR changes.
     - path: "app/{control,link,commands,cloud,mapwrite,areasettings}.py"
       instructions: |
         Robot safety (AGENTS.md -> Rules -> Safety). Flag:
