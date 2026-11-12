@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-11-11
-- **Links:** the docs restructure PR
+- **Links:** #136
 
 ## Context
 The reasons behind the panel's safety rules and its larger choices were spread over `design.md`, PR descriptions
