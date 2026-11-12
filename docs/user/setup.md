@@ -12,8 +12,8 @@ Before any of this, the first visit sets the admin password. It needs the setup 
 
 1. **Robot** ([Robot](#settings/robot)): **Find it on my network** looks for a Yarbo announcing itself on your
    network (it only listens; nothing is sent to anything it finds) and offers **Use this**. Or type its address and
-   press **Connect**: the panel checks for the robot's heartbeat, then saves. The serial is read from the robot; the
-   port and a typed serial are under Advanced. Then the map is read on its own.
+   press **Connect**: the panel checks for the robot's heartbeat, then saves. The serial is read from the robot (or,
+   when only the cloud reaches it, from your Yarbo account); you never type it. The port is under Advanced. Then the map is read on its own.
 2. **Yarbo cloud** (optional, [Robot](#settings/robot)): a fallback route for when the robot can't be reached on your
    network (and, for now, the only route for map writes). You type
    your own password; it goes to Yarbo's SDK and is never stored. Signing in usually takes under a minute.

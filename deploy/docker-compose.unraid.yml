@@ -19,7 +19,7 @@ services:
       PUID: "99"
       PGID: "100"
     # Optional defaults, every one settable in the panel instead (Settings → Robot, Cameras, Home Assistant,
-    # Lawn conditions, Notifications, This panel): YARBO_HOST, YARBO_PORT, YARBO_SN, FRIGATE_URL, HA_URL, HA_TOKEN,
+    # Lawn conditions, Notifications, This panel): YARBO_HOST, YARBO_PORT, FRIGATE_URL, HA_URL, HA_TOKEN,
     # TEMPEST_PORT, PANEL_URL, POLL_IDLE_S, POLL_ACTIVE_S, MAP_REFRESH_S, RAW_EVERY_S, RAW_KEEP_DAYS, RUN_IDLE_END_S,
     # and TZ for the scheduler's clock. They go in the env file (chmod 600), never here.
     env_file:

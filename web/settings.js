@@ -492,11 +492,18 @@ async function robotFind() {
   if (setUI.data) drawSettings(setUI.data, false);
 }
 
-async function robotUse(host, sn, port) {
+async function robotFromAccount(sn) {
+  try {
+    await postJSON("/api/robot/account", { sn });
+    toast("Saved; connecting to that robot.");
+  } catch (e) { toast(e.message); }
+  await renderSettings();
+}
+
+async function robotUse(host, port) {
   setUI.robot = { connecting: host };
   drawSettings(setUI.data, false);
   const values = { host };
-  if (sn) values.sn = sn;
   if (port) values.port = port;
   const ok = await saveIntegration("robot", values, `Saved; connecting to ${host}.`);
   setUI.robot = ok ? null : { error: `Could not save ${host}.` };
@@ -517,7 +524,7 @@ async function robotConnect(host, port) {
     drawSettings(setUI.data, false);
     return;
   }
-  await robotUse(host, data.sn, port);
+  await robotUse(host, port);
 }
 
 function robotConnection(d, ig, t, r) {
@@ -536,16 +543,15 @@ function robotConnection(d, ig, t, r) {
         : ui.error ? h("p", { class: "shelp" }, colored(CORAL, ui.error))
           : found ? (found.found.length
             ? h("div", null, found.found.map((x) => srow(["Robot ", mono(x.sn)], ["at ", mono(x.host)],
-                x.sn === s.sn && t.connected ? sstate(GREEN, "connected") : sbtn("Use this", () => robotUse(x.host, x.sn, x.port), "btn pri"))))
+                x.sn === s.sn && t.connected ? sstate(GREEN, "connected") : sbtn("Use this", () => robotUse(x.host, x.port), "btn pri"))))
             : h("p", { class: "shelp" }, colored(AMBER, found.note || "No robot found."), " Type its address below instead."))
             : null;
-  const adv = h("details", { class: "sadvanced" }, h("summary", null, "Advanced: port and serial"),
+  const adv = h("details", { class: "sadvanced" }, h("summary", null, "Advanced: port"),
     h("form", { class: "login", onsubmit: (e) => {
         e.preventDefault();
         const f = e.target, values = {};
-        const port = f.port.value ? Number(f.port.value) : null, sn = f.sn.value.trim();
+        const port = f.port.value ? Number(f.port.value) : null;
         if (port !== (ival(ig.port) === "" ? null : ival(ig.port))) values.port = port;
-        if (sn !== String(ival(ig.sn))) values.sn = sn || emptied(ig.sn);
         if (!Object.keys(values).length) { toast("Nothing changed."); return; }
         saveIntegration("robot", values, "Saved; reconnecting to the robot.");
       } },
@@ -553,10 +559,7 @@ function robotConnection(d, ig, t, r) {
       h("div", { class: "formgrid" },
         h("label", { class: "formrow" }, h("span", { class: "muted small" }, "MQTT port"),
           h("input", { class: "field", name: "port", "data-key": "robot_port", type: "number", min: 1, max: 65535, value: ival(ig.port), placeholder: "1883" }),
-          whence("robot", "port", ig.port)),
-        h("label", { class: "formrow" }, h("span", { class: "muted small" }, "Serial (only if it can't be read)"),
-          h("input", { class: "field", name: "sn", "data-key": "robot_sn", value: ival(ig.sn), placeholder: "read from the robot", autocomplete: "off", spellcheck: "false" }),
-          whence("robot", "sn", ig.sn))),
+          whence("robot", "port", ig.port))),
       h("div", { class: "row gap wrap" }, h("button", { type: "submit", class: "btn" }, "Save"))));
   return scard("Connection",
     h("div", { class: "robothead" }, head),
@@ -597,6 +600,9 @@ function robotCards(d) {
       cloud.broker ? srow("Broker", null, mono(cloud.broker)) : null,
       cloud.commands_sent ? srow("Commands sent", "Through this session.", String(cloud.commands_sent)) : null,
       cloud.error ? srow("Last error", null, colored(CORAL, cloud.error)) : null,
+      ...(cloud.devices || []).map((x) => srow(["Robot ", mono(x.sn)],
+        [x.name || x.model || "On your Yarbo account", ". Your account has more than one robot: choose the one this panel follows."],
+        sbtn("Use this", () => robotFromAccount(x.sn), "btn pri"))),
       srow("Video service", ["The Yarbo cloud's robot service. It receives your Yarbo session, so its address is ",
                              "built in. Only the YARBO_ROBOT_SERVICE_URL environment variable can replace it, ",
                              "never Settings."],

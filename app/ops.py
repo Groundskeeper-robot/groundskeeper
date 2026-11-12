@@ -8,6 +8,7 @@ from datetime import datetime
 from . import conditions, control, maintenance, telemetry
 from . import why as reasons
 from .cloud import CloudTransport
+from .runtime import found_sn
 from .link import RobotLink
 from .control import Controller
 from .backups import Backups
@@ -54,7 +55,11 @@ def point_in_ring(lon: float, lat: float, ring: list) -> bool:
 class Ops:
     def __init__(self, cfg, rec):
         self.cfg, self.rec, self.store = cfg, rec, rec.store
-        self.cloud = CloudTransport(cfg.data_dir, rec.sn, self._from_cloud)
+        self.cloud = CloudTransport(cfg.data_dir, rec.sn, self._from_cloud, on_sn=self._cloud_found_sn)
+        self._loop: asyncio.AbstractEventLoop | None = None
+        # After a sign-in the cloud checks a serial kept from the account against the new account (never mid-run).
+        self.cloud.sn_source = self._kept_sn_source
+        self.cloud.on_forget = self._cloud_forgot_sn
         # Local first, the cloud as a fallback, for reads and commands alike (app/link.py).
         self.link = RobotLink(rec, self.cloud, self.store, mark_sent=rec.mark_sent)
         self.link.on_change = self._route_changed
@@ -142,6 +147,7 @@ class Ops:
         return fut
 
     async def start(self) -> None:
+        self._loop = asyncio.get_running_loop()
         if getattr(self.cfg, "demo", False):
             pass                                     # DEMO=1 never uses a cloud session, even one left in DATA_DIR
         elif await asyncio.to_thread(self.cloud.restore):
@@ -167,6 +173,23 @@ class Ops:
         self.cloud.sn = sn
         if self.cloud._thread and self.cloud._thread.is_alive():
             asyncio.get_running_loop().run_in_executor(None, self.cloud.restart)
+
+    def _kept_sn_source(self) -> str | None:
+        """Where the kept serial came from, for the cloud's check after a sign-in; None defers the check while the
+        robot is mowing (a run is open or its flags say a plan is going): the guards must keep watching it."""
+        if self.rec.run_id or self.rec.plan_active() is True:
+            return None
+        return found_sn(self.store).get("from")
+
+    def _cloud_forgot_sn(self, sn: str) -> None:
+        """From the cloud worker thread: the signed-in account has no robot with serial `sn`."""
+        if self._loop:
+            self._loop.call_soon_threadsafe(self.rec.forget_account_sn, sn)
+
+    def _cloud_found_sn(self, sn: str) -> None:
+        """From the cloud worker thread: the account's only robot gave the serial. Kept on the event loop."""
+        if self._loop:
+            self._loop.call_soon_threadsafe(self.rec.use_found_sn, sn)
 
     async def apply_frigate(self) -> None:
         await self.frigate.configure(self.cfg.frigate_url)
