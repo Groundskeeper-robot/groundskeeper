@@ -83,6 +83,9 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   `YARBO_HOST` and `YARBO_PORT` environment variables (both ignored if set). `/health` reports `robot_connected`
   (the robot answered through the cloud lately) in place of `local_connected`. The setup guide's first step is the
   Yarbo cloud sign-in.
+- **Yarbo's SDK 0.3.0** (was 0.2.1). The code is the same; Yarbo changed its licence from MIT to PolyForm
+  Noncommercial, so the Docker image, which includes it, is for noncommercial use. The panel's own code stays MIT.
+  See THIRD_PARTY_NOTICES.md.
 
 ### Fixed
 

@@ -192,4 +192,6 @@ and can change in any release, patch releases included, so pin the version you d
 
 ## License
 
-[MIT](LICENSE). Yarbo is a trademark of its owner, used here only to say which robot this works with.
+[MIT](LICENSE). The Docker image also includes Yarbo's SDK, which is PolyForm Noncommercial: see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Yarbo is a trademark of its owner, used here only to say which robot
+this works with.
