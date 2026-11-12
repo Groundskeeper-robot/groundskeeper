@@ -369,7 +369,8 @@ def test_when_the_panel_ends_the_window_the_tile_closes_says_so_and_beats_no_mor
 @needs_node
 def test_changing_camera_restarts_the_beats_without_a_second_timer():
     seg = segment(run_flow(), "beats-pick", beats=True)
-    assert [c[0] for c in seg if c[0] in BEAT_CALLS] == ["clear-interval", "interval", "beat"]
+    # the second clear is the stats timer (#142), playing before the pick
+    assert [c[0] for c in seg if c[0] in BEAT_CALLS] == ["clear-interval", "clear-interval", "interval", "beat"]
     assert ["beat", '{"start":true}'] in seg                                    # picking a camera is a press too
     assert ["intervals", 1] in seg
 
@@ -567,3 +568,84 @@ def test_the_tile_joins_as_host_but_never_publishes_anything():
                  "createCustomAudioTrack", "createCustomVideoTrack", "createBufferSourceAudioTrack", "getUserMedia"):
         assert call not in CODE, call
 
+
+# --- Video stats under the tile (#142): the SDK's own local counters, read here, sent nowhere. ---
+
+def stats_lines(calls):
+    return {c[1]: (c[2], c[3]) for c in calls if c[0] == "stats"}
+
+
+@needs_node
+def test_the_stats_line_formats_the_sdks_counters():
+    lines = stats_lines(run_flow())
+    assert lines["healthy"] == ("640×480 · 15 fps · 1.2 Mbps · 2% loss · RTT 180 ms", False)
+    assert lines["delay"][0].endswith("RTT 180 ms · delay 320 ms")
+    assert lines["kbps"][0] == "640×480 · 15 fps · 640 kbps · <1% loss · RTT 180 ms"
+    assert lines["no-rtt"][0] == "640×480 · 15 fps · 1.2 Mbps · 2% loss"
+
+
+@needs_node
+def test_a_weak_link_is_said_when_loss_freezes_or_the_quality_is_poor():
+    lines = stats_lines(run_flow())
+    assert lines["loss"] == ("640×480 · 15 fps · 1.2 Mbps · 8% loss · RTT 180 ms · weak link", True)
+    assert lines["freeze"] == (
+        "640×480 · 15 fps · 1.2 Mbps · 2% loss · RTT 180 ms · froze 6 s · weak link", True)
+    assert lines["quality"] == ("640×480 · 15 fps · 1.2 Mbps · 2% loss · RTT 180 ms · weak link", True)
+    # only the robot's uplink counts
+    assert lines["downlink-ignored"] == ("640×480 · 15 fps · 1.2 Mbps · 2% loss · RTT 180 ms", False)
+    # 0 means unknown, not poor
+    assert lines["quality-unknown"][1] is False and "weak" not in lines["quality-unknown"][0]
+
+
+@needs_node
+def test_a_slow_browser_is_told_apart_from_a_weak_link():
+    text, weak = stats_lines(run_flow())["slow-browser"]
+    assert text.endswith("slow to draw") and "weak link" not in text and weak is False
+    stalled = stats_lines(run_flow())["render-stalled"]
+    # a stalled renderer is not masked
+    assert stalled == ("640×480 · 0 fps · 1.2 Mbps · 2% loss · RTT 180 ms · slow to draw", False)
+    # no render counter: use the receive rate
+    assert stats_lines(run_flow())["render-missing"][0].startswith("640×480 · 12 fps")
+
+
+@needs_node
+def test_no_numbers_means_no_line_and_a_throwing_sdk_is_quiet():
+    calls = run_flow()
+    assert next(c for c in calls if c[0] == "stats-before") == ["stats-before", ""]
+    lines = stats_lines(calls)
+    for name in ("nothing-yet", "no-user", "bad-numbers", "throws"):
+        assert lines[name] == ("", False), name
+
+
+@needs_node
+def test_the_stats_line_never_carries_a_secret_channel_or_uid():
+    calls = run_flow()
+    assert next(c for c in calls if c[0] == "stats-line-secret-free")[1] is True
+    assert not re.search(r"console\.", CODE)
+
+
+@needs_node
+def test_the_stats_timer_stops_on_every_way_of_stopping():
+    stopped = [c for c in run_flow() if c[0] == "stats-stopped"]
+    assert [c[1] for c in stopped] == [
+        "close", "hidden", "pagehide", "leave-live", "connection-lost", "robot-stops-video"]
+    for _, name, shown, after, reads, timers in stopped:
+        assert shown.startswith("640×480") and after == "" and reads == 0, name
+        # robot-stops-video stays open: the keep-awake beat goes on
+        assert timers == (1 if name == "robot-stops-video" else 0), name
+
+
+@needs_node
+def test_changing_camera_clears_the_line_and_never_doubles_the_timer():
+    calls = run_flow()
+    # only the keep-awake beat is left
+    assert next(c for c in calls if c[0] == "stats-after-pick") == ["stats-after-pick", "", 1]
+    # beat + one stats timer
+    assert next(c for c in calls if c[0] == "stats-timers") == ["stats-timers", 2]
+
+
+def test_the_stats_source_reads_only_local_sdk_counters_every_two_seconds():
+    assert "CAM_STATS_MS = 2000" in CODE
+    for call in ("getRemoteVideoStats", "getRTCStats", "getRemoteNetworkQuality"):
+        assert CODE.count(f".{call}(") == 1
+    assert re.search(r"function camerasLeave\(\) \{[^}]*clearInterval\(cams\.statsTimer\)", CODE, re.S)

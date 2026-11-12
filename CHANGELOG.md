@@ -7,6 +7,11 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ### Added
 
+- **A stats line under the Cameras tile's video** (#142), refreshed every 2 seconds while it plays, for example
+  `640×480 · 15 fps · 1.2 Mbps · 2% loss · RTT 180 ms`. It comes from the video library's own counters in your
+  browser and nothing is sent anywhere. It says **weak link** when loss is 5% or more, the picture froze for 10% of
+  the time or the library rates the robot's upload poor, and **slow to draw** when this browser shows far fewer
+  frames than arrive. The demo shows a made-up line.
 - **Pre-release images for testing** (`ghcr.io/groundskeeper-robot/groundskeeper-dev`): `:edge` after every merge
   and `:nightly` once a night, in their own package so they never replace `:latest` or a release. Settings → This
   panel shows the channel beside the version, for example `0.19.7 · nightly · 1a756d0`. See the README.
