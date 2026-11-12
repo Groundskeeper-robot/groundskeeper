@@ -536,9 +536,10 @@ The panel does not get into the robot, and no video passes through the panel. It
    Agora hosts), and a random `INSTALL_ID`, all before creating the client (never `enableLogUpload`). The SDK's own
    `websdk_ng_*` localStorage items (device id, cached settings, preload cache) are cleared when it has loaded and on
    leaving. A load of the SDK script that hangs gives up after 20 s so the next try loads it again. It joins as
-   an audience member with `aes-128-gcm2`, the base64-decoded salt and, in place of the key, a placeholder that the
+   a host that publishes nothing (the robot publishes only to broadcasters) with `aes-128-gcm2`, the base64-decoded salt and, in place of the key, a placeholder that the
    secret swap replaces (step 6), and plays uid 1. It leaves the channel
-   on close, camera change, leaving Live, a hidden tab and page close. A token's expiry event rejoins with a fresh token
+   on close, camera change, leaving Live, a hidden tab and page close; a camera change waits 3 s after the leave and
+   sends camera-on again (an Open within 3 s of a Close waits out the rest too), since the robot stops a moment after the last broadcaster leaves. A token's expiry event rejoins with a fresh token and camera-on
    (the route picks the viewer uid, so a token cannot be renewed in place). No CSP is set: `connect-src` cannot admit
    `*.agora.io` and block `statscollector*.agora.io`, so an allowlist of exact gateway hosts needs a network capture.
    Live's existing "Camera" layout is the Frigate yard cameras (§11), so the tile's title carries a tooltip saying it is

@@ -63,3 +63,4 @@ The code and tests that hold the decision in place.
 | [0007](0007-yarbo-cloud-only.md) | Yarbo cloud only: no local route | Accepted |
 | [0008](0008-sdk-noncommercial-licence.md) | Use Yarbo SDK 0.3.0 under PolyForm Noncommercial | Accepted |
 | [0009](0009-head-aware-run-rules.md) | Run rules depend on the attached head | Proposed |
+| [0010](0010-robot-video-through-yarbos-agora.md) | Robot video through Yarbo's Agora channel, as a host that publishes nothing | Accepted |

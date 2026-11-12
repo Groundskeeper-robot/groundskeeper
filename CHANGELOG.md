@@ -103,7 +103,15 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 - **The Cameras tile plays over plain http.** Opened at the panel's LAN address (`http://<server>:8427`), it
   stopped at "Loading the video library failed: This browser cannot play the robot's video.": browsers hide the
   camera and microphone API on a page that is not https, and the video library's check asked for it though the
-  tile only watches. The check now leaves devices out.
+  tile only watches. The check now leaves devices out. Joining then failed with "Cannot read properties of
+  undefined (reading 'importKey')": browsers also hide Web Crypto there, and the video library wraps its
+  placeholder secret with it before joining. While the tile is open over http the panel gives the library a
+  stand-in that answers only that wrap, whose result the panel replaces with the real secret anyway.
+- **The Cameras tile gets video without the Yarbo app open.** The robot publishes only while a broadcaster is in its
+  channel, and the tile joined as an audience member, which the robot cannot see: it waited for video until the app's
+  camera page was opened. The tile now joins as a host that publishes nothing. The robot also stops when the last
+  viewer leaves, so changing camera and the token's renewal switch the cameras on again (Control on), 3 s after
+  leaving the last channel; an Open soon after a Close waits the same 3 s.
 - **Home Assistant's link sensor** (`sensor.yarbo_panel_local_link`, and `local_link` in the summary the HA integration
   reads) is "connected" only while the robot itself has answered lately, as `/health`'s `robot_connected` is, not
   whenever the Yarbo cloud session is up. A robot switched off or out of range now shows "down".
