@@ -452,6 +452,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   mark("quick-picks-setup"); sandbox.camerasOpen(); await settle();
   mark("quick-picks"); sandbox.camerasPick("left"); sandbox.camerasPick("right"); await settle();
   sandbox.camerasStop(); await settle();
+  // Opening again soon after a Close waits out the gap too: the robot may still be shutting its video down.
+  mark("reopen-soon"); sandbox.camerasOpen(); await settle(); sandbox.camerasStop(); await settle();
   // A first open long after the last leave does not wait.
   sandbox.cams.leftAt = Date.now() - 60000;
   mark("open-long-after"); sandbox.camerasOpen(); await settle(); sandbox.camerasStop(); await settle();

@@ -25,6 +25,11 @@ def run_flow() -> list:
 BEAT_CALLS = ("beat", "interval", "clear-interval")      # the keep-awake timer's calls: asked for by name (beats=True)
 
 
+def no_gap(seg):
+    """A segment without the rejoin-gap waits, for tests about something else that open soon after a Close."""
+    return [c for c in seg if c[0] != "rejoin-gap"]
+
+
 def segment(calls, name, beats=False):
     start = next(i for i, c in enumerate(calls) if c == ["--", name])
     end = next((i for i, c in enumerate(calls[start + 1:], start + 1) if c[0] == "--"), len(calls))
@@ -92,6 +97,13 @@ def test_a_first_open_does_not_wait_for_the_rejoin_gap():
     calls = run_flow()
     assert "rejoin-gap" not in [c[0] for c in segment(calls, "open")]
     assert "rejoin-gap" not in [c[0] for c in segment(calls, "open-long-after")]
+
+
+@needs_node
+def test_opening_again_soon_after_a_close_waits_out_the_gap():
+    # Close left the channel; the robot may still be shutting its video down, so camera-on waits like a change does.
+    names = [c[0] for c in segment(run_flow(), "reopen-soon")]
+    assert names.count("rejoin-gap") == 1 and names.index("rejoin-gap") < names.index("post")
 
 
 @needs_node
@@ -187,7 +199,7 @@ def test_a_failed_subscribe_leaves_and_shows_a_sanitized_error():
 
 @needs_node
 def test_control_switched_on_after_the_last_render_still_sends_the_command():
-    seg = segment(run_flow(), "control-just-on")
+    seg = no_gap(segment(run_flow(), "control-just-on"))
     assert seg[0][:2] == ["post", "/api/control/send"]
 
 
@@ -319,7 +331,7 @@ def test_the_sdk_comes_from_this_panel_only():
 # -- the keep-awake (the robot streams only while someone sends it) ------------------------------------------------
 @needs_node
 def test_the_first_beat_goes_before_camera_on_and_then_one_every_four_seconds():
-    seg = segment(run_flow(), "beats-open", beats=True)
+    seg = no_gap(segment(run_flow(), "beats-open", beats=True))
     assert seg[0] == ["interval", 4000] and seg[1] == ["beat", '{"start":true}']    # at once: a press opens the window
     assert seg[2][:2] == ["post", "/api/control/send"]                           # ... before camera-on
     assert [c[0] for c in seg].count("beat") == 3                                # 1 at the start, then one per tick
@@ -372,7 +384,7 @@ def test_every_way_of_stopping_stops_the_beats(how):
 
 @needs_node
 def test_try_again_beats_again_and_close_stops_it():
-    seg = segment(run_flow(), "try-again", beats=True)
+    seg = no_gap(segment(run_flow(), "try-again", beats=True))
     assert [c[0] for c in seg][:2] == ["interval", "beat"]
     assert [c for c in seg if c[0] == "intervals"] == [["intervals", 1], ["intervals", 0]]
 

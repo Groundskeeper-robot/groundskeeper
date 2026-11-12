@@ -169,7 +169,8 @@ function camerasPick(camera) {
 // Leaves the channel and forgets everything about the stream. Sends nothing to the robot.
 function camerasStop(message) {
   cams.open = false;
-  cams.leftAt = 0;                                  // a closed tile is no longer changing camera: no rejoin gap
+  if (cams.client) cams.leftAt = Date.now();        // the robot may still be shutting its video down: an Open soon
+                                                    // after waits out the rejoin gap too
   camerasLeave();
   camerasSet("closed", message || "");
 }

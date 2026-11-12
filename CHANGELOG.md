@@ -104,7 +104,7 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   channel, and the tile joined as an audience member, which the robot cannot see: it waited for video until the app's
   camera page was opened. The tile now joins as a host that publishes nothing. The robot also stops when the last
   viewer leaves, so changing camera and the token's renewal switch the cameras on again (Control on), 3 s after
-  leaving the last channel.
+  leaving the last channel; an Open soon after a Close waits the same 3 s.
 - **Home Assistant's link sensor** (`sensor.yarbo_panel_local_link`, and `local_link` in the summary the HA integration
   reads) is "connected" only while the robot itself has answered lately, as `/health`'s `robot_connected` is, not
   whenever the Yarbo cloud session is up. A robot switched off or out of range now shows "down".
