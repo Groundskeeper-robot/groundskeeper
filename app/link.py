@@ -54,8 +54,13 @@ class RobotLink:
         check_read_only(cmd)
         if self.read_route() is None:
             raise NoRoute(self._why_none())
-        self.cloud.publish(cmd, payload or {})
-        self.mark_sent(cmd)
+        undo = self.mark_sent(cmd)       # before it goes, as for commands: its echo may be handled first
+        try:
+            self.cloud.publish(cmd, payload or {})
+        except BaseException:
+            if callable(undo):
+                undo()
+            raise
         return ROUTE
 
     def command(self, cmd: str, payload: dict) -> str:

@@ -117,6 +117,7 @@ FIRMWARE_SETTLE_S = 60    # a new firmware version counts once it has been repor
 
 class Recorder:
     sn: str | None = None            # the robot followed (set in __init__; a bare object made in a test has none)
+    received, last_message_at = 0, 0.0
 
     def __init__(self, cfg: Config, store: Store, imagery: Imagery, sn: str):
         self.cfg, self.store, self.imagery, self.sn = cfg, store, imagery, sn
@@ -381,8 +382,6 @@ class Recorder:
 
     def _from_thread(self, topic: str, data, ts: float, ours: bool | None = None) -> None:
         """`ours`: the verdict the caller already reached (ops, for a cloud message), so it is decided once."""
-        self.received += 1
-        self.last_message_at = ts
         if self.loop:
             self.loop.call_soon_threadsafe(self.queue.put_nowait, (topic, data, ts, ours))
 
@@ -569,6 +568,8 @@ class Recorder:
             return
         if self.sn and parts[1] != self.sn:
             return                       # another robot's (queued before a switch): never this one's state or reply
+        self.received += 1               # counted here, for the robot followed (robot_status: "heard")
+        self.last_message_at = ts
         channel, name = parts[2], parts[3]
         if channel == "app":
             if ours is None:
@@ -957,6 +958,7 @@ class Recorder:
         self.plan, self.plan_at, self.run_plan = None, 0.0, None
         self.detector = RunDetector(self.cfg.run_idle_end_s)
         self.app_stream_at, self._stall_anchor = 0.0, None
+        self.received, self.last_message_at = 0, 0.0     # nothing heard from the next robot yet
         self._map_wake.set()
 
     def forget_account_sn(self, sn: str) -> None:

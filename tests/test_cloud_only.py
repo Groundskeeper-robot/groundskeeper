@@ -592,3 +592,41 @@ def test_the_robot_counts_as_connected_only_once_it_has_been_heard(tmp_path, mon
     assert r.robot_status()["heard"]
     r.last_message_at = time.time() - 3600                       # an hour of silence
     assert not r.robot_status()["heard"]
+
+
+def test_a_message_for_the_last_robot_does_not_count_as_hearing_the_next(tmp_path, monkeypatch):
+    o, env, store = _ops(tmp_path, monkeypatch)
+    r = o.rec
+    r._follow(SN)
+    r._handle(f"snowbot/{SN}/device/heart_beat", {"working_state": 1}, time.time())
+    assert r.received == 1 and r.last_message_at
+    r._follow(SN2)
+    assert r.received == 0 and r.last_message_at == 0.0              # nothing from SN2 yet
+    r._handle(f"snowbot/{SN}/device/heart_beat", {"working_state": 1}, time.time())   # queued before the switch
+    assert r.received == 0 and r.last_message_at == 0.0
+
+
+def test_a_read_is_marked_before_it_goes_and_unmarked_if_it_fails(tmp_path):
+    from app.link import RobotLink
+    seen, marks = [], []
+
+    class Cloud:
+        state, connected = "connected", True
+
+        def __init__(self, fail):
+            self.fail = fail
+
+        def publish(self, cmd, payload):
+            seen.append(list(marks))                             # what an echo handled now would find
+            if self.fail:
+                raise ConnectionError("refused")
+
+    def mark(cmd):
+        marks.append(cmd)
+        return lambda: marks.remove(cmd)
+    RobotLink(None, Cloud(False), None, mark_sent=mark).read("get_map")
+    assert seen == [["get_map"]] and marks == ["get_map"]
+    marks.clear()
+    with pytest.raises(ConnectionError):
+        RobotLink(None, Cloud(True), None, mark_sent=mark).read("get_map")
+    assert marks == []
