@@ -89,6 +89,10 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ### Fixed
 
+- **The imagery credit no longer covers the map legend** (#122). With Signal or Problem areas on, the legend's
+  extra row slid under the credit and hid the Signal menu; the credit now sits just above the legend however tall it
+  is. Phones show the credit too (it was hidden there), above the legend's row, so **Align** is reachable on a phone;
+  there the Problems and Signal boxes now stay one line each in the legend's row instead of wrapping onto two.
 - **Home Assistant's link sensor** (`sensor.yarbo_panel_local_link`, and `local_link` in the summary the HA integration
   reads) is "connected" only while the robot itself has answered lately, as `/health`'s `robot_connected` is, not
   whenever the Yarbo cloud session is up. A robot switched off or out of range now shows "down".

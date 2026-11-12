@@ -38,7 +38,7 @@ are pink, edge passes violet.
   the foot of the map explains the colours.
 - **Map tools** (top right): layers (imagery, zones, labels, track, cameras), Problem areas, Signal, 3D and
   Fit yard. On a phone the row keeps Imagery, Zones and Track; the rest are under **More** (tap outside it or press
-  Esc to close it). **Align**, next to the imagery credit at the foot of the map, lines the aerial photo up with the
+  Esc to close it). **Align**, next to the imagery credit just above the legend, lines the aerial photo up with the
   robot's map (also in [Settings → Map imagery](#settings/imagery)).
 - **3D:** tilts the map and raises the ground: the robot's own heights over the lawns (they sharpen with every mow),
   public lidar elevation (USGS 3DEP) around them. The **Height** menu next to it (1× to 3×) draws it taller so small slopes show. Right-drag, or two fingers on
