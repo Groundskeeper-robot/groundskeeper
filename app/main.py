@@ -436,6 +436,38 @@ async def ha_summary(request: Request):
     return ha_mod.summary(r.status(), o.status(), last, upcoming, r.plans, start, version_info())
 
 
+HA_LIVE_STATE_S = 5      # how often /api/ha/stream repeats its state event; it doubles as the keep-alive
+
+
+def ha_live_state(request: Request) -> dict:
+    v = rec(request).store.versions("map")
+    return ha_mod.live(rec(request).status(), ops(request).follow_camera(), v[0]["sha"] if v else None)
+
+
+@app.get("/api/ha/stream")
+async def ha_stream(request: Request):
+    """The live feed for a Home Assistant map card (#12), lighter than /api/stream: a `state` event (ha.live: state,
+    position, run, follow camera, map version) on connect and every HA_LIVE_STATE_S, and each new position sample
+    as a `pose` event with only time, longitude, latitude and heading. Nothing is asked of the robot or Frigate."""
+    r = rec(request)
+
+    async def events():
+        seq, next_state = r.pose_seq, 0.0
+        while not await request.is_disconnected():
+            now = time.monotonic()
+            if now >= next_state:
+                next_state = now + HA_LIVE_STATE_S
+                yield f"event: state\ndata: {json.dumps(ha_live_state(request))}\n\n"
+            poses = r.poses_since(seq)
+            if poses:
+                seq = poses[-1]["seq"]
+                yield f"event: pose\ndata: {json.dumps([ha_mod.pose(p) for p in poses])}\n\n"
+            await asyncio.sleep(0.25)
+
+    return StreamingResponse(events(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
 @app.get("/api/metrics")
 async def metrics(request: Request):
     """Prometheus text format (#95, app/metrics.py). Off until Settings → Access switches it on; then it answers a
