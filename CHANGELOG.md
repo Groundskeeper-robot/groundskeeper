@@ -5,6 +5,8 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ## Unreleased
 
+## 0.20.1 — 2026-11-13
+
 ### Added
 
 - **A live feed for the Home Assistant integration's map card** (#12): `GET /api/ha/stream` (server-sent events,
@@ -35,7 +37,7 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   See Integrations. Not on the MCP server.
 - **Pre-release images for testing** (`ghcr.io/groundskeeper-robot/groundskeeper-dev`): `:edge` after every merge
   and `:nightly` once a night, in their own package so they never replace `:latest` or a release. Settings → This
-  panel shows the channel beside the version, for example `0.20.1 · nightly · 1a756d0`. See the README.
+  panel shows the channel beside the version, for example `0.20.2 · nightly · 1a756d0`. See the README.
 - **A Cameras tile on Live** shows the robot's own cameras (front, left, right, back), one at a time, while the tile
   is open. It switches the cameras on (Control on, never off), plays the stream with Agora's SDK from this panel
   (the panel asks the SDK not to send usage statistics or upload logs, and switches off its remote configuration; a
