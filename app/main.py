@@ -440,8 +440,7 @@ HA_LIVE_STATE_S = 5      # how often /api/ha/stream repeats its state event; it 
 
 
 def ha_live_state(request: Request) -> dict:
-    v = rec(request).store.versions("map")
-    return ha_mod.live(rec(request).status(), ops(request).follow_camera(), v[0]["sha"] if v else None)
+    return ha_mod.live(rec(request).status(), ops(request).follow_camera(), rec(request).store.latest_sha("map"))
 
 
 @app.get("/api/ha/stream")

@@ -91,3 +91,19 @@ def test_a_token_gets_a_state_event_then_only_the_new_poses(client):
 
 def test_the_stream_is_locked(client):
     assert client.c.get("/api/ha/stream").status_code == 401
+
+
+def test_a_metrics_only_token_cannot_read_the_position(client):
+    assert client.c.post("/api/auth/setup", json={"code": client.auth.setup_code,
+                                                  "password": "correct horse"}).status_code == 200
+    token = client.c.post("/api/auth/tokens", json={"name": "scrape", "scope": "metrics"}).json()["token"]
+    scrape = TestClient(main.app, base_url="http://panel.test", headers={"Authorization": f"Bearer {token}"})
+    assert scrape.get("/api/ha/stream").status_code == 403
+
+
+def test_the_newest_map_version_is_named(tmp_path):
+    store = Store(str(tmp_path))
+    assert store.latest_sha("map") is None
+    store.save_version("map", {"features": [1]})
+    store.save_version("map", {"features": [1, 2]})
+    assert store.latest_sha("map") == store.versions("map")[0]["sha"]
