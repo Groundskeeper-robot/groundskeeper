@@ -5,6 +5,13 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ## Unreleased
 
+### Added
+
+- **Tilt and speed in the Home Assistant live feed** (#12): each position in `GET /api/ha/stream` now also carries the
+  robot's pitch, roll and speed, for a 3D view on the integration's map card that leans the robot with the ground
+  and keeps it moving between samples, as the panel's own 3D view does. No new position data: the same samples
+  as before, with three more numbers each.
+
 ## 0.20.1 — 2026-11-13
 
 ### Added
