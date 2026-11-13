@@ -180,7 +180,7 @@ def summary(status: dict, ops_status: dict, last_run: dict | None, upcoming: lis
     }
 
 
-# -- live feed for a Home Assistant card (GET /api/ha/stream, #12) -----------------------------------------------
+# -- live feed for a Home Assistant card (GET /api/ha/stream, #12, §17) ------------------------------------------
 # What a map card needs between summary polls: where the robot is, which camera covers it, and whether the run or
 # the map changed (so the card fetches the track or the map again). Unlike the summary this carries the robot's
 # position, as /api/stream already does for an API token; the integration sends it only to its card, never into an
