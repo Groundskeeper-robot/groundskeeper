@@ -12,6 +12,18 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   and keeps it moving between samples, as the panel's own 3D view does. No new position data: the same samples
   as before, with three more numbers each.
 
+### Changed
+
+- **Lawn dry is not checked with the snow blower attached** (#126). Falling or fresh snow reads as a wet lawn, so with
+  "Lawn must be dry" on, every snow start was refused. Now the check list shows Lawn dry as "not for the snow
+  blower", for a person, the scheduler, an assistant and an API token alike. Every other start check applies to every
+  head as before.
+- **The rain guard only notifies with the snow blower attached** (#127). Sleet and wet snow read as rain, which sent a
+  snow run home during the storm it was clearing. Now it carries on and you get a notification, whatever the guard is
+  set to (ignore stays silent). Mowing is unchanged.
+- Both apply only while the robot has named the snow blower as its head within the last 2 minutes: any other head, no
+  head, or no such report gets the mowing rules (ADR 0009).
+
 ## 0.20.1 — 2026-11-13
 
 ### Added
