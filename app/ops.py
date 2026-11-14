@@ -272,7 +272,7 @@ class Ops:
             "writing": self.map_writer.lock.locked() if getattr(self, "map_writer", None) else None,
             # ADR 0009: the head and the age of the message that named it, not the merged snapshot's
             "head_type": r.head_type,
-            "head_age_s": round(time.time() - r.head_at, 1) if r.head_at else None,
+            "head_age_s": time.time() - r.head_at if r.head_at else None,    # not rounded: -0.01 is not 0
         }
 
     # -- scheduler ---------------------------------------------------------------------------------------------

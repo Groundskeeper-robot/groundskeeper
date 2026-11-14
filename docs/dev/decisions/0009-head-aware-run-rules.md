@@ -47,5 +47,5 @@ sensor is on the mower module, so with the snow blower attached the panel's rain
 
 ## Enforced by
 `app/control.py` (`snow_blower`, `check`), `app/ops.py` (`_guard_tick`), `app/recorder.py` (`head_type`,
-`head_at`), `app/areasettings.py` (`other_head_block`), `tests/test_guards.py` (the start and resume checks for
-each head), `tests/test_runs.py` (the rain guard for each head), `tests/test_poses.py` (the head and its age).
+`head_at`), `app/areasettings.py` (`other_head_block`), `tests/test_head_rules.py` (the start and resume checks
+for each head), `tests/test_runs.py` (the rain guard for each head), `tests/test_poses.py` (the head and its age).
