@@ -270,6 +270,7 @@ class Ops:
             "conditions": (r.conditions or {}).get("state"),
             "presence": await self.presence(),
             "writing": self.map_writer.lock.locked() if getattr(self, "map_writer", None) else None,
+            "head_type": t.get("head_type"),     # from the same report as snapshot_age_s (ADR 0009)
         }
 
     # -- scheduler ---------------------------------------------------------------------------------------------
@@ -469,6 +470,11 @@ class Ops:
                    "dark": "dock" if dark == "pause" else dark}
         conds = await self._guard_conditions(g)
         now = time.time()
+        # ADR 0009: sleet and wet snow read as rain, and that is when the snow blower is needed. With it attached (by a
+        # fresh report) the rain guard only notifies, whatever its setting; "ignore" is not in conds at all.
+        if actions["rain"] in ("pause", "dock") and "rain" in conds and self._snow_blower(now):
+            actions["rain"] = "notify"
+            conds["rain"] = (conds["rain"][0], "rain (the snow blower carries on)")
         for key in [k for k in self.guards if k not in conds]:      # switched to "ignore" since
             self.guards.pop(key)
         for key, (active, why) in conds.items():
@@ -488,6 +494,11 @@ class Ops:
         await self._guard_confirmations()
         await self._guard_docked(g)
         await self._guard_resume(g)
+
+    def _snow_blower(self, now: float) -> bool:
+        """Is the snow blower attached, by the recorder's latest report while it is fresh (control.snow_blower)?"""
+        at = getattr(self.rec, "snapshot_at", None)
+        return control.snow_blower(self.rec.t.get("head_type"), now - at if at else None)
 
     def _guard_carried(self, key: str, now: float) -> bool:
         """Is this the same detection as one the previous process already notified (same run, seen within

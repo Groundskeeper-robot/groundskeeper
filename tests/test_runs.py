@@ -393,6 +393,50 @@ def test_a_rain_pause_does_not_resume_without_the_full_checks(tmp_path, monkeypa
                                               "guard"), False)[0]
 
 
+# -- ADR 0009: the rain guard only notifies while the snow blower is attached ----------------------------------------
+def _rain(tmp_path, monkeypatch, action, head, fresh=True):
+    o, clock = _ops(tmp_path, monkeypatch, {"guard_rain": action, "guard_person": "pause"})
+    o.rec.t["head_type"] = head
+    o.rec.conditions = {"raining": True}
+    for _ in range(4):
+        clock[0] += 5
+        o.rec.snapshot_at = clock[0] - (1 if fresh else control.ONLINE_S)
+        asyncio.run(o._guard_tick())
+    return o
+
+
+@pytest.mark.parametrize("action", ["pause", "dock"])
+def test_rain_does_not_stop_the_snow_blower_but_says_so(tmp_path, monkeypatch, action):
+    o = _rain(tmp_path, monkeypatch, action, head=1)
+    assert o.controller.sent == []
+    assert len(o.notifier.msgs) == 1
+    title, body = o.notifier.msgs[0]
+    assert "snow blower" in title and body.startswith("notify only")
+
+
+def test_rain_set_to_ignore_stays_silent_for_the_snow_blower(tmp_path, monkeypatch):
+    o = _rain(tmp_path, monkeypatch, "ignore", head=1)
+    assert o.controller.sent == [] and o.notifier.msgs == [] and "rain" not in o.guards
+
+
+@pytest.mark.parametrize("head", [None, 0, 2, 3, 4, 5, "1", True])
+def test_rain_still_sends_every_other_head_home(tmp_path, monkeypatch, head):
+    o = _rain(tmp_path, monkeypatch, "dock", head=head)
+    assert o.controller.sent == ["cmd_recharge"]
+
+
+def test_rain_sends_the_snow_blower_home_when_its_head_report_is_stale(tmp_path, monkeypatch):
+    o = _rain(tmp_path, monkeypatch, "dock", head=1, fresh=False)
+    assert o.controller.sent == ["cmd_recharge"]
+
+
+def test_the_person_guard_still_pauses_the_snow_blower(tmp_path, monkeypatch):
+    o, clock = _ops(tmp_path, monkeypatch, {"guard_rain": "dock"})
+    o.rec.t["head_type"], o.rec.snapshot_at, o.yard["person"] = 1, clock[0], True
+    _tick(o, clock, n=2)
+    assert o.controller.sent == ["pause"]
+
+
 def test_no_auto_resume_unless_switched_on(tmp_path, monkeypatch):
     o, clock = _ops(tmp_path, monkeypatch, {"guard_resume": False})
     o.yard["person"] = True
