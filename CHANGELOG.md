@@ -21,8 +21,8 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 - **The rain guard only notifies with the snow blower attached** (#127). Sleet and wet snow read as rain, which sent a
   snow run home during the storm it was clearing. Now it carries on and you get a notification, whatever the guard is
   set to (ignore stays silent). Mowing is unchanged.
-- Both apply only while the robot's last report is under 2 minutes old and says the snow blower is attached: any other
-  head, no head, or no fresh report gets the mowing rules (ADR 0009).
+- Both apply only while the robot has named the snow blower as its head within the last 2 minutes: any other head, no
+  head, or no such report gets the mowing rules (ADR 0009).
 
 ## 0.20.1 — 2026-11-13
 

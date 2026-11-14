@@ -59,9 +59,9 @@ Resuming after a guard is off unless you switch it on, because resuming spins th
 
 **With the snow blower attached:** sleet and wet snow read as rain, and that is when it is needed. So the rain
 guard only notifies, whatever it is set to (set to ignore, it stays silent), and stopping the run is your call.
-The other guards work as they do for mowing. This is fixed, not a setting, and it applies only while the robot's
-last report is under 2 minutes old and says the snow blower is on: any other head, no head, or no fresh report
-gets the mowing rules.
+The other guards work as they do for mowing. This is fixed, not a setting, and it applies only while the robot has
+named the snow blower as its head within the last 2 minutes: any other head, no head, or no such report gets the
+mowing rules. With resume after a guard pause switched on, a pause is not resumed while rain is still reported.
 
 ## Map writes
 

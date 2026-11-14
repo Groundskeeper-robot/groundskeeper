@@ -75,13 +75,15 @@ NOT_FOR_SNOW = "not for the snow blower"
 
 def snow_blower(head_type, snapshot_age_s) -> bool:
     """ADR 0009: is the snow blower attached, by a report that is still fresh? Only then is Lawn dry left unchecked and
-    the rain guard held to a notification. Every other head, no head, a head not heard yet, a value that is not a
-    number and a report past the Robot online limit all get the full mowing rules: unknown fails closed."""
-    if isinstance(head_type, bool) or not isinstance(head_type, (int, float)) or head_type != SNOW_BLOWER:
+    the rain guard held to a notification. head_type and its age come from the last message that itself named a head
+    (Recorder.head_type, head_at). Every other head, no head, a head not heard yet, a value that is not a whole
+    number, a report past the Robot online limit and an age below zero (the server's clock went back) all get the
+    full mowing rules: unknown fails closed."""
+    if type(head_type) is not int or head_type != SNOW_BLOWER:
         return False
     if isinstance(snapshot_age_s, bool) or not isinstance(snapshot_age_s, (int, float)):
         return False
-    return snapshot_age_s < ONLINE_S
+    return 0 <= snapshot_age_s < ONLINE_S
 
 
 def _i(t: dict, k: str) -> int:
@@ -135,7 +137,7 @@ def check(cmd: str, args: dict, ctx: dict, cfg: dict, actor: str) -> list[dict]:
         f"last snapshot {ctx['snapshot_age_s']} s ago" if ctx["snapshot_age_s"] is not None else "no data")
     add("Route to the robot", ctx["route_state"] == "connected", ctx["route_state"])
     # ADR 0009: Lawn dry is a mowing rule. With the snow blower attached it is listed, not checked, for every actor.
-    snow = snow_blower(ctx.get("head_type"), ctx["snapshot_age_s"])
+    snow = snow_blower(ctx.get("head_type"), ctx.get("head_age_s"))
     if cmd in ("start_plan", "resume"):
         # A map, settings or Wi-Fi write in progress must finish first (#57): a Wi-Fi join holds the writer for up to
         # a minute while it checks. Unknown (no writer to ask) blocks too. Pause, stop and dock are never held back.

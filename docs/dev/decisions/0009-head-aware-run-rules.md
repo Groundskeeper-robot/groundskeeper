@@ -39,9 +39,13 @@ sensor is on the mower module, so with the snow blower attached the panel's rain
   common, so revisit this once snow runs have been recorded.
 - Each relaxed rule needs a guard test for the snow blower and for a head that does not relax it (leaf blower, none,
   unknown).
+- A pause from another guard is not resumed automatically while rain is still reported: auto-resume waits for every
+  guard to clear, a notify-only one included. In a long storm a person resumes it.
+- The head and its age come from the last message that itself named a head, not from the merged snapshot, which
+  keeps an old head for as long as later messages leave it out.
 - Accepted with the PR that built it (#126, #127).
 
 ## Enforced by
-`app/control.py` (`snow_blower`, `check`), `app/ops.py` (`_guard_tick`), `app/areasettings.py`
-(`other_head_block`), `tests/test_guards.py` (the start and resume checks for each head), `tests/test_runs.py` (the
-rain guard for each head).
+`app/control.py` (`snow_blower`, `check`), `app/ops.py` (`_guard_tick`), `app/recorder.py` (`head_type`,
+`head_at`), `app/areasettings.py` (`other_head_block`), `tests/test_guards.py` (the start and resume checks for
+each head), `tests/test_runs.py` (the rain guard for each head), `tests/test_poses.py` (the head and its age).

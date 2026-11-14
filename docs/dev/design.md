@@ -306,8 +306,10 @@ A skipped window records why and what would fix it.
 - The area settings editor holds the mower's record, so it is read-only on an area labelled only for other heads
   (a snow blower's driveway) and when the area's labels cannot be read; an unlabelled area stays editable
   (`areasettings.other_head_block`).
-- Two mowing rules are relaxed for the snow blower, and only for it, while its report is fresh
-  (`control.snow_blower`): "Lawn dry" is listed but not checked, and the rain guard only notifies
+- Two mowing rules are relaxed for the snow blower, and only for it, while a message has named it within the
+  Robot online limit (`control.snow_blower`; `Recorder.head_type` and `head_at`, kept apart from the merged
+  snapshot, whose head outlives the message it came in): "Lawn dry" is listed but not checked, and the rain guard
+  only notifies
   ([ADR 0009](decisions/0009-head-aware-run-rules.md)). Every other head, no head and a stale report get the
   mowing rules. Snow rules of its own are not built (#126). The UI shows the same controls and wording for every
   head (#134).

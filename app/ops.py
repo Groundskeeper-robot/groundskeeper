@@ -270,7 +270,9 @@ class Ops:
             "conditions": (r.conditions or {}).get("state"),
             "presence": await self.presence(),
             "writing": self.map_writer.lock.locked() if getattr(self, "map_writer", None) else None,
-            "head_type": t.get("head_type"),     # from the same report as snapshot_age_s (ADR 0009)
+            # ADR 0009: the head and the age of the message that named it, not the merged snapshot's
+            "head_type": r.head_type,
+            "head_age_s": round(time.time() - r.head_at, 1) if r.head_at else None,
         }
 
     # -- scheduler ---------------------------------------------------------------------------------------------
@@ -496,9 +498,9 @@ class Ops:
         await self._guard_resume(g)
 
     def _snow_blower(self, now: float) -> bool:
-        """Is the snow blower attached, by the recorder's latest report while it is fresh (control.snow_blower)?"""
-        at = getattr(self.rec, "snapshot_at", None)
-        return control.snow_blower(self.rec.t.get("head_type"), now - at if at else None)
+        """Is the snow blower attached, by the last message that named a head, while it is fresh?"""
+        r = self.rec
+        return control.snow_blower(r.head_type, now - r.head_at if r.head_at else None)
 
     def _guard_carried(self, key: str, now: float) -> bool:
         """Is this the same detection as one the previous process already notified (same run, seen within
