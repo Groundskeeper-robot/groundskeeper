@@ -26,7 +26,7 @@ const R3D = {
   glide: null,        // a replay step: {from, to, t0, ms}
   mode: "live",       // live (the robot now) | replay (a selected run's replay point)
   colour: null,
-  head: null,         // the attached head's type, from the last live status that gave one
+  head: null,         // the attached head's type, from the last live status (null: none heard)
   raf: 0, last: 0,
   follow: { on: false, offset: 45, cam: null, turning: false, hands: false, wheelAt: 0 },   // cam: the heading the camera has turned to
 };
@@ -221,12 +221,14 @@ function r3dBuild(THREE) {
     sadd(cheek, black, side * 0.335, 0, 0);                                 // side plates
     sadd(shield, yellow, side * 0.353, 0, 0);                               // their yellow panels
     sadd(new THREE.BoxGeometry(0.12, 0.012, 0.03), light, side * 0.2, 0.502, 0.35);     // headlights, in the beam
-    for (const x of [0.07, 0.17, 0.27]) sadd(flight, graphite, side * x, SY, SZ).rotation.z = side * 0.45;   // auger flights, leaning to the middle
+    // auger flights, leaning to the middle
+    for (const x of [0.07, 0.17, 0.27]) sadd(flight, graphite, side * x, SY, SZ).rotation.z = side * 0.45;
   }
   sadd(across(new THREE.CylinderGeometry(0.02, 0.02, 0.60, 10)), graphite, 0, SY, SZ);
   sadd(tube([[-0.35, 0.17, 0.30], [-0.35, 0.19, 0.45], [-0.35, 0.47, 0.46], [-0.29, 0.53, 0.46], [0.29, 0.53, 0.46],
              [0.35, 0.47, 0.46], [0.35, 0.19, 0.45], [0.35, 0.17, 0.30]], 0.019), graphite, 0, 0, 0);   // guard bar
-  const wire = tube([[-0.33, 0.47, 0], [-0.31, 0.57, 0], [-0.22, 0.61, 0], [0.22, 0.61, 0], [0.31, 0.57, 0], [0.33, 0.47, 0]], 0.006);
+  const wire = tube([[-0.33, 0.47, 0], [-0.31, 0.57, 0], [-0.22, 0.61, 0],
+                     [0.22, 0.61, 0], [0.31, 0.57, 0], [0.33, 0.47, 0]], 0.006);
   for (const z of [0.05, 0.10, 0.15]) sadd(wire, graphite, 0, 0, z);        // wire guard before the mouth
   sadd(slab(0.50, 0.035, 0.025, 0.012, 0.006), yellow, 0, 0.455, 0.40);     // the yellow scraper bar, across the front
   // The chute: a collar, the column leaning back and the deflector on top, with its yellow joint. Drawn thrown to
@@ -388,7 +390,7 @@ async function robot3dSync() {
 
 // A live status: where the robot is now. Called with status.robot.
 function robot3dLive(robot) {
-  if (robot && robot.head_type != null) { R3D.head = robot.head_type; r3dHead(); }
+  if (robot) { R3D.head = robot.head_type ?? null; r3dHead(); }             // no head heard: back to the mower
   const p = robot && robot.position;
   if (!p) return;
   const sp = (robot.speed || []).filter((v) => typeof v === "number");

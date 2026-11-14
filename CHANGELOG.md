@@ -3,6 +3,14 @@
 What changed in each version of the panel, newest first. The version is in Settings → This panel and under the
 robot card. Before 0.9.0 the panel had no version numbers; those changes are listed by date.
 
+## Unreleased
+
+### Added
+
+- **The 3D robot carries the Snow Blower when that is the head** (part of #134): the auger housing with its guard
+  bar, the wire guard and the chute, in place of the Lawn Mower Pro. Live it follows the attached head; a replay
+  shows the head the run was driven with. The chute is drawn in one place.
+
 ## 0.20.2 — 2026-11-13
 
 ### Added
@@ -32,9 +40,6 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   read with an API token) sends the robot's state, last known position, current run, the camera that covers it
   and the map's version every 5 seconds, and each new position sample in between. It is lighter than
   `/api/stream` and asks nothing of the robot or Frigate. See Integrations.
-- **The 3D robot carries the Snow Blower when that is the head** (part of #134): the auger housing with its guard
-  bar, the wire guard and the chute, in place of the Lawn Mower Pro. Live it follows the attached head; a replay
-  shows the head the run was driven with. The chute is drawn in one place.
 
 ## 0.20.0 — 2026-11-12
 
