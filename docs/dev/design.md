@@ -312,7 +312,8 @@ A skipped window records why and what would fix it.
   only notifies
   ([ADR 0009](decisions/0009-head-aware-run-rules.md)). Every other head, no head and a stale report get the
   mowing rules. Snow rules of its own are not built (#126). The UI shows the same controls and wording for every
-  head (#134).
+  head (#134), except the 3D model, which carries the Snow Blower when that is the head (`web/robot3d.js`
+  `r3dHead`: live the attached head, in a replay the run's).
 
 ---
 
