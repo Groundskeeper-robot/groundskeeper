@@ -616,7 +616,7 @@ function secRules(d) {
         numCtl({ key: "min_battery_pct", value: g.min_battery_pct, min: 0, max: 100, unit: "%", onsave: (v) => gate("min_battery_pct", v) })),
       srow("Lawn must be dry", ["From the weather station, by the rules in ",
                                 slink("#settings/lawn", "Lawn conditions"),
-                                ". Not checked while the snow blower is attached; every other head is."],
+                                ". Not checked while the robot reports the snow blower attached; every other head is."],
         switchCtl("Lawn must be dry", g.require_dry, (v) => gate("require_dry", v), "require_dry")),
       g.require_dry ? ssub(srow("Damp is fine too", "Dew or light rain that is drying out.",
         switchCtl("Damp is fine too", g.allow_damp, (v) => gate("allow_damp", v), "allow_damp"))) : null,
@@ -642,7 +642,8 @@ function secRules(d) {
         selCtl({ key: "guard_person", value: g.guard_person, options: ACTIONS, onsave: (v) => gate("guard_person", v) })),
       peopleNote(g, "guard", d.st.control_enabled),
       srow("Rain starts",
-        "From the weather station. While the snow blower is attached, Pause and Return to dock only notify.",
+        "From the weather station. While the robot reports the snow blower attached, Pause and Return to dock " +
+        "only notify.",
         selCtl({ key: "guard_rain", value: g.guard_rain, options: ACTIONS, onsave: (v) => gate("guard_rain", v) })),
       srow("Everyone leaves", "The presence entity says nobody is home.",
         selCtl({ key: "guard_everyone_left", value: g.guard_everyone_left, options: ACTIONS, onsave: (v) => gate("guard_everyone_left", v) })),
