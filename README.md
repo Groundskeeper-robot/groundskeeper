@@ -14,6 +14,9 @@ pauses or docks it only when every safety check passes.
 > Yarbo**. It controls a machine with spinning blades: read [Safety](#safety) before switching control on, and use
 > it at your own risk.
 
+**Use Home Assistant?** The [Groundskeeper integration](https://github.com/Groundskeeper-robot/groundskeeper-ha)
+(HACS) shows the robot there through this panel: a mower entity, sensors and a map card.
+
 ![Live: the robot mid-mow on aerial imagery, its track coloured by RTK fix, the plan's progress and the lawn conditions](docs/screenshots/live.png)
 
 | | |
