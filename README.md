@@ -91,6 +91,9 @@ More: [Integrations](docs/user/integrations.md), [Safety](docs/user/safety.md).
   scheduled start, a "ready to mow" note with a camera snapshot for you to confirm.
 - **Sensors back into Home Assistant:** state, battery, RTK, whether it is mowing, the link, lawn conditions
   and the last run, for your own dashboards and automations.
+- **The Home Assistant integration:** [groundskeeper-ha](https://github.com/Groundskeeper-robot/groundskeeper-ha),
+  installed through HACS, adds a mower entity and a map card that follows the robot. Its Commands option (off by
+  default) lets Home Assistant start, pause and dock, each still passing the panel's checks.
 
 More: [Integrations](docs/user/integrations.md).
 
