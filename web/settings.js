@@ -642,7 +642,7 @@ function secRules(d) {
         selCtl({ key: "guard_person", value: g.guard_person, options: ACTIONS, onsave: (v) => gate("guard_person", v) })),
       peopleNote(g, "guard", d.st.control_enabled),
       srow("Rain starts", ["From the weather station. Only notifies for the ", slink("#help/safety", "snow blower"),
-                           " (Ignore stays silent)."],
+                           " if the robot named it in the last 2 min (Ignore stays silent)."],
         selCtl({ key: "guard_rain", value: g.guard_rain, options: ACTIONS, onsave: (v) => gate("guard_rain", v) })),
       srow("Everyone leaves", "The presence entity says nobody is home.",
         selCtl({ key: "guard_everyone_left", value: g.guard_everyone_left, options: ACTIONS, onsave: (v) => gate("guard_everyone_left", v) })),
