@@ -16,6 +16,8 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 - **The Home Assistant live feed no longer sends NaN or infinity** (#164): a position sample whose pitch, roll or speed
   was not a finite number went into `GET /api/ha/stream` as a bare `NaN` or `Infinity`, which is not JSON and which a
   strict parser rejects. Those values are now sent as null, like a missing one.
+- **A NaN or infinite longitude or latitude is no fix in the Home Assistant live feed** (#175): the position of such a
+  sample was sent with `"lon": null` or `"lat": null`; now the feed reports no position, like a sample without a fix.
 - **`scripts/deploy.sh` and `scripts/deploy_demo.sh` build again on a remote host** (#165). Their build context left out
   `LICENSE` and `THIRD_PARTY_NOTICES.md`, which the Dockerfile copies, so the build failed. A test now checks that
   every local file the Dockerfile copies is in both scripts' file lists.

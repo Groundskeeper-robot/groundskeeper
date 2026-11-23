@@ -47,6 +47,17 @@ def test_a_pose_never_carries_nan_or_infinity_which_strict_json_parsers_reject()
     json.dumps(ha.live(status, None, None), allow_nan=False)
 
 
+@pytest.mark.parametrize("key", ["lon", "lat"])
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_a_non_finite_longitude_or_latitude_is_no_fix(key, bad):
+    status = robot_status()
+    status["robot"]["position"][key] = bad
+    assert ha.pose(status["robot"]["position"]) is None
+    s = ha.live(status, None, None)
+    assert s["position"] is None
+    json.dumps(s, allow_nan=False)
+
+
 def test_the_state_position_carries_tilt_and_the_mean_wheel_speed():
     status = robot_status()
     status["robot"].update(pitch=2.5, roll=-1.0, speed=[0.4, 0.6])
