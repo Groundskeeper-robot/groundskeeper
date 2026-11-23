@@ -13,7 +13,7 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ### Fixed
 
-- **Replay no longer races through samples that have no speed.** A run recorded without wheel-speed telemetry was
+- **Replay no longer races through samples that have no speed** (#166). A run recorded without wheel-speed telemetry was
   fast-forwarded at 600× even with 1× chosen, because a missing speed counted as standing still. Only a known
   speed near zero (or a gap in the track) is hurried now.
 
