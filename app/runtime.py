@@ -6,6 +6,7 @@ keeps reading cfg.frigate_url and gets the live value whichever layer it came fr
 """
 from __future__ import annotations
 
+import hmac
 import logging
 import math
 import os
@@ -113,6 +114,11 @@ def _same(a, b) -> bool:
     return str(a or "").rstrip("/") == str(b or "").rstrip("/")
 
 
+def _same_secret(a, b) -> bool:
+    """Two secrets in effect are the same one. Compared in constant time: a session can set one side."""
+    return isinstance(a, str) and isinstance(b, str) and hmac.compare_digest(a.encode(), b.encode())
+
+
 class Runtime:
     """Reads like a Config; writes go to the settings store under 'integrations'. A stored false is "off"."""
 
@@ -209,7 +215,8 @@ class Runtime:
             sent, to = self._in_effect(group, secret, after), self._in_effect(group, address, after)
             if not sent or not to:
                 continue                                            # nothing would be sent
-            if sent == self._in_effect(group, secret, before) and _same(to, self._in_effect(group, address, before)):
+            was, went = self._in_effect(group, secret, before), self._in_effect(group, address, before)
+            if _same_secret(sent, was) and _same(to, went):
                 continue                                            # the same secret to the same address as before
             if after.get(secret) is None and _same(to, getattr(self.env, GROUPS[group][address])):
                 continue                                            # the environment's secret to its own address
