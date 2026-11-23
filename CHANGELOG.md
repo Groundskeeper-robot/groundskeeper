@@ -11,6 +11,12 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   bar, the wire guard and the chute, in place of the Lawn Mower Pro. Live it follows the attached head; a replay
   shows the head the run was driven with. The chute is drawn in one place.
 
+### Fixed
+
+- **The Home Assistant live feed no longer sends NaN or infinity** (#164): a position sample whose pitch, roll or speed
+  was not a finite number went into `GET /api/ha/stream` as a bare `NaN` or `Infinity`, which is not JSON and which a
+  strict parser rejects. Those values are now sent as null, like a missing one.
+
 ## 0.20.2 — 2026-11-13
 
 ### Added
