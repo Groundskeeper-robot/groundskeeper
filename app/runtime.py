@@ -108,6 +108,11 @@ def _check(group: str, field: str, v):
     return VALIDATE[(group, field)](v)
 
 
+def _same(a, b) -> bool:
+    """Two addresses are the same place (a trailing slash aside)."""
+    return str(a or "").rstrip("/") == str(b or "").rstrip("/")
+
+
 class Runtime:
     """Reads like a Config; writes go to the settings store under 'integrations'. A stored false is "off"."""
 
@@ -193,18 +198,23 @@ class Runtime:
         return v if v is not None else getattr(self.env, GROUPS[group][field])
 
     def _keep_secrets_home(self, group: str, values: dict, after: dict) -> None:
-        """Refuse a change that would send a secret in effect to an address other than the one it went to before,
-        unless this same change gives the secret (a new one, not a hand-back to the environment's)."""
+        """Refuse a change after which a secret would go to an address it did not go to before, unless this same
+        change gives the secret. The environment's secret may also go to the environment's own address: that pair was
+        set together, outside the panel. Without that, switching the environment's secret off, changing the address
+        and handing the secret back would send it to the new address in two allowed steps."""
         before = self._stored.get(group, {})
         for (g, secret), address in SENT_TO.items():
             if g != group or (isinstance(values.get(secret), str) and values[secret]):
                 continue
-            old, new = self._in_effect(group, address, before), self._in_effect(group, address, after)
-            if not new or not self._in_effect(group, secret, after):
+            sent, to = self._in_effect(group, secret, after), self._in_effect(group, address, after)
+            if not sent or not to:
                 continue                                            # nothing would be sent
-            if str(new).rstrip("/") != str(old or "").rstrip("/"):
-                raise ValueError(f"paste the {secret} as well to use a different address: "
-                                 f"the saved one only goes to the saved address")
+            if sent == self._in_effect(group, secret, before) and _same(to, self._in_effect(group, address, before)):
+                continue                                            # the same secret to the same address as before
+            if after.get(secret) is None and _same(to, getattr(self.env, GROUPS[group][address])):
+                continue                                            # the environment's secret to its own address
+            raise ValueError(f"paste the {secret} as well to use a different address: "
+                             f"the saved one only goes to the saved address")
 
     def set(self, group: str, values: dict) -> list[str]:
         """Apply a partial update to one group. A field left out is unchanged; null clears the user's value (the

@@ -250,6 +250,31 @@ def test_a_new_address_needs_the_token_too(tmp_path, where):
     assert set(out["changed"]) == {"url", "token"} and r.applied[-1] == ("ha", "https://ha.example", "new-secret")
 
 
+@pytest.mark.parametrize("first", [{"token": "other"}, {"token": False}])
+def test_the_environments_token_does_not_follow_a_new_address_in_two_steps(tmp_path, first):
+    """Replacing or switching off the environment's token lets the address change; handing the token back to the
+    environment afterwards must not send it there."""
+    req, r, o = fake_request(tmp_path, ha_url="http://192.0.2.10:8123", ha_token="secret")
+    run(main.put_integration(req, "home_assistant", {"url": "https://attacker.example", **first}))
+    assert req.app.state.cfg.ha_token != "secret"
+    before, applied = r.store.setting("integrations"), list(r.applied)
+    with pytest.raises(HTTPException) as e:
+        run(main.put_integration(req, "home_assistant", {"token": None}))
+    assert e.value.status_code == 400 and "token" in e.value.detail and "secret" not in e.value.detail
+    assert req.app.state.cfg.ha_token != "secret"
+    assert r.store.setting("integrations") == before and r.applied == applied       # nothing kept, nothing applied
+    # back to the environment's pair, address and token together or one after the other: that is where it was sent
+    out = run(main.put_integration(req, "home_assistant", {"url": None, "token": None}))
+    assert set(out["changed"]) == {"url", "token"} and r.applied[-1] == ("ha", "http://192.0.2.10:8123", "secret")
+
+
+def test_the_environments_token_can_be_switched_off_and_on_at_its_own_address(tmp_path):
+    req, r, o = fake_request(tmp_path, ha_url="http://192.0.2.10:8123", ha_token="secret")
+    assert run(main.put_integration(req, "home_assistant", {"token": False}))["changed"] == ["token"]
+    assert run(main.put_integration(req, "home_assistant", {"token": None}))["changed"] == ["token"]
+    assert r.applied[-1] == ("ha", "http://192.0.2.10:8123", "secret")
+
+
 def test_a_new_address_may_drop_the_saved_token(tmp_path):
     req, r, o = fake_request(tmp_path)
     run(main.put_integration(req, "home_assistant", {"url": "http://192.0.2.10:8123", "token": "secret"}))
