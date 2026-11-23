@@ -50,10 +50,9 @@ def test_a_pose_never_carries_nan_or_infinity_which_strict_json_parsers_reject()
 @pytest.mark.parametrize("key", ["lon", "lat"])
 @pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
 def test_a_non_finite_longitude_or_latitude_is_no_fix(key, bad):
-    p = {"t": 9.5, "lon": 1.0, "lat": 2.0, "heading": 45, key: bad}
-    assert ha.pose(p) is None
     status = robot_status()
-    status["robot"]["position"] = {"t": 9.5, "lon": 1.0, "lat": 2.0, "heading": 45, key: bad}
+    status["robot"]["position"][key] = bad
+    assert ha.pose(status["robot"]["position"]) is None
     s = ha.live(status, None, None)
     assert s["position"] is None
     json.dumps(s, allow_nan=False)
