@@ -27,6 +27,9 @@ ENV_NAMES = {"frigate_url": "FRIGATE_URL",
              "poll_idle_s": "POLL_IDLE_S", "poll_active_s": "POLL_ACTIVE_S", "map_refresh_s": "MAP_REFRESH_S",
              "raw_every_s": "RAW_EVERY_S", "raw_keep_days": "RAW_KEEP_DAYS", "run_idle_end_s": "RUN_IDLE_END_S"}
 SECRETS = {("home_assistant", "token")}
+# A secret that is sent to an address: it only goes to the address it was given with. A change that would point it at
+# another one must bring the secret too, as the test route already asks, so a session cannot redirect a saved token.
+SENT_TO = {("home_assistant", "token"): "url"}
 # DEMO=1 talks to no robot, Home Assistant, Frigate or Tempest: these groups keep the environment's (empty) values.
 DEMO_LOCKED = ("frigate", "home_assistant", "weather")
 # false stored here means "switched off", even when the environment has a value
@@ -185,9 +188,28 @@ class Runtime:
             out[group] = g
         return out
 
+    def _in_effect(self, group: str, field: str, stored: dict):
+        v = stored.get(field)
+        return v if v is not None else getattr(self.env, GROUPS[group][field])
+
+    def _keep_secrets_home(self, group: str, values: dict, after: dict) -> None:
+        """Refuse a change that would send a secret in effect to an address other than the one it went to before,
+        unless this same change gives the secret (a new one, not a hand-back to the environment's)."""
+        before = self._stored.get(group, {})
+        for (g, secret), address in SENT_TO.items():
+            if g != group or (isinstance(values.get(secret), str) and values[secret]):
+                continue
+            old, new = self._in_effect(group, address, before), self._in_effect(group, address, after)
+            if not new or not self._in_effect(group, secret, after):
+                continue                                            # nothing would be sent
+            if str(new).rstrip("/") != str(old or "").rstrip("/"):
+                raise ValueError(f"paste the {secret} as well to use a different address: "
+                                 f"the saved one only goes to the saved address")
+
     def set(self, group: str, values: dict) -> list[str]:
         """Apply a partial update to one group. A field left out is unchanged; null clears the user's value (the
-        environment applies again); anything else is validated and stored. Returns the fields that changed."""
+        environment applies again); anything else is validated and stored. A new address for a secret in effect needs
+        the secret in the same change (SENT_TO). Returns the fields that changed."""
         if group not in GROUPS:
             raise KeyError(group)
         if not isinstance(values, dict):
@@ -209,6 +231,7 @@ class Runtime:
             if current.get(field) != clean:
                 current[field] = clean
                 changed.append(field)
+        self._keep_secrets_home(group, values, current)
         if changed:
             if current:
                 self._stored[group] = current

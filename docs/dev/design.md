@@ -638,7 +638,9 @@ the panel's write support are summarised in [`map-writes.md`](map-writes.md).
 ## 17. Integrations
 
 - **Home Assistant, out:** entities for state, battery, RTK quality, running, the robot link, lawn conditions and
-  the last run (`app/ha.py`), every minute, via HA's REST API with a long-lived token. Alerts go to a notify service
+  the last run (`app/ha.py`), every minute, via HA's REST API with a long-lived token. The token only goes to the
+  address it was set with: a new address needs the token in the same change (`runtime.SENT_TO`), in Settings and Test.
+  Alerts go to a notify service
   and/or the webhook: robot error, the robot pausing itself, stuck, lost contact, guard action, head changed, cloud
   needs sign-in, maintenance due, a start waiting for confirmation, a skipped window and auto-starts
   (`app/notify.py`).
