@@ -11,6 +11,12 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   bar, the wire guard and the chute, in place of the Lawn Mower Pro. Live it follows the attached head; a replay
   shows the head the run was driven with. The chute is drawn in one place.
 
+### Fixed
+
+- **Help text for the snow blower's relaxed rules**: the start-check text now says Lawn dry is skipped only while the
+  robot named the snow blower as its head within the last 2 minutes, and Settings → Run rules says the rain guard
+  stays silent when set to Ignore, as the code does (ADR 0009).
+
 ## 0.20.2 — 2026-11-13
 
 ### Added
