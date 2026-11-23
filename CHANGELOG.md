@@ -11,6 +11,12 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   bar, the wire guard and the chute, in place of the Lawn Mower Pro. Live it follows the attached head; a replay
   shows the head the run was driven with. The chute is drawn in one place.
 
+### Fixed
+
+- **Replay no longer races through samples that have no speed.** A run recorded without wheel-speed telemetry was
+  fast-forwarded at 600× even with 1× chosen, because a missing speed counted as standing still. Only a known
+  speed near zero (or a gap in the track) is hurried now.
+
 ## 0.20.2 — 2026-11-13
 
 ### Added
