@@ -13,7 +13,7 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ### Fixed
 
-- **`scripts/deploy.sh` and `scripts/deploy_demo.sh` build again on a remote host.** Their build context left out
+- **`scripts/deploy.sh` and `scripts/deploy_demo.sh` build again on a remote host** (#165). Their build context left out
   `LICENSE` and `THIRD_PARTY_NOTICES.md`, which the Dockerfile copies, so the build failed. A test now checks that
   every local file the Dockerfile copies is in both scripts' file lists.
 
