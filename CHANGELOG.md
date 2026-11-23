@@ -19,6 +19,9 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 - **`scripts/deploy.sh` and `scripts/deploy_demo.sh` build again on a remote host** (#165). Their build context left out
   `LICENSE` and `THIRD_PARTY_NOTICES.md`, which the Dockerfile copies, so the build failed. A test now checks that
   every local file the Dockerfile copies is in both scripts' file lists.
+- **Replay no longer races through samples that have no speed** (#166). A run recorded without wheel-speed telemetry was
+  fast-forwarded at 600× even with 1× chosen, because a missing speed counted as standing still. Only a known
+  speed near zero (or a gap in the track) is hurried now.
 
 ## 0.20.2 — 2026-11-13
 
