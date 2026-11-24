@@ -5,6 +5,16 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ## Unreleased
 
+## 0.20.3 — 2026-11-23
+
+### Security
+
+- **A new Home Assistant address needs the token again** (GHSA-fw48-fr97-8r8h). Saving only a new address in
+  Settings → Home Assistant sent the saved token to that address. Now the token has to be pasted with it, as Test
+  already asked; switching the address off, or removing the token with it, still works on its own. A token from the
+  `HA_TOKEN` environment variable is covered too: taking it up again in Settings only sends it to the address it had
+  before or to the environment's own, not to one saved in between.
+
 ### Added
 
 - **The 3D robot carries the Snow Blower when that is the head** (part of #134): the auger housing with its guard
@@ -13,11 +23,6 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ### Fixed
 
-- **A new Home Assistant address needs the token again.** Saving only a new address in Settings → Home Assistant
-  sent the saved token to that address. Now the token has to be pasted with it, as Test already asked; switching
-  the address off, or removing the token with it, still works on its own. A token from the `HA_TOKEN` environment
-  variable is covered too: taking it up again in Settings only sends it to the address it had before or to the
-  environment's own, not to one saved in between.
 - **The Home Assistant live feed no longer sends NaN or infinity** (#164): a position sample whose pitch, roll or speed
   was not a finite number went into `GET /api/ha/stream` as a bare `NaN` or `Infinity`, which is not JSON and which a
   strict parser rejects. Those values are now sent as null, like a missing one.
@@ -86,7 +91,7 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   See Integrations. Not on the MCP server.
 - **Pre-release images for testing** (`ghcr.io/groundskeeper-robot/groundskeeper-dev`): `:edge` after every merge
   and `:nightly` once a night, in their own package so they never replace `:latest` or a release. Settings → This
-  panel shows the channel beside the version, for example `0.20.3 · nightly · 1a756d0`. See the README.
+  panel shows the channel beside the version, for example `0.20.4 · nightly · 1a756d0`. See the README.
 - **A Cameras tile on Live** shows the robot's own cameras (front, left, right, back), one at a time, while the tile
   is open. It switches the cameras on (Control on, never off), plays the stream with Agora's SDK from this panel
   (the panel asks the SDK not to send usage statistics or upload logs, and switches off its remote configuration; a
