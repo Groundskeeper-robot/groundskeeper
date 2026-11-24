@@ -1,6 +1,7 @@
 """Phase 2 orchestration: cloud session, control, gates, during-run guards, the scheduler, alerts, maintenance and
 the follow-cam. Kept out of the recorder so recording stays simple and always on."""
 import asyncio
+import contextvars
 import logging
 import time
 from datetime import datetime
@@ -41,6 +42,10 @@ BUSY = {"mowing", "transit", "planning", "moving"}
 GUARD_RULES = {"person": "person guard", "rain": "rain guard", "away": "everyone-left guard", "dark": "after-dark guard"}
 AFTER_CHARGE_S = 120      # the robot counts as leaving its charger if it was charging mid-plan this recently (it can
                           # pass through idle for a moment on its way out)
+# The longer yard-clear window of the guard's own resume, in minutes: set by Ops._resume_as_guard around its preview
+# and send, read by Ops.yard_window. It is the server's own record, never the request's (a command's args come from
+# whoever asked, and must not say how far back the yard check looks).
+_GUARD_YARD_MIN = contextvars.ContextVar("guard_yard_minutes", default=None)
 
 
 def point_in_ring(lon: float, lat: float, ring: list) -> bool:
@@ -217,6 +222,12 @@ class Ops:
     def yard_cameras(self) -> list[str]:
         return self.store.setting("yard_cameras", []) or []
 
+    def yard_window(self, g: dict) -> float:
+        """How many minutes back the yard check looks: the window in Settings, or the guard's longer one while it
+        asks for its own resume. Never shorter than the one in Settings."""
+        guard = _GUARD_YARD_MIN.get()
+        return g["yard_clear_minutes"] if guard is None else max(guard, float(g["yard_clear_minutes"]))
+
     async def yard_status(self, minutes: float, labels) -> dict:
         if not self.frigate.enabled or not self.yard_cameras():
             return {"ok": None, "detail": "Frigate not set up" if not self.frigate.enabled else "no yard cameras chosen",
@@ -265,7 +276,7 @@ class Ops:
             "error_code": int(t.get("error_code") or 0),
             "battery": t.get("battery"),
             "running": bool(r.run_id) or bool(r.plan_active()),
-            "yard": await self.yard_status(args.get("yard_minutes") or g["yard_clear_minutes"], g["yard_labels"]),
+            "yard": await self.yard_status(self.yard_window(g), g["yard_labels"]),    # never from args
             "phone_app_active": self.phone_app_active(quiet),
             "conditions": (r.conditions or {}).get("state"),
             "presence": await self.presence(),
@@ -643,8 +654,7 @@ class Ops:
         if now - self._guard_cmd_at < GUARD_GAP_S:
             return
         self._guard_cmd_at = now
-        yard_minutes = max(float(g["guard_resume_after_min"]), float(g["yard_clear_minutes"]))
-        preview = await self.controller.preview("resume", {"yard_minutes": yard_minutes}, actor="guard")
+        preview = await self._resume_as_guard(g)
         if not preview.get("would_send"):
             self._guard_cmd_at = now + RESUME_BACKOFF_S - GUARD_GAP_S     # look again in 5 min, not every minute
             if not any(st["warned"] for st in sts):
@@ -661,7 +671,7 @@ class Ops:
         if plan is None or not plan.active or plan.session not in sessions:
             self._drop_ownership("the paused plan is no longer the one in progress")
             return
-        result = await self.controller.send("resume", {"yard_minutes": yard_minutes}, actor="guard", wait=False)
+        result = await self._resume_as_guard(g, send=True)
         whys = ", ".join(st["why"] for st in sts)
         if result.get("sent"):
             self._resume = {"at": now, "keys": held}
@@ -671,6 +681,17 @@ class Ops:
                 st["warned"] = True
             await self.notifier.send("guard", "Guard: not resuming yet", str(result.get("refused") or result.get("error")))
 
+    async def _resume_as_guard(self, g: dict, send: bool = False) -> dict:
+        """The guard's own resume, previewed or sent. Its yard check looks back over the resume delay when that is
+        longer than the start's window: the yard has to have been clear that long."""
+        window = _GUARD_YARD_MIN.set(max(float(g["guard_resume_after_min"]), float(g["yard_clear_minutes"])))
+        try:
+            if send:
+                return await self.controller.send("resume", {}, actor="guard", wait=False)
+            return await self.controller.preview("resume", {}, actor="guard")
+        finally:
+            _GUARD_YARD_MIN.reset(window)
+
     async def _guard_docked(self, g: dict) -> None:
         """A guard sent the robot home, the cause has gone, and the robot heads back out by itself (a mid-plan
         charging break resumes on its own). That is a resume nobody checked: run the guard-resume interlocks and,
@@ -679,8 +700,7 @@ class Ops:
         for st in self.guards.values():
             if st["acted"] != "dock" or st["active"] or st["pending"] or r.activity not in BUSY:
                 continue
-            yard_minutes = max(float(g["guard_resume_after_min"]), float(g["yard_clear_minutes"]))
-            preview = await self.controller.preview("resume", {"yard_minutes": yard_minutes}, actor="guard")
+            preview = await self._resume_as_guard(g)
             if preview.get("would_send"):
                 st.update(acted=None, owner=None)
                 await self.notifier.send("guard", f"Guard: {st['why']}",
