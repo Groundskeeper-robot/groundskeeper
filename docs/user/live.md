@@ -117,6 +117,14 @@ are pink, edge passes violet.
     - Not yet looked at on a phone.
     - Tried with one robot and one viewer at a time.
 - **Control card:** pick a plan and see its areas. Only the buttons that make sense in the robot's state are on.
+  The start confirmation has **Start at**, to start the plan part-way through and finish a mow that was stopped: the
+  beginning (the default), every 5%, and, when the newest run was this plan and ended early, how far it got ("last
+  run", with its date). That figure is the robot's own last progress reading (area done of the plan's area, read once
+  a minute), rounded down. Whether the robot measures a start point the same way has not been checked on a robot yet,
+  so pick a step lower for more overlap. It is not offered after a run that itself began part-way, or one the panel
+  stopped watching before it ended. Picking a start point runs the checks again for it, and it holds for that one
+  start: the next confirmation is back at the beginning. Scheduled starts always begin at the beginning. Only a
+  stopped or ended plan needs this: a paused one has **Resume**.
   Needs control switched on ([Safety](#help/safety)). Hover a button that is off to see why; on a phone or a narrow
   window a line under the buttons says it instead.
 - **Ready to start:** runs every check a start would face and sends nothing. When a start would be refused it says

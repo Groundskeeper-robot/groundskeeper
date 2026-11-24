@@ -554,13 +554,78 @@ function controlCard(s) {
    in the camera layout). It lives outside Live, so the redraw on every status event leaves it alone; Esc, Cancel or a
    tap outside closes it. Its head says whether the command would go; Send is offered only when it would (soft
    checks: once the override is ticked), so a refused start is never a button that seems to do nothing. */
+// A run that ended one of these ways says nothing about where to pick the plan up: it finished, or the panel stopped
+// watching before the robot did.
+const NO_LEFT_OFF = new Set(["plan finished", "recorder restarted", "paused, not resumed"]);
+
+// How far the newest run got, when it was this plan and ended before the plan finished: {pct, ended}, else null. pct
+// is the robot's last progress reading (area done of the plan's area, asked once a minute), rounded down so a start
+// there overlaps rather than skips. Not offered after a run this panel itself started part-way (the control log,
+// newest first): what the robot reports as progress after such a start is not known yet.
+function leftOffAt(run, planId, log) {
+  if (!run || !run.ended || NO_LEFT_OFF.has(run.end_reason)) return null;
+  if (!String(run.plan_session || "").startsWith(`${planId}:`)) return null;
+  if (typeof run.plan_progress_pct !== "number") return null;
+  const startPct = (l) => { try { return JSON.parse(l.args).start_percent; } catch { return null; } };
+  // The robot can take a few minutes to act on a start, and the run opens when it does.
+  const start = (log || []).find((l) => l.cmd === "start_plan" && l.sent && l.ts <= run.started + 60
+                                        && l.ts >= run.started - 600);
+  if (start && startPct(start)) return null;
+  const pct = Math.floor(run.plan_progress_pct);
+  return pct >= 1 && pct <= 99 ? { pct, ended: run.ended } : null;
+}
+
+async function lastRunLeftOff(planId) {
+  try {
+    const [runs, log] = await Promise.all([getJSON("/api/runs?limit=1"), getJSON("/api/control/log?limit=50")]);
+    return leftOffAt((runs.runs || [])[0], planId, log.log);
+  } catch { return null; }    // no hint; the list still has every 5 %
+}
+
+// The start points on offer: the beginning, every 5 %, where the last run got to, and the one picked.
+function startPoints(leftOff, picked) {
+  const every5 = Array.from({ length: 19 }, (_, i) => (i + 1) * 5);
+  return [...new Set([0, ...every5, leftOff, picked])].filter((v) => typeof v === "number").sort((x, y) => x - y);
+}
+
+// One place makes both what the confirmation says and what Send sends, so the two cannot differ. A start from the
+// beginning carries no start point at all, as before.
+function startChoice(base, planId, pct) {
+  return { label: pct ? `${base} from ${pct}%` : base,
+           args: pct ? { plan_id: planId, start_percent: pct } : { plan_id: planId } };
+}
+
+// Another start point picked in the confirmation: the checks are asked again for exactly what Send would now send, and
+// Send is off until they are back. An override ticked for the earlier choice does not carry over.
+function pickStartPoint(c, pct) {
+  c.startAt.pct = pct;
+  ({ label: c.label, args: c.args } = startChoice(c.startAt.base, c.startAt.planId, pct));
+  c.preview = null; c.error = null; c.override = false;
+  drawConfirm();
+  return previewConfirm(c);
+}
+
+// What the command would face (reads only). An answer for args that were replaced meanwhile is dropped: the checks on
+// screen must be the ones for what Send sends.
+async function previewConfirm(c) {
+  const args = c.args;
+  let preview = null, error = null;
+  try { preview = await postJSON("/api/control/preview", { cmd: c.cmd, args }); } catch (e) { error = e.message; }
+  if (ops.confirm !== c || c.args !== args) return;
+  c.preview = preview; c.error = error;
+  drawConfirm();
+}
+
 async function openConfirm(cmd, label, args = {}, previewOnly = false) {
   closeConfirm();
   const opener = document.activeElement;
   const box = h("div", { class: "imgdialogbox confirmbox", role: "dialog", "aria-modal": "true", "aria-labelledby": "confirm-title" });
   const overlay = h("div", { class: "imgdialog", onclick: (e) => { if (e.target === overlay) closeConfirm(); } });
   const onKey = (e) => { if (e.key === "Escape") closeConfirm(); };
-  const c = ops.confirm = { cmd, label, args, previewOnly, preview: null, override: false, box,
+  // A start a person is about to send can begin part-way through the plan: picked here, for this one start.
+  const startAt = cmd === "start_plan" && !previewOnly
+    ? { base: label, planId: args.plan_id, pct: 0, leftOff: null } : null;
+  const c = ops.confirm = { cmd, label, args, previewOnly, preview: null, override: false, box, startAt,
     close: () => {
       overlay.remove();
       document.removeEventListener("keydown", onKey);
@@ -572,8 +637,12 @@ async function openConfirm(cmd, label, args = {}, previewOnly = false) {
   document.body.append(overlay);
   document.addEventListener("keydown", onKey);
   drawConfirm();
-  try { c.preview = await postJSON("/api/control/preview", { cmd, args }); } catch (e) { c.error = e.message; }
-  if (ops.confirm === c) drawConfirm();
+  if (startAt) {
+    lastRunLeftOff(startAt.planId).then((v) => {
+      if (v && ops.confirm === c) { startAt.leftOff = v; drawConfirm(); }
+    });
+  }
+  await previewConfirm(c);
 }
 
 function closeConfirm() {
@@ -594,6 +663,7 @@ function drawConfirm() {
   fill(c.box,
     h("h3", { id: "confirm-title" }, c.previewOnly ? `Gate check · ${c.label}` : `Send “${c.label}”?`),
     c.error ? h("p", { class: "small", style: `color:${CORAL}` }, c.error) : null,
+    c.startAt ? startAtRow(c) : null,
     head,
     p ? checkList(p.checks) : h("p", { class: "muted small" }, "Checking interlocks…"),
     p && !p.enabled ? h("p", { class: "muted small" }, "Control is switched off; nothing will be sent.") : null,
@@ -610,6 +680,21 @@ function drawConfirm() {
         refreshLive();
       } }, "Send")));
   if (!c.box.contains(document.activeElement)) c.box.querySelector("button:not([disabled])")?.focus();  // a redraw drops focus
+}
+
+// The confirmation's "Start at" list. It lives in the dialog, not on Live: Live redraws on every status event, which
+// would shut an open list, and here the choice is in view when Send is pressed.
+function startAtRow(c) {
+  const s = c.startAt, left = s.leftOff;
+  const day = left ? new Date(left.ended * 1000).toLocaleDateString([], { month: "short", day: "numeric" }) : "";
+  const text = (v) => (v === 0 ? "The beginning" : left && v === left.pct ? `${v}% (last run, ${day})` : `${v}%`);
+  return h("label", { class: "row gap small", style: "margin:0 0 8px",
+    title: "Start part-way through the plan, to finish a mow that was stopped." },
+    h("span", { class: "muted", style: "white-space:nowrap" }, "Start at"),
+    h("select", { class: "field slim", style: "flex:1;min-width:0", "data-key": "confirm-from",
+      onchange: (e) => pickStartPoint(c, Number(e.target.value)) },
+      startPoints(left && left.pct, s.pct).map((v) =>
+        h("option", { value: v, selected: v === s.pct || null }, text(v)))));
 }
 
 function refreshLive() {
