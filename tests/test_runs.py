@@ -609,6 +609,33 @@ def test_a_resume_that_would_fail_its_checks_is_not_sent(tmp_path, monkeypatch):
     assert sum("not resuming yet" in m[0] for m in o.notifier.msgs) == 1
 
 
+@pytest.mark.parametrize("after_min, window", [(30, 30), (5, 10)])
+def test_the_guards_resume_is_checked_over_the_longer_of_its_delay_and_the_start_window(tmp_path, monkeypatch,
+                                                                                        after_min, window):
+    """The window is the panel's own (Ops.yard_window), in force only around the guard's preview and send; the
+    command's args carry nothing, as a request's could."""
+    o, clock = _ops(tmp_path, monkeypatch, {**RESUME_ON, "guard_resume_after_min": after_min})
+    seen, preview, send = [], o.controller.preview, o.controller.send
+
+    async def watched_preview(cmd, args, actor="user"):
+        seen.append((cmd, actor, args, o.yard_window(control.gates(o.store))))
+        return await preview(cmd, args, actor)
+
+    async def watched_send(cmd, args=None, actor="user", override=False, wait=True):
+        seen.append((cmd, actor, args, o.yard_window(control.gates(o.store))))
+        return await send(cmd, args, actor, override, wait)
+
+    o.controller.preview, o.controller.send = watched_preview, watched_send
+    o.yard["person"] = True
+    _tick(o, clock, n=3)
+    o.yard["person"] = False
+    _tick(o, clock, secs=60, n=after_min + 2)
+    assert o.controller.sent == ["pause", "resume"]
+    assert [s for s in seen if s[0] == "resume"] == [("resume", "guard", {}, window)] * 2   # the preview, then the send
+    assert all(s[3] == 10 for s in seen if s[0] != "resume")                                # the pause: no guard window
+    assert o.yard_window(control.gates(o.store)) == 10                                      # and none left behind
+
+
 # -- stuck detection and the live track ------------------------------------------------------------------------
 def test_working_without_getting_anywhere_counts_as_stalled(tmp_path):
     """2026-10-05 10:07-10:19: 'mowing', wheels at 0, position frozen, stuck flag 0."""

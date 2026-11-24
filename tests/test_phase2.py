@@ -558,6 +558,63 @@ def test_ops_wires_the_start_and_the_writer_to_each_other(tmp_path, monkeypatch)
     assert run(held()) is True and o.controller.writing() is False
 
 
+def _yard_ops(tmp_path, monkeypatch, left_min_ago):
+    """The real Ops, Controller and Frigate client over FakeHTTP: one person on a yard camera who has since left."""
+    import json
+    import time
+    from tests.fakehttp import FakeHTTP, FakeResponse
+    o = _ops(tmp_path, monkeypatch)
+    left = time.time() - left_min_ago * 60
+    events = [{"id": "e1", "camera": "back", "label": "person", "start_time": left - 30, "end_time": left}]
+
+    def answer(url, params, headers):
+        hit = [] if params.get("in_progress") else [e for e in events if e["start_time"] > float(params["after"])]
+        return FakeResponse(200, json.dumps(hit).encode(), "application/json")
+
+    http = FakeHTTP(answer)
+    o.frigate.url, o.frigate.enabled, o.frigate.http = "http://192.0.2.10:5000", True, http
+    o.store.set_setting("yard_cameras", ["back"])
+    return o, http
+
+
+def _yard_check(preview):
+    return next(c for c in preview["checks"] if c["name"] == "Yard clear (Frigate)")
+
+
+def _asked_min(http):
+    """How many minutes back the last yard lookup asked Frigate for."""
+    import time
+    recent = [c["params"] for c in http.calls if not c["params"].get("in_progress")]
+    return (time.time() - recent[-1]["after"]) / 60
+
+
+@pytest.mark.parametrize("asked", [0.01, -5, "0.01"])
+@pytest.mark.parametrize("actor", ["token", "user"])
+def test_a_request_cannot_shorten_the_yard_clear_window(tmp_path, monkeypatch, asked, actor):
+    """A command's args come from the request. `yard_minutes` among them once set how far back the yard check
+    looked, so a start could be asked for seconds after a person left the cameras."""
+    o, http = _yard_ops(tmp_path, monkeypatch, left_min_ago=2)                  # inside the default 10 minutes
+    for cmd, args in (("start_plan", {"plan_id": 1}), ("resume", {})):
+        if cmd == "resume" and actor == "user":
+            continue                                                            # a person's resume has no yard check
+        yard = _yard_check(run(o.controller.preview(cmd, {**args, "yard_minutes": asked}, actor=actor)))
+        assert yard["ok"] is False and yard["hard"] and "person on back" in yard["detail"]
+        assert _asked_min(http) == pytest.approx(10, abs=0.1)
+
+
+def test_the_guards_own_resume_still_looks_back_the_longer_window(tmp_path, monkeypatch):
+    o, http = _yard_ops(tmp_path, monkeypatch, left_min_ago=20)
+    o.store.set_setting("gates", {"guard_resume_after_min": 30})                # longer than the start's 10 minutes
+    yard = _yard_check(run(o._resume_as_guard(control.gates(o.store))))
+    assert yard["ok"] is False and "person on back" in yard["detail"] and _asked_min(http) == pytest.approx(30, abs=0.1)
+    # ...and only the guard's: the next start is back to the window in Settings
+    yard = _yard_check(run(o.controller.preview("start_plan", {"plan_id": 1}, actor="token")))
+    assert yard["ok"] is True and _asked_min(http) == pytest.approx(10, abs=0.1)
+    o.store.set_setting("gates", {"guard_resume_after_min": 5})                 # shorter: the start's window holds
+    run(o._resume_as_guard(control.gates(o.store)))
+    assert _asked_min(http) == pytest.approx(10, abs=0.1)
+
+
 def test_the_writer_asks_the_plan_state_again_before_it_sends(tmp_path, monkeypatch):
     """Map Studio apply and backup restore read for many seconds after their gates: a plan shown by then stops them."""
     from app import mapwrite

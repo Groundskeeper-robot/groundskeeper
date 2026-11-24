@@ -5,6 +5,15 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ## Unreleased
 
+### Security
+
+- **A command can no longer shorten the yard check's look-back.** A start or resume sent to `POST /api/control/send`
+  (or `/api/control/preview`) with `yard_minutes` in its `args` had "Yard clear (Frigate)" look back that long
+  instead of the minutes set in Settings → Run rules, so a program with an API token could start the robot moments
+  after a person or pet left the yard cameras. Something on camera at that moment was still seen. The window now
+  comes only from Settings; the guard's own resume keeps its longer one, held on the server. Starts from the panel,
+  the scheduler and an AI assistant never sent `yard_minutes` and work as before.
+
 ## 0.20.3 — 2026-11-23
 
 ### Security
