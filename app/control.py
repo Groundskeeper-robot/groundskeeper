@@ -23,6 +23,8 @@ from . import why
 log = logging.getLogger(__name__)
 
 CATALOGUE = {
+    # Optional start_percent (a whole number, 1 to START_PERCENT_MAX): start part-way through the plan, as the SDK's
+    # start_plan(start_percent) does (docs/dev/protocol.md, Run commands). Absent or 0 = from the beginning.
     "start_plan": {"label": "Start plan", "args": ("plan_id",)},
     "pause": {"label": "Pause", "args": ()},
     "resume": {"label": "Resume", "args": ()},
@@ -71,6 +73,7 @@ STRICT_ACTORS = ("mcp", "token")    # an AI assistant, or a program with an API 
 ONLINE_S = 120                      # a report older than this no longer says what the robot is doing ("Robot online")
 SNOW_BLOWER = 1                     # HeadMsg.head_type of the only head that relaxes a mowing rule (ADR 0009)
 NOT_FOR_SNOW = "not for the snow blower"
+START_PERCENT_MAX = 99              # a start point is 1..99 % of the plan; 100 would be a start with nothing left
 
 
 def snow_blower(head_type, snapshot_age_s) -> bool:
@@ -106,7 +109,13 @@ CONFIRM = {
 
 def payload_for(cmd: str, args: dict) -> dict:
     if cmd == "start_plan":
-        return {"id": int(args["plan_id"])}
+        # As the SDK builds it: "percent" only for a start part-way through, never a 0. The Start point check has
+        # refused a bad one before this; should a caller ever skip it, nothing is built (never a start from the
+        # beginning that nobody asked for).
+        pct = start_percent_of(args)
+        if pct is None:
+            raise Refused("Start point: not a whole number in range")
+        return {"id": int(args["plan_id"]), **({"percent": pct} if pct else {})}
     if cmd == "cmd_recharge":
         return {"cmd": 2}  # the firmware requires cmd=2 (official SDK)
     if cmd in ("smart_vision_control", KEEP_AWAKE):
@@ -193,6 +202,13 @@ def check(cmd: str, args: dict, ctx: dict, cfg: dict, actor: str) -> list[dict]:
     plan_ids = {p.get("id") for p in ctx["plans"]}
     pid = plan_id_of(args)
     add("Plan exists", pid is not None and pid in plan_ids, f"plan {args.get('plan_id')}")
+    if args.get("start_percent") is not None:
+        # Listed only when a start point was asked for. Anything but a whole number in range is refused, never
+        # rounded or clamped into one: the robot would start somewhere nobody chose.
+        pct = start_percent_of(args)
+        add("Start point", pct is not None,
+            "from the beginning" if pct == 0 else f"from {pct}% of the plan" if pct
+            else f"{repr(args['start_percent'])[:40]} refused: a whole number from 0 to {START_PERCENT_MAX}")
     add("No active error", not ctx["error_code"], f"error code {ctx['error_code'] or 'none'}")
     batt = ctx["battery"]
     add("Battery", batt is not None and batt >= cfg["min_battery_pct"],
@@ -246,6 +262,17 @@ def plan_id_of(args: dict) -> int | None:
         return int(v)
     except (TypeError, ValueError):
         return None
+
+
+def start_percent_of(args: dict) -> int | None:
+    """Where in the plan a start begins: 0 (absent: from the beginning) or a whole number up to START_PERCENT_MAX.
+    None = not a valid start point (a boolean, a string, a fraction, out of range); the Start point check refuses it."""
+    v = args.get("start_percent")
+    if v is None:
+        return 0
+    if type(v) is not int or not 0 <= v <= START_PERCENT_MAX:
+        return None
+    return v
 
 
 def verdict(checks: list[dict], override: bool) -> tuple[bool, str]:

@@ -347,7 +347,9 @@ and blade load. Wheel slip confounds wet grass with slope and turning; without a
 
 ### 10.1 Catalogue
 The source of truth for official commands is the SDK's `devices/yarbo_Y.json` → `control_topics`. The panel exposes
-exactly five run commands: `start_plan`, `pause`, `resume`, `stop`, `cmd_recharge` (return to dock), plus
+exactly five run commands: `start_plan` (with the SDK's optional start point, `percent` 1 to 99, checked as **Start
+point**: a whole number in range or the start is refused), `pause`, `resume`, `stop`, `cmd_recharge` (return to
+dock), plus
 `smart_vision_control {"state":1}` (cameras on) and `set_working_state {"state":1}` (keep-awake), both people only,
 cloud only and never off (§13). Everything else is refused, and **`cmd_vel` (manual drive) is hard-blocked for every
 actor**.
@@ -368,7 +370,9 @@ Every request passes, in order: the catalogue, the master switch (`control_enabl
 interlocks for that command.
 
 - **All commands:** the robot is online (data under 2 minutes old) and the cloud is connected.
-- **Start plan:** the plan exists; no active error; battery ≥ the start threshold; not already running; presence
+- **Start plan:** the plan exists; a start point, when one is asked for, is a whole number from 0 to 99 (nothing is
+  rounded or clamped into one; [ADR 0012](decisions/0012-start-part-way-through-a-plan.md)); no active error;
+  battery ≥ the start threshold; not already running; presence
   rule; Conditions gate; yard clear; phone app not active (§5.5). For a start or resume requested by an AI
   assistant, a check that cannot tell (camera, weather or Home Assistant down) counts as failed.
 - **RTK is not a panel-side gate.** The robot enforces its own RTK precondition; the panel sends the command and

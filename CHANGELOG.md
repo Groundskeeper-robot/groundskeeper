@@ -5,6 +5,21 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ## Unreleased
 
+### Added
+
+- **Start a plan part-way through**: the start confirmation on Live has **Start at**, to finish a mow that was stopped
+  (Stop and Return to dock end the plan, so Resume no longer applies). It offers the beginning, every 5% and, when the
+  newest run was that plan and ended early, how far the robot said it got. The start point goes to the robot the way
+  Yarbo's SDK sends it and faces every start check plus one of its own (a whole number from 0 to 99). Scheduled starts
+  and the AI assistant's command tool still start at the beginning; a program with an API token can ask for a start
+  point through `POST /api/control/send` (`args.start_percent`), under the same strict checks as any start it asks for.
+
+### Fixed
+
+- **The start confirmation names the plan it sends.** After another plan was picked on Live, a click on Start before
+  the page had redrawn opened "Start" with the old plan's name while the new plan was the one sent. The plan is now
+  read once, at the click, for both.
+
 ## 0.20.3 — 2026-11-23
 
 ### Security

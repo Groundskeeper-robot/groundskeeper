@@ -28,7 +28,9 @@ Each one is checked, in order:
 2. Control is on.
 3. The robot is online (data under 2 minutes old) and the panel can reach it through the Yarbo cloud.
 4. For a start, also: the plan exists, no active error, enough battery, not already running, the yard is clear on
-   the cameras, the phone app is not driving it, the lawn is dry, and someone is home.
+   the cameras, the phone app is not driving it, the lawn is dry, and someone is home. A start part-way through the
+   plan (**Start at** in the start confirmation) faces the same checks, plus one: the start point is a whole number
+   from 0 to 99, or the start is refused.
 5. For a start or a resume: no map, settings or Wi-Fi change is being written to the robot (a Wi-Fi join can take
    a minute). Pause, stop and return to dock never wait.
 

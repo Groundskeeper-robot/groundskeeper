@@ -13,6 +13,9 @@ Short answers. Each links to the page with more.
   works and amber when it is held mid-plan. See [Live](#help/live).
 - **Start, pause or send it home from the panel?** Switch control on in [Settings → Safety](#settings/safety) (you
   type ENABLE), then use the Control card on Live. See [Safety](#help/safety).
+- **Finish a mow that was stopped?** A paused plan has **Resume**. Stop and Return to dock end the plan, so start it
+  again from Live's Control card and pick **Start at** in the confirmation, which offers how far the last run got.
+  See [Live](#help/live).
 - **Check whether it would start right now, without starting it?** The "Ready to start" line on Live and Schedule
   runs every check and sends nothing.
 - **Mow on a schedule?** [Schedule](#schedule): add a window (days, times, plan). The panel asks you to confirm each
