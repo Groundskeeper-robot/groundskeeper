@@ -128,3 +128,15 @@ def test_a_late_answer_for_an_earlier_start_point_is_dropped():
     assert r["afterRace"]["args"] == {"plan_id": 1, "start_percent": 45}
     assert r["afterRace"]["preview"] == {"for": 45}                    # not the 40% answer that came back last
     assert r["afterClose"] is None                                     # an answer after closing is not taken up
+
+
+@needs_node
+def test_a_start_point_picked_after_send_was_pressed_changes_nothing():
+    r = start_points()["whileSending"]
+    assert r == {"label": "Start Mow All from 40%", "args": {"plan_id": 1, "start_percent": 40},
+                 "preview": {"would_send": True}, "pct": 40, "asked": 4}       # no fifth preview was asked for
+
+
+def test_send_stays_off_once_it_was_pressed():
+    code = (ROOT / "web" / "ops.js").read_text(encoding="utf-8")
+    assert "disabled: !canSend || c.sending || null" in code               # a redraw cannot bring Send back

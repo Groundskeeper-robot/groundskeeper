@@ -371,7 +371,8 @@ interlocks for that command.
 
 - **All commands:** the robot is online (data under 2 minutes old) and the cloud is connected.
 - **Start plan:** the plan exists; a start point, when one is asked for, is a whole number from 0 to 99 (nothing is
-  rounded or clamped into one); no active error; battery ≥ the start threshold; not already running; presence
+  rounded or clamped into one; [ADR 0012](decisions/0012-start-part-way-through-a-plan.md)); no active error;
+  battery ≥ the start threshold; not already running; presence
   rule; Conditions gate; yard clear; phone app not active (§5.5). For a start or resume requested by an AI
   assistant, a check that cannot tell (camera, weather or Home Assistant down) counts as failed.
 - **RTK is not a panel-side gate.** The robot enforces its own RTK precondition; the panel sends the command and

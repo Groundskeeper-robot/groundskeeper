@@ -598,6 +598,7 @@ function startChoice(base, planId, pct) {
 // Another start point picked in the confirmation: the checks are asked again for exactly what Send would now send, and
 // Send is off until they are back. An override ticked for the earlier choice does not carry over.
 function pickStartPoint(c, pct) {
+  if (c.sending) return undefined;      // Send was pressed: what is on its way cannot be changed any more
   c.startAt.pct = pct;
   ({ label: c.label, args: c.args } = startChoice(c.startAt.base, c.startAt.planId, pct));
   c.preview = null; c.error = null; c.override = false;
@@ -672,8 +673,13 @@ function drawConfirm() {
       "Override the soft checks above") : null,
     h("div", { class: "row gap", style: "justify-content:flex-end;margin-top:12px" },
       h("button", { type: "button", class: "btn", onclick: closeConfirm }, c.previewOnly ? "Close" : "Cancel"),
-      c.previewOnly ? null : h("button", { type: "button", class: "btn pri", disabled: !canSend || null, onclick: async (e) => {
-        e.target.disabled = true;
+      // c.sending: once Send is pressed nothing in the dialog can send again or change what is sent. The redraw
+      // (a start point's checks coming back, the override box) would otherwise rebuild Send as enabled while the
+      // first request is still on its way, and a second click would publish a second command.
+      c.previewOnly ? null : h("button", { type: "button", class: "btn pri", disabled: !canSend || c.sending || null,
+        onclick: async () => {
+        c.sending = true;
+        drawConfirm();
         try { reportSend(await postJSON("/api/control/send", { cmd: c.cmd, args: c.args, confirm: true, override: c.override }), c.label); }
         catch (err) { toast(err.message); }
         if (ops.confirm === c) closeConfirm();
@@ -692,6 +698,7 @@ function startAtRow(c) {
     title: "Start part-way through the plan, to finish a mow that was stopped." },
     h("span", { class: "muted", style: "white-space:nowrap" }, "Start at"),
     h("select", { class: "field slim", style: "flex:1;min-width:0", "data-key": "confirm-from",
+      disabled: c.sending || null,
       onchange: (e) => pickStartPoint(c, Number(e.target.value)) },
       startPoints(left && left.pct, s.pct).map((v) =>
         h("option", { value: v, selected: v === s.pct || null }, text(v)))));

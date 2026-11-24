@@ -76,5 +76,11 @@ const out = {
   asked[3].answer({ for: 50 });
   await fourth;
   out.afterClose = c.preview;
+  // Once Send is pressed, another start point is not taken up and no checks are asked for it.
+  const d = sandbox.ops.confirm = { cmd: "start_plan", label: "Start Mow All from 40%", sending: true,
+    args: { plan_id: 1, start_percent: 40 }, preview: { would_send: true }, override: false,
+    startAt: { base: "Start Mow All", planId: 1, pct: 40, leftOff: null } };
+  await sandbox.pickStartPoint(d, 45);
+  out.whileSending = { label: d.label, args: d.args, preview: d.preview, pct: d.startAt.pct, asked: asked.length };
   console.log(JSON.stringify(out));
 })();
