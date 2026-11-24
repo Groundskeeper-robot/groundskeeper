@@ -14,6 +14,12 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   and the AI assistant's command tool still start at the beginning; a program with an API token can ask for a start
   point through `POST /api/control/send` (`args.start_percent`), under the same strict checks as any start it asks for.
 
+### Fixed
+
+- **The start confirmation names the plan it sends.** After another plan was picked on Live, a click on Start before
+  the page had redrawn opened "Start" with the old plan's name while the new plan was the one sent. The plan is now
+  read once, at the click, for both.
+
 ## 0.20.3 — 2026-11-23
 
 ### Security

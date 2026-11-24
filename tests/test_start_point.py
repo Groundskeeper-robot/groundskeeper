@@ -151,3 +151,14 @@ def test_send_stays_off_once_it_was_pressed():
     assert r["after"]["sent"] == {"cmd": "start_plan", "args": {"plan_id": 1, "start_percent": 40}, "confirm": True,
                                   "override": False}
     assert r["refused"] == {"sendOff": True}
+
+
+@needs_node
+def test_the_confirmation_names_the_plan_it_sends_when_start_is_clicked_before_the_redraw():
+    """Live's Control card, drawn into a plain tree: another plan is picked and Start is clicked on the old card."""
+    out = subprocess.run([shutil.which("node"), str(ROOT / "tests" / "start_plan_flow.cjs")],
+                         capture_output=True, encoding="utf-8", timeout=60, check=True).stdout
+    r = json.loads(out)
+    assert r["sameDraw"] == ["start_plan", "Start Mow All", {"plan_id": 1}]
+    assert r["afterPick"] == ["start_plan", "Start Mow Side", {"plan_id": 2}]     # not "Start Mow All" with plan 2
+    assert r["planGone"] == ["start_plan", "Start plan", {"plan_id": 2}]          # unnamed; the server refuses it

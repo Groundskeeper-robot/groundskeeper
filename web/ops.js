@@ -499,8 +499,13 @@ function controlCard(s) {
   // Live re-renders on every status event, so the picked plan lives in ops.planId, not in the <select>.
   if (!plans.some((p) => p.id === ops.planId)) ops.planId = plans[0]?.id ?? null;
   const plan = plans.find((p) => p.id === ops.planId);
-  const startArgs = () => ({ plan_id: ops.planId });
-  const startLabel = plan ? `Start ${plan.name}` : "Start plan";
+  // The plan is read once, at the click, for both the confirmation's name and what is sent. This draw's `plan` can be
+  // a moment old: after another plan is picked, the redraw waits on the cameras, and a click in between used to open
+  // "Start <the old plan>" while sending the new one.
+  const startPicked = () => {
+    const p = (state.plansCache || []).find((x) => x.id === ops.planId);
+    openConfirm("start_plan", p ? `Start ${p.name}` : "Start plan", { plan_id: ops.planId });
+  };
   const disabled = !on || !routeOk(o);
   const why = !on ? ["Control is switched off. ", h("a", { href: "#settings/safety" }, "Switch it on in Settings"), "."]
             : !routeOk(o) ? noRouteWhy(o) : null;
@@ -545,7 +550,7 @@ function controlCard(s) {
     h("div", { class: "ctlgrid" },
       h("button", { type: "button", class: "btn pri wide", "data-key": "ctl-start_plan",
         disabled: disabled || !plan || !!idle.start_plan || null, title: idle.start_plan || null,
-        onclick: () => openConfirm("start_plan", startLabel, startArgs()) }, plan ? `Start ${plan.name}…` : "Start plan…"),
+        onclick: startPicked }, plan ? `Start ${plan.name}…` : "Start plan…"),
       btn("pause", "Pause"), btn("resume", "Resume"), btn("stop", "Stop"), btn("cmd_recharge", "Return to dock")),
     whyLine ? h("p", { class: "whyline muted tiny", style: "margin-top:6px" }, whyLine) : null);
 }
