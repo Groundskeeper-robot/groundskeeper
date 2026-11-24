@@ -23,6 +23,8 @@ CHECKS = {
                            "#settings/robot"),
     "Plan exists": ("plan_missing", "That plan is not on the robot",
                     "Pick another plan, or make it again in the Yarbo app", "#help/not-yet"),
+    "Start point": ("start_point", "That start point is not valid",
+                    "Pick a whole number from 0 to 99 percent of the plan", "#help/live"),
     "No active error": ("robot_error", "The robot has an active error",
                         "Clear the error on the robot or in the Yarbo app", "#health"),
     "Battery": ("battery", "The battery is too low", "Let it charge on the dock", "#settings/rules"),

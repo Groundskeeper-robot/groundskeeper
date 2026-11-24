@@ -327,14 +327,16 @@ own resolution (at most 4096 px a side), and keeps it.
 - **Commands:** only `app.control.Controller.send()` sends run commands, through the link, each once. It is
   called by `POST /api/control/send` (which requires `confirm: true`) and by a confirmed or auto-start schedule
   window. Every call goes through, in order:
-  1. **Catalogue:** `start_plan {"id": N}`, `pause {}`, `resume {}`, `stop {}`, `cmd_recharge {"cmd": 2}` (the
+  1. **Catalogue:** `start_plan {"id": N}` (or `{"id": N, "percent": 1–99}` for a start part-way through),
+     `pause {}`, `resume {}`, `stop {}`, `cmd_recharge {"cmd": 2}` (the
      official SDK payloads), `smart_vision_control {"state": 1}` (cameras on) and `set_working_state {"state": 1}`
      (keep-awake for the Cameras tile): both people only, cloud only, never off. Anything else is refused.
      **`cmd_vel` (manual drive) is blocked for good.**
   2. **Master switch** `control_enabled`, **off by default**. Switching it on in Settings → Safety needs typing ENABLE and is
      logged as an event.
   3. **Interlocks.** Every command needs the robot online (snapshot under 2 min old) and the cloud connected.
-     `start_plan` also needs: the plan exists, no active error, battery at or above the minimum, not already
+     `start_plan` also needs: the plan exists, a valid start point when one is asked for (a whole number from 0 to
+     99), no active error, battery at or above the minimum, not already
      running, the yard clear on Frigate, the phone app not driving it, a dry lawn, and someone home. Hard checks can
      never be overridden. Unknown Frigate or phone-app state does not block; unknown presence blocks only the
      scheduler. A wet lawn is a soft check a person can override, and a hard one for the scheduler.

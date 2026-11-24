@@ -28,6 +28,14 @@ pass=JWT`. Legacy broker: `user=JWT, pass=""`. Hosts come from the unauthenticat
 detection, obstacle handling, wireless charging and the read requests. **It has no map, plan or schedule writes and
 no manual drive.** Those are learned by watching the official app on `snowbot/{SN}/app/#`.
 
+**Run command payloads** (the SDK's `modules.py`): `start_plan {"id": <plan id>}`, and
+`start_plan {"id": <plan id>, "percent": <whole number>}` to start part-way through the plan
+(`start_plan(plan_id, start_percent)`; the SDK adds `percent` only when it is above 0). A capture of the official app
+showed `percent` on its `start_plan` too, equal to the one in the `preview_plan_path` just before. The panel sends
+`percent` 1 to 99 only (`control.START_PERCENT_MAX`). **Not yet shown on a robot from the panel:** how the robot
+measures the percent (area or route length) and what it reports as plan progress after such a start.
+`cmd_recharge {"cmd": 2}`; `pause`, `resume` and `stop` take `{}`.
+
 ## Message format
 
 - **Requests:** `snowbot/{SN}/app/{cmd}`, payload `zlib.compress(json.dumps({...}))`.
