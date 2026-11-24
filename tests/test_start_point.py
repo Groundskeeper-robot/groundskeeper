@@ -137,6 +137,17 @@ def test_a_start_point_picked_after_send_was_pressed_changes_nothing():
                  "preview": {"would_send": True}, "pct": 40, "asked": 4}       # no fifth preview was asked for
 
 
+@needs_node
 def test_send_stays_off_once_it_was_pressed():
-    code = (ROOT / "web" / "ops.js").read_text(encoding="utf-8")
-    assert "disabled: !canSend || c.sending || null" in code               # a redraw cannot bring Send back
+    """The real dialog, drawn into a plain tree: Send is pressed, its request left pending, the dialog drawn again."""
+    out = subprocess.run([shutil.which("node"), str(ROOT / "tests" / "start_send_flow.cjs")],
+                         capture_output=True, encoding="utf-8", timeout=60, check=True).stdout
+    r = json.loads(out)
+    assert r["before"] == {"sendOff": False, "listOff": False}
+    assert r["pressed"] == {"sendOff": True, "listOff": True, "sends": 1}
+    assert r["redrawn"] == {"sendOff": True, "listOff": True}          # a redraw does not bring Send back
+    assert r["pickedLate"] == {"args": {"plan_id": 1, "start_percent": 40}, "sendOff": True, "previews": 0}
+    assert r["after"]["sends"] == 1 and r["after"]["closed"] == 1
+    assert r["after"]["sent"] == {"cmd": "start_plan", "args": {"plan_id": 1, "start_percent": 40}, "confirm": True,
+                                  "override": False}
+    assert r["refused"] == {"sendOff": True}
