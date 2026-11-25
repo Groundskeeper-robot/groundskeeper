@@ -19,6 +19,13 @@ def test_version_is_semver_and_in_the_changelog():
     assert version_info()["version"] == __version__
 
 
+def test_the_changelog_opens_with_an_unreleased_section():
+    """A release renames ## Unreleased and starts a new empty one above it (CONTRIBUTING.md), so the next change
+    has a place to go and is never filed under a version already out."""
+    headings = re.findall(r"^## .*$", help_mod.CHANGELOG.read_text(encoding="utf-8"), flags=re.M)
+    assert headings[0] == "## Unreleased", f"CHANGELOG.md starts at {headings[0]!r}: add an empty ## Unreleased"
+
+
 def test_index_lists_every_page_and_the_changelog_last():
     idx = asyncio.run(main.help_index())
     ids = [p["id"] for p in idx["pages"]]
