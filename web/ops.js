@@ -525,7 +525,11 @@ function controlCard(s) {
   const act = s.activity, known = stateKnown(s);
   const running = !!s.run || !["docked", "idle"].includes(act);
   // A missing route is said once: by the start checks under Start when they are shown, else here.
-  const checksShown = (!known || !running) && !patchUI.view?.patch && plans.length;
+  // Only when those checks, as last asked (they are cached for 30 s), already show a refusal: a pass from before the
+  // route dropped would leave Start off with nothing saying why.
+  const shownChecks = plan ? ready.cache.get(String(plan.id))?.r : null;
+  const checksShown = (!known || !running) && !patchUI.view?.patch && plans.length && shownChecks
+    && !shownChecks.would_send;
   const why = !on ? ["Control is switched off. ", h("a", { href: "#settings/safety" }, "Switch it on in Settings"), "."]
             : !routeOk(o) && !checksShown ? noRouteWhy(o) : null;
   const no = (ok, text) => (known && !ok ? text : null);

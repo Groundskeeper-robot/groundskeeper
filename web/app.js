@@ -1427,7 +1427,10 @@ async function series(metric, hours, weather = false) {
 let conditionsCache = { at: 0, data: null };
 async function conditionsCard() {
   if (Date.now() - conditionsCache.at > 30000) {
-    try { conditionsCache = { ...conditionsCache, at: Date.now(), data: await getJSON("/api/conditions") }; } catch { /* keep */ }
+    try {
+      const data = await getJSON("/api/conditions");
+      conditionsCache = { ...conditionsCache, at: Date.now(), data };   // read after the wait: a toggle meanwhile stays
+    } catch { /* keep */ }
   }
   const c = conditionsCache.data;
   if (!c || !c.state) {
