@@ -249,13 +249,30 @@ Write rules that follow from the robot's behaviour (details in [`map-writes.md`]
   refers to, are changed as "add the new one, then delete the old one".
 - **The robot reuses freed ids.** History keyed by id alone can mistake a new feature for a deleted one.
 - Adding or deleting an area changes ids and drops the plans and settings tied to it, so the panel does not offer
-  it.
+  it. The one exception is a patch (§7.4.1).
 - Sidewalks and fences have no captured write commands; edits to them stay in the draft.
 - Robot backups hold a second copy of every pathway and sidewalk (fresh ids), so they are de-duplicated before any
   comparison with the live map.
 - A whole-map restore (`map_recovery`) deletes every plan and resets area settings. The panel refuses to restore
   unless it can first read all of that, keeps it locally, waits for the map to match, then puts settings back on
   same-id areas and recreates the plans.
+
+#### 7.4.1 A patch: one temporary area (ADR 0013)
+Live's Control card can mow one rectangle inside an area once (`app/patch.py`). The panel adds an area of its own
+(`save_clean_area` without an id, the surrounding area's `ref`), copies the surrounding area's settings with
+`edge_circles` 0, `buffer_dis` 0 and one pass (`current_index` 0, `clean_times` 1, both pass angles the same), and adds a plan holding only it. The line direction and position come from the
+newest recorded run with stripes over the patch, else from the surrounding area's route preview. The robot measures
+`route_angle` from the outline's long side, so the rectangle is laid along the lines with angle 0 (90 when it is
+wider than long); the patch's own preview is then checked, and the outline moved across the lines (under one gap)
+until they match within 3 cm; the moved outline must still pass the placement checks. The plan can be started
+only from the patch's own Start (`control.PATCH_START`), never from the plan picker, a token, MCP, Home Assistant or
+the scheduler, and only while the robot still lists it with the patch's name and area. The state is stored before the first command. Once the robot is on its charger with no
+plan, two minutes after the start (or 30 minutes after set-up without a start), the plan is deleted and then the area, each
+only if it still carries the patch's name and was not on the robot before (ids are reused), and each read back as
+gone; the area stays while any plan uses it, and anything left keeps the patch tracked as stuck. Then the areas, plans and pathway links are compared with the
+copy taken before (also after the add and after the shift, against the robot's read-back). A difference keeps the
+patch tracked as stuck until a person checks again or accepts the map (`DELETE /api/patch?accept=true`). Any failure
+after the first command removes what was added. Removal runs in its own loop, never inside the guard loop.
 
 ### 7.5 Tidy tools
 Clean up, Straighten, Round, Smooth and Square work on a feature's own points and obey the same rules

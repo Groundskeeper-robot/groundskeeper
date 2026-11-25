@@ -205,7 +205,7 @@ def area_params(aid: int) -> dict:
             "contract_dis": 0.0254, "current_blade_height": 25, "current_index": 0,
             "double_clean_params": {**clean, "route_angle": (angle + 90) % 180}, "edge_area_first": True,
             "edge_bypass_sw": True, "edge_circles": 1, "edge_direction_mode": 0, "en_trimmer": False,
-            "enable_clean_times_dis": False, "enable_explore": False, "first_clean_params": clean, "gap": 0.3,
+            "enable_clean_times_dis": False, "enable_explore": False, "first_clean_params": clean, "gap": SPACING,
             "id": aid, "m1pro_sensor_switch": 139, "move2area_max_offset": 2.0, "move2area_offset_count": {},
             "move2area_offset_enable": True, "move2area_step_offset": 0.1, "mower_ngz_edge_sw": True,
             "mower_target_height_count": 5, "ngz_expand_dis": 0.102, "parallel_angle_max": 90,

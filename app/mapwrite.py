@@ -65,6 +65,7 @@ WRITE_COMMANDS = frozenset({*SAVE.values(), *DELETE.values(), "save_mower_pathwa
                             DEADEND_PARAMS_SAVE,
                             NOVIS_SAVE, NOVIS_DELETE, PLAN_SAVE, PLAN_DELETE,
                             AREA_SAVE, BACKUP_CMD, "get_all_map_backup",
+                            "del_clean_area",                  # only for a patch the panel added (app/patch.py)
                             "del_map_backup", "map_recovery", "save_mower_area_params", "rename_map_backup",   # backups.py
                             "change_to_wifi", "forget_wifi"})                                                  # network.py
 # Backup bookkeeping: allowed during a plan (nothing the robot drives by changes); every other write needs it idle.
