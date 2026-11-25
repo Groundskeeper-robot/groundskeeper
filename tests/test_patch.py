@@ -851,3 +851,34 @@ def test_corners_must_be_lon_lat_pairs(tmp_path, bad):
     _, _, p, _, _ = setup(tmp_path)
     with pytest.raises(ValueError):
         asyncio.run(p.check_corners(bad, lonlat(12.0, 13.0)))
+
+
+def _lines_that_turn(p, angles):
+    """target() answering with the given line angles in turn (then the last one), the rest of its answer kept."""
+    real, seen = p.target, []
+
+    async def turning(*a, **k):
+        got = await real(*a, **k)
+        ang = angles[min(len(seen), len(angles) - 1)]
+        seen.append(ang)
+        return {**got, "angle": ang} if got else got
+    p.target = turning
+    return seen
+
+
+def test_lines_that_differ_around_the_final_rectangle_rebuild_it_from_the_taps(tmp_path):
+    _, _, p, _, _ = setup(tmp_path)
+    seen = _lines_that_turn(p, [30.0, 120.0])                   # the taps' lines, then other lines around the result
+    a, b = (9.0, 11.0), (12.7, 16.6)
+    r = asyncio.run(p.check_corners(lonlat(*a), lonlat(*b)))
+    assert r["ok"] and r["target"]["angle"] == 120.0 and seen[:3] == [30.0, 120.0, 120.0]
+    want = patch.span(a, b, 120.0)                              # built along the lines set-up will use
+    assert _frame([_local(c) for c in r["corners"]], 120.0) == pytest.approx(
+        (want[1] - want[0], want[3] - want[2]), abs=0.02)
+
+
+def test_lines_that_never_agree_are_refused(tmp_path):
+    _, _, p, _, _ = setup(tmp_path)
+    _lines_that_turn(p, [30.0, 120.0, 30.0, 120.0, 30.0, 120.0, 30.0])
+    r = asyncio.run(p.check_corners(lonlat(9.0, 11.0), lonlat(12.7, 16.6)))
+    assert not r["ok"] and "run two ways" in r["problems"][0]

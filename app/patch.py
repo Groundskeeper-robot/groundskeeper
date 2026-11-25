@@ -549,29 +549,41 @@ class PatchMower:
         tgt = await self.target(parent, mid, half + 1.0, gap, gps_ref) if gap > 0 else None
         if tgt is None:
             return {"ok": False, "area": named, "problems": ["no mowing lines to line up with here yet"]}
-        asked = span(pts[0], pts[1], tgt["angle"])
-        notes = []
-        for lo, hi in ((0, 1), (2, 3)):                          # grown to the smallest patch around its middle
-            if asked[hi] - asked[lo] < MIN_SIDE_M:
-                mid_s = (asked[lo] + asked[hi]) / 2
-                asked[lo], asked[hi] = mid_s - MIN_SIDE_M / 2, mid_s + MIN_SIDE_M / 2
-                notes.append(f"made {MIN_SIDE_M:g} m, the smallest a patch can be")
-        _, length, width = span_rect(asked, tgt["angle"])
-        if length > MAX_SIDE_M or width > MAX_SIDE_M:
-            return {"ok": False, "area": named, "problems": [f"at most {MAX_SIDE_M:.0f} m each way"]}
-        ring_parent = mapstudio.local(parent, gps_ref)
-        final = trim(asked, tgt["angle"], ring_parent, EDGE_CLEAR_M + TRIM_STEP_M)   # a step to spare for set-up
-        if final is None:
+        # Built along the lines found around the taps, then checked as set-up will check it: around the final
+        # rectangle. Where two mows' stripes meet, those can be different lines; then it is built again from the taps
+        # along the lines the check found, until both agree, so what is drawn is what set-up adds.
+        for _ in range(3):
+            asked = span(pts[0], pts[1], tgt["angle"])
+            notes = []
+            for lo, hi in ((0, 1), (2, 3)):                          # grown to the smallest patch around its middle
+                if asked[hi] - asked[lo] < MIN_SIDE_M:
+                    mid_s = (asked[lo] + asked[hi]) / 2
+                    asked[lo], asked[hi] = mid_s - MIN_SIDE_M / 2, mid_s + MIN_SIDE_M / 2
+                    notes.append(f"made {MIN_SIDE_M:g} m, the smallest a patch can be")
+            _, length, width = span_rect(asked, tgt["angle"])
+            if length > MAX_SIDE_M or width > MAX_SIDE_M:
+                return {"ok": False, "area": named, "problems": [f"at most {MAX_SIDE_M:.0f} m each way"]}
+            ring_parent = mapstudio.local(parent, gps_ref)
+            final = trim(asked, tgt["angle"], ring_parent, EDGE_CLEAR_M + TRIM_STEP_M)   # a step to spare for set-up
+            if final is None:
+                return {"ok": False, "area": named, "problems": [
+                    f"too little of it is inside “{parent.get('name') or parent['id']}” to mow"],
+                    "requested": [geo.to_lonlat(gps_ref, x, y) for x, y in rectangle(*span_rect(asked, tgt["angle"]),
+                                                                                      tgt["angle"])]}
+            center, length, width = span_rect(final, tgt["angle"])
+            length, width = round(length, 2), round(width, 2)
+            trimmed = final != asked
+            if trimmed:
+                notes.append(f"trimmed to {length:g} × {width:g} m to stay inside "
+                             f"“{parent.get('name') or parent['id']}”")
+            out = await self.check(*geo.to_lonlat(gps_ref, *center), length, width, raw)
+            got = out.get("target")
+            if not got or abs(_wrap_deg(got["angle"] - tgt["angle"])) <= ANGLE_TOL_DEG:
+                break
+            tgt = got
+        else:
             return {"ok": False, "area": named, "problems": [
-                f"too little of it is inside “{parent.get('name') or parent['id']}” to mow"],
-                "requested": [geo.to_lonlat(gps_ref, x, y) for x, y in rectangle(*span_rect(asked, tgt["angle"]),
-                                                                                  tgt["angle"])]}
-        center, length, width = span_rect(final, tgt["angle"])
-        length, width = round(length, 2), round(width, 2)
-        trimmed = final != asked
-        if trimmed:
-            notes.append(f"trimmed to {length:g} × {width:g} m to stay inside “{parent.get('name') or parent['id']}”")
-        out = await self.check(*geo.to_lonlat(gps_ref, *center), length, width, raw)
+                "the stripes here run two ways: tap a little further into one mow's stripes"]}
         u, n = axes(tgt["angle"])
         su = 1 if (pts[0][0] - center[0]) * u[0] + (pts[0][1] - center[1]) * u[1] >= 0 else -1
         sn = 1 if (pts[0][0] - center[0]) * n[0] + (pts[0][1] - center[1]) * n[1] >= 0 else -1
