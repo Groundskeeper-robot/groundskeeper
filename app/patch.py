@@ -18,6 +18,7 @@ the surrounding area's own frame (its `ref`), which the patch shares.
 State lives in the setting `patch_mow` and is written BEFORE the first command, so a restart mid-way still removes
 what was added. The robot reuses freed ids: nothing is deleted unless it has the patch's name and was not on the robot before the
 patch; the plan goes first, the area only once the plan is gone, and anything left keeps the state for another try."""
+import asyncio
 import copy
 import math
 import time
@@ -155,6 +156,15 @@ def lines(segs, gap: float) -> dict | None:
             "coherence": round(math.hypot(sx, cx) / metres, 3)}
 
 
+def phase_shift(tgt: dict, got: dict, gap: float) -> float:
+    """How far across the lines `got` must move to sit on `tgt`, both measured along tgt's normal. Two fits of the
+    same direction can come out near 0° and near 180°, whose normals point opposite ways: the phase flips with them."""
+    gp = got["phase"]
+    if abs((got["angle"] - tgt["angle"] + 180) % 360 - 180) > 90:
+        gp = (-gp) % gap
+    return _wrap_gap(tgt["phase"] - gp, gap)
+
+
 def _near(segs, center, radius: float) -> list:
     return [s for s in segs if math.hypot(s[0] - center[0], s[1] - center[1]) <= radius]
 
@@ -242,11 +252,29 @@ def patch_settings(parent_read: dict, new_id: int, route_angle: int) -> dict:
     return out
 
 
+def settings_changed(read: dict, st: dict) -> list[str]:
+    """The settings that make the patch's route, as the set-up left them, that read differently now."""
+    angle = (st.get("settings") or {}).get("route_angle")
+    want = {"clean_times": 1, "current_index": 0, "edge_circles": 0, "gap": st["target"]["gap"],
+            "first_clean_params.route_angle": angle}
+    if isinstance(read.get("double_clean_params"), dict):
+        want["double_clean_params.route_angle"] = angle
+    out = []
+    for k, v in want.items():
+        a, *b = k.split(".")
+        have = read.get(a) if not b else (read.get(a) or {}).get(b[0])
+        if v is None or not isinstance(have, (int, float)) or abs(have - v) > 1e-6:
+            out.append(f"{k} {have}")
+    return out
+
+
 def snapshot(raw: dict, plans: list) -> dict:
     """What must look the same after the patch is gone."""
     def pts(a):
         return [[round(p.get("x", 0), 4), round(p.get("y", 0), 4)] for p in a.get("range") or []]
     return {"areas": {str(a.get("id")): pts(a) for a in raw.get("areas") or []},
+            "refs": {str(a.get("id")): [round(v, 9) if isinstance(v, (int, float)) else v
+                                        for v in (geo.ref_of(a, None) or ())] for a in raw.get("areas") or []},
             "plans": sorted([[p.get("id"), sorted(p.get("areaIds") or []), p.get("name")] for p in plans]),
             "links": {str(p.get("id")): [p.get("start_id"), p.get("end_id")] for p in raw.get("pathways") or []}}
 
@@ -274,6 +302,12 @@ def compare(before: dict, after: dict) -> list[str]:
     for k, v in before["links"].items():
         if after["links"].get(k) != v:
             out.append(f"pathway {k}'s links changed {v} → {after['links'].get(k)}")
+    new = sorted(set(after["links"]) - set(before["links"]))
+    if new:
+        out.append(f"new pathways {', '.join(new)}")
+    for k, v in (before.get("refs") or {}).items():
+        if k in (after.get("refs") or {}) and after["refs"][k] != v:
+            out.append(f"area {k}'s reference point changed")
     return out
 
 
@@ -286,6 +320,7 @@ class PatchMower:
         self._runs: dict[int, list] = {}            # run id -> its track's steps in the gps_ref frame
         self._plan_lines: dict[int, tuple] = {}     # area id -> (when, its own route preview's steps)
         self._params: dict[int, tuple] = {}         # area id -> (when, its settings) for the placing checks
+        self._start_lock = asyncio.Lock()
 
     # -- state ---------------------------------------------------------------------------------------------------------
     def state(self) -> dict | None:
@@ -548,7 +583,7 @@ class PatchMower:
         if not got or abs(_wrap_deg(got["angle"] - tgt["angle"])) > ANGLE_TOL_DEG:
             raise RuntimeError(f"the robot's lines for the patch run at {got and got['angle']}°, not "
                                f"{tgt['angle']}°")
-        d = _wrap_gap(tgt["phase"] - got["phase"], gap)
+        d = phase_shift(tgt, got, gap)
         if abs(d) > SHIFT_TOL_M:
             ring = shifted(ring, tgt["angle"], d)
             moved = problems(raw, st["parent"]["id"], ring, gps_ref)      # raw: the map before the patch was added
@@ -566,7 +601,7 @@ class PatchMower:
             st["log"].append(f"moved {d * 100:+.0f} cm onto the lines")
             got, summary = await self._preview(aid, gap, gps_ref)
             if (not got or abs(_wrap_deg(got["angle"] - tgt["angle"])) > ANGLE_TOL_DEG
-                    or abs(_wrap_gap(tgt["phase"] - got["phase"], gap)) > SHIFT_TOL_M):
+                    or abs(phase_shift(tgt, got, gap)) > SHIFT_TOL_M):
                 raise RuntimeError("the patch's lines still do not sit on the last mow's")
         mine = mapstudio.find(await self.writer.read_map(), "areas", aid)
         if mine is None or not _range_matches(mine, [tuple(p) for p in st["ring"]], gps_ref):
@@ -589,9 +624,15 @@ class PatchMower:
 
     async def start(self, override: bool = False) -> dict:
         """Start the patch's plan through the controller, as a person (all the usual checks)."""
+        async with self._start_lock:                 # one start per ready patch: a second press finds it started
+            return await self._start(override)
+
+    async def _start(self, override: bool) -> dict:
         st = self.state()
         if not st or st.get("stage") != "ready":
             raise WriteRefused("no patch is ready to start")
+        if not self.store.setting("map_write_enabled", False):    # it has to come off again afterwards
+            raise WriteRefused("map writing is switched off (Settings → Safety): the patch could not come off again")
         try:                                         # still the patch's plan? ids are reused if it went in the app
             plans = await self.rec.reload_plans()
         except Exception as exc:
@@ -607,13 +648,20 @@ class PatchMower:
                 or not _range_matches(area, [tuple(p) for p in st["ring"]], self.rec.gps_ref)):
             raise WriteRefused("the patch's area is not the one that was set up any more (changed in the app?); "
                                "remove the patch and set it up again")
+        got, err = await areasettings.read_settings(self.rec.read_area_params, st["area_id"])
+        changed = settings_changed(got, st) if got is not None else [err or "could not read them"]
+        if changed:
+            raise WriteRefused("the patch's mowing settings are not the ones that were set up any more ("
+                               + ", ".join(changed) + "); remove the patch and set it up again")
         token = PATCH_START.set(True)
         try:
             res = await self.controller.send("start_plan", {"plan_id": st["plan_id"]}, actor="user",
                                              override=override, wait="background")
         finally:
             PATCH_START.reset(token)
-        if res.get("sent"):
+        cur = self.state()
+        if res.get("sent") and cur and cur.get("created") == st.get("created"):   # not removed meanwhile
+            st = cur
             st.update(stage="started", started_at=time.time())
             st["log"].append("started")
             self._save(st)
@@ -699,7 +747,7 @@ class PatchMower:
                                                     f"look for “{NAME}” in the app")
             return {"ok": False, "error": str(exc) or type(exc).__name__, "notes": notes}
         diff = compare(st["before"], after)
-        if diff and not accept:
+        if diff and not (accept and diff == st.get("differs")):      # accept only what the person was shown
             st.update(stage="stuck", differs=diff)
             st["log"].append("the patch is off, but the map differs from before")
             self._save(st)

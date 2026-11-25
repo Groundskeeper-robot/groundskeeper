@@ -1029,7 +1029,11 @@ async function patchRefresh(force = false) {
   const settling = PATCH_SETTLING.has(patchUI.view?.patch?.stage);
   if (!force && Date.now() - patchUI.fetchedAt < (settling ? 5000 : 20000)) return patchUI.view;
   patchUI.fetchedAt = Date.now();
-  try { patchUI.view = await getJSON("/api/patch"); } catch { /* keep the last answer */ }
+  const seq = patchUI.seq = (patchUI.seq || 0) + 1;
+  try {
+    const v = await getJSON("/api/patch");
+    if (seq === patchUI.seq) patchUI.view = v;              // an older answer arriving late never replaces a newer one
+  } catch { /* keep the last answer */ }
   drawPatchMap();
   return patchUI.view;
 }

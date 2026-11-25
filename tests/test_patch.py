@@ -572,3 +572,63 @@ def test_override_must_be_a_real_boolean():
     for bad in ("false", "true", 1, 0, None, "yes"):
         with pytest.raises(HTTPException):
             _override({"override": bad})
+
+
+# -- the second CodeRabbit pass -------------------------------------------------------------------------------------
+def test_fits_near_0_and_180_degrees_compare_along_one_normal():
+    tgt = {"angle": 179.6, "phase": 0.10}
+    assert patch.phase_shift(tgt, {"angle": 0.3, "phase": 0.20}, 0.3) == pytest.approx(0.0, abs=1e-9)
+    assert patch.phase_shift(tgt, {"angle": 179.2, "phase": 0.08}, 0.3) == pytest.approx(0.02)
+
+
+def test_start_refuses_settings_changed_in_the_app(tmp_path):
+    robot, store, p, ctl, _ = setup(tmp_path)
+    asyncio.run(p.prepare(*CENTER, 6.0, 3.0))
+    robot.params[900]["clean_times"] = 2
+    with pytest.raises(mw.WriteRefused, match="mowing settings"):
+        asyncio.run(p.start())
+    assert ctl.sent == []
+
+
+def test_start_needs_map_writing_so_the_patch_can_come_off(tmp_path):
+    robot, store, p, ctl, _ = setup(tmp_path)
+    asyncio.run(p.prepare(*CENTER, 6.0, 3.0))
+    store.set_setting("map_write_enabled", False)
+    with pytest.raises(mw.WriteRefused, match="map writing"):
+        asyncio.run(p.start())
+    assert ctl.sent == []
+
+
+def test_two_presses_of_start_send_once(tmp_path):
+    robot, store, p, ctl, _ = setup(tmp_path)
+    asyncio.run(p.prepare(*CENTER, 6.0, 3.0))
+
+    async def both():
+        return await asyncio.gather(p.start(), p.start(), return_exceptions=True)
+    out = asyncio.run(both())
+    assert len(ctl.sent) == 1 and sum(isinstance(r, mw.WriteRefused) for r in out) == 1
+
+
+def test_a_start_that_finishes_after_the_removal_does_not_bring_the_patch_back(tmp_path):
+    robot, store, p, ctl, _ = setup(tmp_path)
+    asyncio.run(p.prepare(*CENTER, 6.0, 3.0))
+    real = ctl.send
+
+    async def slow(*a, **k):
+        store.set_setting(patch.STATE, None)                  # the removal ran while the start was on its way
+        return await real(*a, **k)
+    ctl.send = slow
+    asyncio.run(p.start())
+    assert p.state() is None
+
+
+def test_accepting_takes_only_the_differences_that_were_shown(tmp_path):
+    robot, store, p, _, _ = setup(tmp_path)
+    asyncio.run(p.prepare(*CENTER, 6.0, 3.0))
+    robot.map["pathways"][0]["end_id"] = 99
+    shown = asyncio.run(p.remove("test"))["problems"]
+    robot.map["pathways"].append({"id": 53, "name": "", "ref": robot.map["pathways"][0]["ref"], "start_id": 1,
+                                  "end_id": 11, "range": robot.map["pathways"][0]["range"]})
+    r = asyncio.run(p.remove("accepted", accept=True))
+    assert not r["ok"] and "new pathways 53" in "; ".join(r["problems"]) and p.state()["differs"] != shown
+    assert asyncio.run(p.remove("accepted", accept=True))["accepted"] and p.state() is None
