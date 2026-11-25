@@ -156,13 +156,21 @@ def lines(segs, gap: float) -> dict | None:
             "coherence": round(math.hypot(sx, cx) / metres, 3)}
 
 
-def phase_shift(tgt: dict, got: dict, gap: float) -> float:
-    """How far across the lines `got` must move to sit on `tgt`, both measured along tgt's normal. Two fits of the
-    same direction can come out near 0° and near 180°, whose normals point opposite ways: the phase flips with them."""
-    gp = got["phase"]
+def phase_at(fit: dict, p, gap: float) -> float:
+    """Where a fit's lines sit across their direction, measured from point p instead of the frame's origin."""
+    t = math.radians(fit["angle"])
+    return (fit["phase"] - (-p[0] * math.sin(t) + p[1] * math.cos(t))) % gap
+
+
+def phase_shift(tgt: dict, got: dict, gap: float, at=(0.0, 0.0)) -> float:
+    """How far across the lines `got` must move to sit on `tgt`, both measured along tgt's normal from point `at`
+    (the patch: fits a fraction of a degree apart drift apart with distance from where they are compared). Two fits
+    of the same direction can come out near 0° and near 180°, whose normals point opposite ways: the phase flips with
+    them."""
+    tp, gp = phase_at(tgt, at, gap), phase_at(got, at, gap)
     if abs((got["angle"] - tgt["angle"] + 180) % 360 - 180) > 90:
         gp = (-gp) % gap
-    return _wrap_gap(tgt["phase"] - gp, gap)
+    return _wrap_gap(tp - gp, gap)
 
 
 def _near(segs, center, radius: float) -> list:
@@ -255,7 +263,7 @@ def patch_settings(parent_read: dict, new_id: int, route_angle: int) -> dict:
 def settings_changed(read: dict, st: dict) -> list[str]:
     """The settings that make the patch's route, as the set-up left them, that read differently now."""
     angle = (st.get("settings") or {}).get("route_angle")
-    want = {"clean_times": 1, "current_index": 0, "edge_circles": 0, "gap": st["target"]["gap"],
+    want = {"clean_times": 1, "current_index": 0, "edge_circles": 0, "buffer_dis": 0.0, "gap": st["target"]["gap"],
             "first_clean_params.route_angle": angle}
     if isinstance(read.get("double_clean_params"), dict):
         want["double_clean_params.route_angle"] = angle
@@ -336,7 +344,7 @@ class PatchMower:
 
     def view(self) -> dict:
         st = self.state()
-        shown = None if not st else {k: v for k, v in st.items() if k not in ("before", "settings")}
+        shown = None if not st else {k: v for k, v in st.items() if k not in ("before", "settings", "differs_map")}
         return {"patch": shown, "blocked": self.block(), "last": self.store.setting(STATE + "_last")}
 
     def block(self, start: bool = False) -> str | None:
@@ -377,7 +385,7 @@ class PatchMower:
             if not run.get("ended"):
                 continue
             steps = self._run_steps(run["id"], gps_ref)
-            here = lines(_near(steps, center, radius), gap)
+            here = lines(_near(_inside(steps, ring), center, radius), gap)
             if not here or here["metres"] < MIN_RUN_METRES or here["coherence"] < MIN_COHERENCE:
                 continue
             whole = lines([s for s in _inside(steps, ring) if abs(_wrap_deg(s[2] - here["angle"])) <= 3], gap)
@@ -451,6 +459,7 @@ class PatchMower:
             if self.state():
                 raise WriteRefused("a patch is already set up; start it or remove it first")
             self._params.clear()                                     # the set-up works from fresh reads only
+            self._plan_lines.clear()
             try:
                 raw = await self.writer.read_map()
                 records = await self.writer.read_areas()
@@ -583,7 +592,8 @@ class PatchMower:
         if not got or abs(_wrap_deg(got["angle"] - tgt["angle"])) > ANGLE_TOL_DEG:
             raise RuntimeError(f"the robot's lines for the patch run at {got and got['angle']}°, not "
                                f"{tgt['angle']}°")
-        d = phase_shift(tgt, got, gap)
+        at = (sum(p[0] for p in ring) / len(ring), sum(p[1] for p in ring) / len(ring))
+        d = phase_shift(tgt, got, gap, at)
         if abs(d) > SHIFT_TOL_M:
             ring = shifted(ring, tgt["angle"], d)
             moved = problems(raw, st["parent"]["id"], ring, gps_ref)      # raw: the map before the patch was added
@@ -601,7 +611,7 @@ class PatchMower:
             st["log"].append(f"moved {d * 100:+.0f} cm onto the lines")
             got, summary = await self._preview(aid, gap, gps_ref)
             if (not got or abs(_wrap_deg(got["angle"] - tgt["angle"])) > ANGLE_TOL_DEG
-                    or abs(phase_shift(tgt, got, gap)) > SHIFT_TOL_M):
+                    or abs(phase_shift(tgt, got, gap, at)) > SHIFT_TOL_M):
                 raise RuntimeError("the patch's lines still do not sit on the last mow's")
         mine = mapstudio.find(await self.writer.read_map(), "areas", aid)
         if mine is None or not _range_matches(mine, [tuple(p) for p in st["ring"]], gps_ref):
@@ -641,13 +651,19 @@ class PatchMower:
         if not mine or mine.get("name") != NAME or mine.get("areaIds") != [st["area_id"]]:
             raise WriteRefused(f"plan {st['plan_id']} is not the patch's any more; remove the patch and set it up again")
         try:
-            area = mapstudio.find(await self.writer.read_map(), "areas", st["area_id"])
+            raw = await self.writer.read_map()
+            area = mapstudio.find(raw, "areas", st["area_id"])
         except Exception as exc:
             raise WriteRefused(f"could not read the robot's map ({str(exc) or type(exc).__name__})")
         if (area is None or area.get("name") != NAME
                 or not _range_matches(area, [tuple(p) for p in st["ring"]], self.rec.gps_ref)):
             raise WriteRefused("the patch's area is not the one that was set up any more (changed in the app?); "
                                "remove the patch and set it up again")
+        rest = {**raw, "areas": [a for a in raw.get("areas") or [] if a.get("id") != st["area_id"]]}
+        moved = problems(rest, st["parent"]["id"], [tuple(p) for p in st["ring"]], self.rec.gps_ref)
+        if moved:
+            raise WriteRefused("the map changed around the patch (" + "; ".join(moved) + "); remove it and set it "
+                               "up again")
         got, err = await areasettings.read_settings(self.rec.read_area_params, st["area_id"])
         changed = settings_changed(got, st) if got is not None else [err or "could not read them"]
         if changed:
@@ -691,7 +707,8 @@ class PatchMower:
         if aid is None:                         # the area's add reply was lost: only the plan id is known
             return [p for p in plans if p.get("name") == NAME and p.get("id") not in before
                     and p.get("id") == st.get("plan_id")]
-        return [p for p in plans if p.get("name") == NAME and p.get("id") not in before and p.get("areaIds") == [aid]]
+        return [p for p in plans if p.get("name") == NAME and p.get("id") not in before and p.get("areaIds") == [aid]
+                and p.get("id") == st.get("plan_id")]
 
     async def _remove_locked(self, st: dict, why: str, accept: bool = False) -> dict:
         """del_plan, then del_clean_area, for what this panel added, each only if it is still the patch (its name, and
@@ -747,8 +764,8 @@ class PatchMower:
                                                     f"look for “{NAME}” in the app")
             return {"ok": False, "error": str(exc) or type(exc).__name__, "notes": notes}
         diff = compare(st["before"], after)
-        if diff and not (accept and diff == st.get("differs")):      # accept only what the person was shown
-            st.update(stage="stuck", differs=diff)
+        if diff and not (accept and diff == st.get("differs") and after == st.get("differs_map")):
+            st.update(stage="stuck", differs=diff, differs_map=after)    # accept only the map the person was shown
             st["log"].append("the patch is off, but the map differs from before")
             self._save(st)
             self.store.event("patch_removed_with_differences",

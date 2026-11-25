@@ -632,3 +632,54 @@ def test_accepting_takes_only_the_differences_that_were_shown(tmp_path):
     r = asyncio.run(p.remove("accepted", accept=True))
     assert not r["ok"] and "new pathways 53" in "; ".join(r["problems"]) and p.state()["differs"] != shown
     assert asyncio.run(p.remove("accepted", accept=True))["accepted"] and p.state() is None
+
+
+# -- the third CodeRabbit pass --------------------------------------------------------------------------------------
+def _fit_through(angle, p, gap=0.3):
+    t = math.radians(angle)
+    return {"angle": angle, "phase": (-p[0] * math.sin(t) + p[1] * math.cos(t)) % gap}
+
+
+def test_lines_are_compared_where_the_patch_is():
+    a, b = _fit_through(0.0, (50, 0)), _fit_through(0.5, (50, 0))       # both pass through the patch at (50, 0)
+    assert patch.phase_shift(a, b, 0.3, (50, 0)) == pytest.approx(0.0, abs=1e-9)
+    assert abs(patch.phase_shift(a, b, 0.3)) > 0.05                       # measured at the origin they seem apart
+
+
+def test_start_refuses_a_patch_the_map_has_moved_around(tmp_path):
+    robot, store, p, ctl, _ = setup(tmp_path)
+    asyncio.run(p.prepare(*CENTER, 6.0, 3.0))
+    robot.map["areas"].append({"id": 12, "name": "new bed", "ref": robot.map["areas"][0]["ref"],
+                               "range": [{"x": 11.5, "y": 12.5, "phi": 0}, {"x": 12.5, "y": 12.5, "phi": 0},
+                                         {"x": 12.5, "y": 13.5, "phi": 0}]})
+    with pytest.raises(mw.WriteRefused, match="map changed around the patch"):
+        asyncio.run(p.start())
+    assert ctl.sent == []
+
+
+def test_start_refuses_a_boundary_extension_added_in_the_app(tmp_path):
+    robot, store, p, ctl, _ = setup(tmp_path)
+    asyncio.run(p.prepare(*CENTER, 6.0, 3.0))
+    robot.params[900]["buffer_dis"] = 0.3
+    with pytest.raises(mw.WriteRefused, match="buffer_dis"):
+        asyncio.run(p.start())
+
+
+def test_another_plan_with_the_patch_name_is_never_deleted(tmp_path):
+    robot, store, p, _, _ = setup(tmp_path)
+    asyncio.run(p.prepare(*CENTER, 6.0, 3.0))
+    robot.plans.append({"id": 3, "name": patch.NAME, "areaIds": [900], "enable_self_order": True})
+    r = asyncio.run(p.remove("test"))
+    assert (mw.PLAN_DELETE, {"id": 3}) not in robot.sent and (mw.PLAN_DELETE, {"id": 2}) in robot.sent
+    assert not r["ok"] and "kept while plan 3 uses it" in r["error"]
+
+
+def test_accepting_needs_the_map_that_was_shown_not_just_the_same_words(tmp_path):
+    robot, store, p, _, _ = setup(tmp_path)
+    asyncio.run(p.prepare(*CENTER, 6.0, 3.0))
+    a = ms.find(robot.map, "areas", 11)
+    a["range"] = [{**q, "x": q["x"] + 1.0} for q in a["range"]]
+    asyncio.run(p.remove("test"))
+    a["range"] = [{**q, "x": q["x"] + 1.0} for q in a["range"]]       # moved again: same message, other outline
+    assert not asyncio.run(p.remove("accepted", accept=True))["ok"]
+    assert asyncio.run(p.remove("accepted", accept=True))["accepted"] and p.state() is None
