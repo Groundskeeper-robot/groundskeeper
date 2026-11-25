@@ -130,3 +130,16 @@ def test_non_finite_values_never_reach_the_pose_event(tmp_path):
     status = {"robot": {"position": {"lon": math.nan}, "speed": [math.inf, 0.1]}, "n": 1, "ok": True}
     assert json.loads(json.dumps(json_finite(status), allow_nan=False)) == {
         "robot": {"position": {"lon": None}, "speed": [None, 0.1]}, "n": 1, "ok": True}
+
+
+def test_a_non_finite_heading_is_no_heading_in_the_status(tmp_path):
+    """#177 review: an infinite phi made math.cos raise in Recorder.status(), which stopped /api/stream."""
+    import json
+    import math
+    from app import telemetry
+    for v in (math.nan, math.inf, -math.inf, None, "x", True):
+        assert telemetry.heading_deg(v) is None
+    r = _recorder(tmp_path)
+    _pose(r, 1.0, 100.0, 1000.0)
+    r.t["phi"] = math.inf
+    json.dumps(r.status(), allow_nan=False)
