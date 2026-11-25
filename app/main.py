@@ -684,11 +684,19 @@ def _override(body: dict) -> bool:
     return v
 
 
+def _patch_plan_id(body: dict) -> int:
+    """The patch the person is looking at: Start and its checks act on that one only, never on whichever is current."""
+    v = body.get("plan_id")
+    if isinstance(v, bool) or not isinstance(v, int):
+        raise HTTPException(400, "plan_id: the patch's plan id is required")
+    return v
+
+
 @app.post("/api/patch/preview")
-async def patch_preview(request: Request):
+async def patch_preview(request: Request, body: dict = Body(...)):
     """The checks the patch's start would meet now; nothing is sent."""
     try:
-        return await ops(request).patch.preview()
+        return await ops(request).patch.preview(plan_id=_patch_plan_id(body))
     except mapwrite.WriteRefused as exc:
         raise HTTPException(409, str(exc))
 
@@ -699,7 +707,7 @@ async def patch_start(request: Request, body: dict = Body(...)):
     if body.get("confirm") is not True:
         raise HTTPException(400, "confirm: true is required")
     try:
-        return await ops(request).patch.start(override=_override(body))
+        return await ops(request).patch.start(override=_override(body), plan_id=_patch_plan_id(body))
     except mapwrite.WriteRefused as exc:
         raise HTTPException(409, str(exc))
 

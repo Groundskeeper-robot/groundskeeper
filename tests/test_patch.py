@@ -602,9 +602,22 @@ def test_start_needs_map_writing_so_the_patch_can_come_off(tmp_path):
 def test_two_presses_of_start_send_once(tmp_path):
     robot, store, p, ctl, _ = setup(tmp_path)
     asyncio.run(p.prepare(*CENTER, 6.0, 3.0))
+    real = ctl.send
 
     async def both():
-        return await asyncio.gather(p.start(), p.start(), return_exceptions=True)
+        inside, go = asyncio.Event(), asyncio.Event()
+
+        async def held(*a, **k):                             # the first start waits here until the second has pressed
+            inside.set()
+            await go.wait()
+            return await real(*a, **k)
+        ctl.send = held
+        first = asyncio.ensure_future(p.start())
+        await inside.wait()
+        second = asyncio.ensure_future(p.start())
+        await asyncio.sleep(0.05)
+        go.set()
+        return await asyncio.gather(first, second, return_exceptions=True)
     out = asyncio.run(both())
     assert len(ctl.sent) == 1 and sum(isinstance(r, mw.WriteRefused) for r in out) == 1
 
@@ -683,3 +696,70 @@ def test_accepting_needs_the_map_that_was_shown_not_just_the_same_words(tmp_path
     a["range"] = [{**q, "x": q["x"] + 1.0} for q in a["range"]]       # moved again: same message, other outline
     assert not asyncio.run(p.remove("accepted", accept=True))["ok"]
     assert asyncio.run(p.remove("accepted", accept=True))["accepted"] and p.state() is None
+
+
+# -- the GitHub review ----------------------------------------------------------------------------------------------
+def test_map_writing_switched_off_part_way_stops_the_next_write(tmp_path):
+    robot, store, p, _, _ = setup(tmp_path)
+    orig = robot._apply
+
+    def switch_off(cmd, payload):
+        out = orig(cmd, payload)
+        if cmd == "save_mower_area_params":
+            store.set_setting("map_write_enabled", False)       # switched off while the set-up runs
+        return out
+    robot._apply = switch_off
+    r = asyncio.run(p.prepare(*CENTER, 6.0, 3.0))
+    cmds = [c for c, _ in robot.sent]
+    assert not r["ok"] and cmds == [mw.AREA_SAVE, "save_mower_area_params"]
+    assert p.state()["stage"] == "stuck"                        # removal refused too: it waits for the switch
+
+
+def test_start_refuses_any_copied_setting_changed_in_the_app(tmp_path):
+    robot, store, p, ctl, _ = setup(tmp_path)
+    asyncio.run(p.prepare(*CENTER, 6.0, 3.0))
+    robot.params[900]["first_clean_params"]["blade_height"] = 60
+    with pytest.raises(mw.WriteRefused, match="blade_height"):
+        asyncio.run(p.start())
+    assert ctl.sent == []
+
+
+def test_start_acts_only_on_the_patch_the_person_confirmed(tmp_path):
+    robot, store, p, ctl, _ = setup(tmp_path)
+    asyncio.run(p.prepare(*CENTER, 6.0, 3.0))
+    with pytest.raises(mw.WriteRefused, match="another one"):
+        asyncio.run(p.start(plan_id=7))
+    with pytest.raises(mw.WriteRefused, match="another one"):
+        asyncio.run(p.preview(plan_id=7))
+    assert ctl.sent == [] and asyncio.run(p.start(plan_id=2))["sent"]
+
+
+def test_a_route_that_is_not_one_grid_is_no_answer(tmp_path):
+    robot, store, p, _, rec = setup(tmp_path)
+    real = rec.preview_area_path
+
+    async def two_grids(payload):
+        out = await real(payload)
+        nx, ny = -math.sin(math.radians(LINE_ANGLE)), math.cos(math.radians(LINE_ANGLE))   # across the lines
+        out["path"] = ([{**q, "x": q["x"] + 0.06 * nx, "y": q["y"] + 0.06 * ny} for q in out["path"]]
+                       + [{**q, "x": q["x"] - 0.06 * nx, "y": q["y"] - 0.06 * ny} for q in out["path"]])
+        return out
+    rec.preview_area_path = two_grids
+    r = asyncio.run(p.prepare(*CENTER, 6.0, 3.0))
+    assert not r["ok"] and p.state() is None
+
+
+def test_a_pathway_that_moved_counts_as_a_difference():
+    raw = sample_map()
+    before = patch.snapshot(raw, [])
+    raw["pathways"][0]["range"][0]["y"] += 0.5
+    assert any("pathway 52's outline changed" in d for d in patch.compare(before, patch.snapshot(raw, [])))
+
+
+def test_the_patch_routes_need_the_plan_id():
+    from fastapi import HTTPException
+    from app.main import _patch_plan_id
+    assert _patch_plan_id({"plan_id": 2}) == 2
+    for bad in ({}, {"plan_id": "2"}, {"plan_id": True}, {"plan_id": None}):
+        with pytest.raises(HTTPException):
+            _patch_plan_id(bad)
