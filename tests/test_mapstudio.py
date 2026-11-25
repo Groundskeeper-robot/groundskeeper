@@ -259,3 +259,31 @@ def test_a_map_put_back_as_it_was_becomes_current_again(tmp_path):
     assert st.latest_version("map") == a
     assert not st.save_version("map", a)        # unchanged now
     assert len(st.versions("map")) == 2 and st.versions("map")[0]["sha"] != st.versions("map")[1]["sha"]
+
+
+def test_the_idle_row_reads_a_plan_error_as_idle(monkeypatch, tmp_path):
+    """The robot keeps the last plan's error code (negative, WP005 = -12) in its planning value after the error is
+    cleared in the app; Map Studio's Idle row reads it as the writer does: only a value above 0 is a plan going."""
+    import time as _t
+    from types import SimpleNamespace
+
+    from app import main
+    from app.store import Store
+    rec = SimpleNamespace(store=Store(str(tmp_path)), t={"charging": 1}, snapshot_at=_t.time(), run_id=None)
+    req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(rec=rec)))
+    monkeypatch.setattr(main, "ops", lambda request: SimpleNamespace(
+        cloud=SimpleNamespace(state="connected"), link=SimpleNamespace(why_no_writes=lambda: None),
+        controller=SimpleNamespace(start_settling=lambda: None)))
+    monkeypatch.setattr(main, "_draft_meta", lambda request, d: {"stale": False})
+
+    def idle(planning, run_id=None):
+        rec.t["planning"], rec.run_id = planning, run_id
+        row = next(c for c in main._write_checks(req, {}, [], {"steps": [], "blocked": []}) if c["name"] == "Idle")
+        return row["ok"], row["detail"]
+
+    assert idle(-12) == (True, "idle")                   # WP005 left over after the app cleared it
+    assert idle(0) == (True, "idle")
+    assert idle(None) == (True, "idle")
+    assert idle(1) == (False, "a plan is running")
+    assert idle(2) == (False, "a plan is running")
+    assert idle(-12, run_id=8) == (False, "a plan is running")   # a run the panel is recording still holds it
