@@ -1,5 +1,5 @@
-// The start confirmation's "Start at" (leftOffAt, startPoints, startChoice, pickStartPoint and previewConfirm in
-// web/ops.js): which start points are offered, and that the checks on screen are the ones for what Send sends.
+// The start confirmation's "Start at" (leftOffAt, startPct, startChoice, pickStartPoint and previewConfirm in
+// web/ops.js): where the last run got to, what a typed start point may be, and that the checks on screen are the ones for what Send sends.
 // Run by tests/test_start_point.py (only when node is installed). Synthetic values only.
 "use strict";
 const fs = require("fs");
@@ -21,9 +21,9 @@ const sandbox = {
   postJSON: (url, body) => new Promise((resolve) => asked.push({ args: body.args, answer: resolve })),
 };
 vm.createContext(sandbox);
-vm.runInContext([noLeftOff[0], cut("function leftOffAt("), cut("function startPoints("), cut("function startChoice("),
+vm.runInContext([noLeftOff[0], cut("function leftOffAt("), cut("function startPct("), cut("function startChoice("),
   cut("function pickStartPoint("), cut("async function previewConfirm(")].join("\n")
-  + "\nObject.assign(this, { leftOffAt, startPoints, startChoice, pickStartPoint, previewConfirm });", sandbox);
+  + "\nObject.assign(this, { leftOffAt, startPct, startChoice, pickStartPoint, previewConfirm });", sandbox);
 
 const run = { started: 10000, ended: 20000, end_reason: "returned to dock", plan_session: "1:9950",
               plan_progress_pct: 42.7 };
@@ -46,9 +46,7 @@ const out = {
   beganAtTheStart: at(run, [sent(9940, { plan_id: 1 })]),
   refusedPartWay: at(run, [sent(9940, { plan_id: 1, start_percent: 30 }, 0), sent(9930, { plan_id: 1 })]),
   olderPartWay: at(run, [sent(9940, { plan_id: 1 }), sent(2000, { plan_id: 1, start_percent: 30 })]),
-  points: sandbox.startPoints(42, 0),
-  pointsPlain: sandbox.startPoints(null, 0),
-  pointsPicked: sandbox.startPoints(null, 42),
+  typed: ["1", "42", " 99 ", "0", "100", "4.5", "-3", "abc", "", null, "042"].map((t) => sandbox.startPct(t)),
   choice: sandbox.startChoice("Start Mow All", 1, 40),
   choiceBeginning: sandbox.startChoice("Start Mow All", 1, 0),
 };

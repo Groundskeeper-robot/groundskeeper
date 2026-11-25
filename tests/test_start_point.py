@@ -93,7 +93,6 @@ def test_the_confirmation_offers_where_the_last_run_got_to():
     assert r["early"] == {"pct": 42, "ended": 20000}                   # rounded down, so a start there overlaps
     assert r["allButDone"]["pct"] == 99
     assert r["beganAtTheStart"]["pct"] == 42 and r["refusedPartWay"]["pct"] == 42 and r["olderPartWay"]["pct"] == 42
-    assert r["points"] == sorted({0, 42, *range(5, 100, 5)})
 
 
 @needs_node
@@ -104,10 +103,9 @@ def test_no_left_off_point_is_offered_when_the_last_run_cannot_say(case):
 
 
 @needs_node
-def test_the_start_points_are_the_beginning_and_every_five_percent():
-    r = start_points()
-    assert r["pointsPlain"] == [0, *range(5, 100, 5)]
-    assert r["pointsPicked"] == sorted({0, 42, *range(5, 100, 5)})
+def test_a_typed_start_point_is_a_whole_number_from_1_to_99():
+    # The beginning has its own button; anything else typed is refused, never rounded or clamped into range.
+    assert start_points()["typed"] == [1, 42, 99, None, None, None, None, None, None, None, None]
 
 
 @needs_node
@@ -143,9 +141,10 @@ def test_send_stays_off_once_it_was_pressed():
     out = subprocess.run([shutil.which("node"), str(ROOT / "tests" / "start_send_flow.cjs")],
                          capture_output=True, encoding="utf-8", timeout=60, check=True).stdout
     r = json.loads(out)
-    assert r["before"] == {"sendOff": False, "listOff": False}
+    assert r["before"] == {"sendOff": False, "listOff": False, "label": "Start from 40%"}
     assert r["pressed"] == {"sendOff": True, "listOff": True, "sends": 1}
     assert r["redrawn"] == {"sendOff": True, "listOff": True}          # a redraw does not bring Send back
+    assert r["typedBad"] == {"sendOff": True, "previews": 0}            # "4.5" is no start point: nothing is asked
     assert r["pickedLate"] == {"args": {"plan_id": 1, "start_percent": 40}, "sendOff": True, "previews": 0}
     assert r["after"]["sends"] == 1 and r["after"]["closed"] == 1
     assert r["after"]["sent"] == {"cmd": "start_plan", "args": {"plan_id": 1, "start_percent": 40}, "confirm": True,

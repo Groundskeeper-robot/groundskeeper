@@ -127,11 +127,14 @@ async function liveExtras(s) {
   if (ops.mode === "camera") {
     const away = !fc.pinned && (!fc.cam || fc.covered === false);
     if (away !== ops.camAway) { ops.camAway = away; syncLiveMode(); }
+    document.body.classList.remove("ecpinned");
     if (away) return [emergencyCard(s), camAwayCard(fc), statusCard(s), ...rest];
     drawCamStage(fc, s);
     return [emergencyCard(s), miniMapCard(), statusCard(s), ...rest];
   }
-  return [PHONE_LIVE.matches && runGoing(s) ? emergencyCard(s) : null, statusCard(s), ...rest, followCamCard(fc)];
+  const pinned = PHONE_LIVE.matches && runGoing(s);
+  document.body.classList.toggle("ecpinned", pinned);
+  return [pinned ? emergencyCard(s, true) : null, statusCard(s), ...rest, followCamCard(fc)];
 }
 
 /* ---------------------------------------------------------- live layout
@@ -243,7 +246,8 @@ const routeOk = (o) => (o.link ? !!o.link.commands : !!(o.cloud && o.cloud.state
 const noRouteWhy = (o) => [`No route to the robot: the Yarbo cloud is ${(o.cloud || {}).state || "not set up"}. `,
   h("a", { href: "#settings/robot" }, "Settings → Robot"), "."];
 
-function emergencyCard(s) {
+// pinned: on a phone during a run the card sits at the bottom of the screen, its buttons in one row (style.css).
+function emergencyCard(s, pinned = false) {
   const o = s.ops || {}, on = o.control_enabled;
   const act = s.activity, known = !!act && !s.lost_contact && s.state !== "waiting for data";
   const running = !!s.run || !["docked", "idle"].includes(act);
@@ -273,11 +277,13 @@ function emergencyCard(s) {
   const why = !on ? ["Control is off. ", h("a", { href: "#settings/safety" }, "Switch it on"), " to use these."]
             : !routeOk(o) ? noRouteWhy(o)
             : known && !can[main[0]] ? `Nothing to ${main[1].toLowerCase()}: the robot is ${s.state}.` : null;
-  return h("div", { class: "card ecard" },
+  return h("div", { class: `card ecard${pinned ? " pinned" : ""}` },
     button(main[0], main[1], main[2], held ? "pri huge" : "danger huge"),
-    h("div", { class: "ehalf" }, button("stop", "Stop", "■", ""), button("cmd_recharge", "Return to dock", "⌂", "")),
+    h("div", { class: "ehalf" }, button("stop", "Stop", "■", ""),
+      button("cmd_recharge", pinned ? "Dock" : "Return to dock", "⌂", "")),          // pinned: a third of a phone
     armedLabel ? h("p", { class: "armhint", role: "status" }, `Armed: tap “${armedLabel}” again within 4 seconds to send it.`)
-      : h("p", { class: "muted small", style: "margin:8px 0 0" }, why || "These need two taps: the first arms the button (it turns amber), the second sends."));
+      : h("p", { class: "muted small ehint", style: "margin:8px 0 0" }, why || (pinned ? "Two taps: the first arms, the second sends."
+        : "These need two taps: the first arms the button (it turns amber), the second sends.")));
 }
 
 // The second tap must come at least this long after the first: a bounce, a held key or a habitual double-click (500 ms
@@ -524,39 +530,57 @@ function controlCard(s) {
     stop: no(running, `Nothing to stop: the robot is ${s.state}.`),
     cmd_recharge: no(!NOT_DOCKABLE.has(act), act === "docked" ? "Already on the dock." : `Already on its way: ${s.state}.`),
   };
-  // A touch screen never shows a disabled button's title, so the same reasons go in one line under the grid
-  // (.whyline). The button's name replaces "Nothing to pause:", so buttons off for the same state share one entry
-  // ("Pause, Stop: the robot is docked."). Control off and no plans already say so above the buttons.
-  const labels = { start_plan: "Start", pause: "Pause", resume: "Resume", stop: "Stop",
-    cmd_recharge: "Return to dock" };
-  const offWhy = new Map();
-  for (const [cmd, text] of Object.entries(idle)) {
-    const t = text?.replace(/^Nothing to \w+: /, "");
-    if (t) offWhy.set(t, [...(offWhy.get(t) || []), labels[cmd]]);
-  }
-  const whyLine = [...offWhy].map(([t, names]) => `${names.join(", ")}: ${t[0].toLowerCase()}${t.slice(1)}`).join(" ");
-  const btn = (cmd, label, args) => h("button", { type: "button", class: "btn", "data-key": `ctl-${cmd}`,
-    disabled: disabled || !!idle[cmd] || null,
-    title: idle[cmd] || null, onclick: () => openConfirm(cmd, label, args) }, label);
-  return h("div", { class: "card" },
-    h("p", { class: "label" }, "Control"),
+  // One main action per state, and a button only where it does something: docked, the plan and Start; a run going,
+  // Pause (or Resume when held) and Return to dock, with Stop on a row of its own, never next to Start. A button the
+  // state rules out is left out rather than shown greyed. Where the emergency card is on screen (the camera layout, a
+  // phone during a run) it holds the run's buttons, so this card does not repeat them.
+  const showStart = !known || !running;
+  const showRun = (!known || running) && !emergencyShown(s);
+  const held = known && HELD.has(act);
+  const btn = (cmd, label, cls = "") => (idle[cmd] ? null : h("button", { type: "button", class: `btn ${cls}`.trim(),
+    "data-key": `ctl-${cmd}`, disabled: disabled || null, onclick: () => openConfirm(cmd, label) }, label));
+  const runPlan = s.run?.plan?.plan_id != null ? (state.plansCache || []).find((p) => p.id === s.run.plan.plan_id) : null;
+  const pct = s.run?.plan?.progress_pct, left = s.run?.plan?.left_s;
+  const runLine = known && running ? h("div", { class: "ctlrun" },
+    h("span", { class: "ctlrunname" }, runPlan ? runPlan.name : held ? "Plan held" : s.state),
+    pct !== null && pct !== undefined ? h("span", { class: "muted small mono" },
+      `${num(pct)}% of the plan${left ? ` · about ${dur(left)} left` : ""}`) : null) : null;
+  // The emergency card has no Resume while the state is unknown (it shows Pause then), so this card keeps it.
+  const runButtons = !showRun ? (!known && emergencyShown(s) ? [btn("resume", "Resume")] : null) : held
+    ? [btn("resume", "Resume…", "pri wide"), h("div", { class: "ctlgrid" }, btn("cmd_recharge", "Return to dock"),
+        btn("stop", "Stop", "stopbtn"))]
+    : [h("div", { class: "ctlgrid" }, btn("pause", "Pause"), btn("cmd_recharge", "Return to dock"),
+        known ? null : btn("resume", "Resume")), btn("stop", "Stop", "stopbtn wide")];
+  return h("div", { class: `card${held ? " attention" : ""}` },
+    h("div", { class: "row gap", style: "justify-content:space-between;align-items:baseline" },
+      h("p", { class: "label", style: "margin:0" }, "Control"),
+      known ? h("span", { class: "small", style: `color:${stateColor(s)}` }, s.pause_reason ? `paused: ${s.pause_reason}`
+        : s.state) : null),
     why ? h("p", { class: "muted small" }, why) : null,
-    plans.length ? [
+    showStart ? (plans.length ? [
       h("label", { for: "ctlplan", class: "muted small" }, "Plan"),
       h("select", { id: "ctlplan", class: "field", "data-key": "ctl-plan",
         onchange: (e) => { ops.planId = Number(e.target.value); closeConfirm(); refreshLive(); } },
         plans.map((p) => h("option", { value: p.id, selected: p.id === ops.planId || null }, p.name))),
       h("p", { class: "muted small", style: "margin:-4px 0 8px" }, `Mows ${planAreas(plan) || "no areas"}`),
-      readinessView(plan.id)]
-      : h("p", { class: "muted small" }, "No plans on the robot. Make them in the Yarbo app; they appear here (",
-          h("a", { href: "#help/not-yet" }, "the panel cannot make plans yet"), ")."),
-    h("div", { class: "ctlgrid" },
-      h("button", { type: "button", class: "btn pri wide", "data-key": "ctl-start_plan",
+      h("button", { type: "button", class: "btn pri wide ctlstart", "data-key": "ctl-start_plan",
         disabled: disabled || !plan || !!idle.start_plan || null, title: idle.start_plan || null,
         onclick: startPicked }, plan ? `Start ${plan.name}…` : "Start plan…"),
-      btn("pause", "Pause"), btn("resume", "Resume"), btn("stop", "Stop"), btn("cmd_recharge", "Return to dock")),
-    whyLine ? h("p", { class: "whyline muted tiny", style: "margin-top:6px" }, whyLine) : null,
+      readinessView(plan.id)]
+      : h("p", { class: "muted small" }, "No plans on the robot. Make them in the Yarbo app; they appear here (",
+          h("a", { href: "#help/not-yet" }, "the panel cannot make plans yet"), ").")) : null,
+    runLine,
+    runButtons ? h("div", { class: "ctlrunbtns" }, runButtons) : null,
+    // Stopped out in the yard (idle, off the dock): no run, but it can still be sent home.
+    known && !running && !idle.cmd_recharge && !emergencyShown(s)
+      ? h("div", { class: "ctlrunbtns" }, btn("cmd_recharge", "Return to dock")) : null,
     patchBlock(disabled, idle.start_plan));
+}
+
+// The emergency card (two-tap Pause, Stop, Return to dock) is on screen: always in the camera layout, and on a phone
+// while a run goes, where it is pinned to the bottom of the screen.
+function emergencyShown(s) {
+  return ops.mode === "camera" || (PHONE_LIVE.matches && runGoing(s));
 }
 
 /* A command's confirmation is a modal over the page (it used to open under the buttons, below the fold on a phone or
@@ -588,13 +612,15 @@ async function lastRunLeftOff(planId) {
   try {
     const [runs, log] = await Promise.all([getJSON("/api/runs?limit=1"), getJSON("/api/control/log?limit=50")]);
     return leftOffAt((runs.runs || [])[0], planId, log.log);
-  } catch { return null; }    // no hint; the list still has every 5 %
+  } catch { return null; }    // no hint; the box is left empty
 }
 
-// The start points on offer: the beginning, every 5 %, where the last run got to, and the one picked.
-function startPoints(leftOff, picked) {
-  const every5 = Array.from({ length: 19 }, (_, i) => (i + 1) * 5);
-  return [...new Set([0, ...every5, leftOff, picked])].filter((v) => typeof v === "number").sort((x, y) => x - y);
+// A typed start point: a whole number from 1 to 99, else null (0 is the beginning, which has its own button).
+function startPct(text) {
+  const t = String(text ?? "").trim();
+  if (!/^\d{1,2}$/.test(t)) return null;
+  const v = Number(t);
+  return v >= 1 && v <= 99 ? v : null;
 }
 
 // One place makes both what the confirmation says and what Send sends, so the two cannot differ. A start from the
@@ -609,6 +635,7 @@ function startChoice(base, planId, pct) {
 function pickStartPoint(c, pct) {
   if (c.sending) return undefined;      // Send was pressed: what is on its way cannot be changed any more
   c.startAt.pct = pct;
+  c.startAt.invalid = false;
   ({ label: c.label, args: c.args } = startChoice(c.startAt.base, c.startAt.planId, pct));
   c.preview = null; c.error = null; c.override = false;
   drawConfirm();
@@ -637,7 +664,7 @@ async function openConfirm(cmd, label, args = {}, previewOnly = false, own = nul
   const onKey = (e) => { if (e.key === "Escape") closeConfirm(); };
   // A start a person is about to send can begin part-way through the plan: picked here, for this one start.
   const startAt = cmd === "start_plan" && !previewOnly && !own
-    ? { base: label, planId: args.plan_id, pct: 0, leftOff: null } : null;
+    ? { base: label, planId: args.plan_id, pct: 0, leftOff: null, mode: "begin", typed: null, invalid: false } : null;
   const c = ops.confirm = { cmd, label, args, previewOnly, preview: null, override: false, box, startAt, own,
     close: () => {
       overlay.remove();
@@ -667,28 +694,29 @@ function closeConfirm() {
 function drawConfirm() {
   const c = ops.confirm, p = c.preview;
   const softOnly = p && !p.would_send && p.checks.every((x) => x.hard ? x.ok === true : true);
-  const canSend = p && p.enabled && (p.would_send || (softOnly && c.override && c.cmd === "start_plan"));
-  const head = !p ? null
-    : p.would_send ? h("p", { class: "small", style: `color:${GREEN};margin:0 0 6px` }, "Every check passes.")
-    : softOnly && !c.previewOnly && c.cmd === "start_plan" ? h("p", { class: "small", style: `color:${AMBER};margin:0 0 6px` },
-        `Only soft checks fail (${p.reason}). Tick the override below to start anyway.`)
-    : h("p", { class: "small", style: `color:${CORAL};margin:0 0 6px` }, h("b", null, "Can't send: "), p.reason);
+  const start = c.cmd === "start_plan";
+  const canSend = p && p.enabled && !c.startAt?.invalid
+    && (p.would_send || (softOnly && c.override && start));
+  // A typed start point: keep the caret in the box across the redraw its own checks cause.
+  const typing = document.activeElement?.dataset?.key === "confirm-from" ? document.activeElement : null;
+  const caret = typing ? [typing.selectionStart, typing.selectionEnd, typing.selectionDirection] : null;
   fill(c.box,
-    h("h3", { id: "confirm-title" }, c.previewOnly ? `Gate check · ${c.label}` : `Send “${c.label}”?`),
+    h("h3", { id: "confirm-title" }, c.previewOnly ? `Gate check · ${c.label}`
+      : start ? `${c.startAt?.base || c.label}?` : `Send “${c.label}”?`),
     c.error ? h("p", { class: "small", style: `color:${CORAL}` }, c.error) : null,
     c.startAt ? startAtRow(c) : null,
-    head,
-    p ? checkList(p.checks) : h("p", { class: "muted small" }, "Checking interlocks…"),
+    c.startAt?.invalid ? null : p ? checksBlock(c, p) : h("p", { class: "muted small" }, "Checking interlocks…"),
     p && !p.enabled ? h("p", { class: "muted small" }, "Control is switched off; nothing will be sent.") : null,
     !c.previewOnly && softOnly && c.cmd === "start_plan" ? h("label", { class: "row gap small" },
       h("input", { type: "checkbox", checked: c.override || null, onchange: (e) => { c.override = e.target.checked; drawConfirm(); } }),
-      "Override the soft checks above") : null,
+      start ? "Start anyway" : "Override the soft checks above") : null,
     h("div", { class: "row gap", style: "justify-content:flex-end;margin-top:12px" },
       h("button", { type: "button", class: "btn", onclick: closeConfirm }, c.previewOnly ? "Close" : "Cancel"),
       // c.sending: once Send is pressed nothing in the dialog can send again or change what is sent. The redraw
       // (a start point's checks coming back, the override box) would otherwise rebuild Send as enabled while the
       // first request is still on its way, and a second click would publish a second command.
-      c.previewOnly ? null : h("button", { type: "button", class: "btn pri", disabled: !canSend || c.sending || null,
+      c.previewOnly ? null : h("button", { type: "button", class: "btn pri", "data-key": "confirm-send",
+        disabled: !canSend || c.sending || null,
         onclick: async () => {
         c.sending = true;
         drawConfirm();
@@ -700,24 +728,69 @@ function drawConfirm() {
         catch (err) { toast(err.message); }
         if (ops.confirm === c) closeConfirm();
         refreshLive();
-      } }, "Send")));
-  if (!c.box.contains(document.activeElement)) c.box.querySelector("button:not([disabled])")?.focus();  // a redraw drops focus
+      } }, start ? (c.startAt?.pct ? `Start from ${c.startAt.pct}%` : "Start") : "Send")));
+  const box = c.box.querySelector?.('[data-key="confirm-from"]');
+  if (typing && box) { box.focus(); box.setSelectionRange?.(...caret); }     // where the caret was, not the end
+  else if (!c.box.contains(document.activeElement)) c.box.querySelector("button:not([disabled])")?.focus();  // a redraw drops focus
+}
+
+// The checks as one line: all pass (a green dot), or how many fail, each failing one spelled out with its reason.
+// "Show all" opens the full list.
+function checksBlock(c, p) {
+  const checks = p.checks || [];
+  const fails = checks.filter((x) => (x.hard ? x.ok !== true : x.ok === false));
+  const hard = fails.some((x) => x.hard);
+  const what = c.cmd === "start_plan" ? "start checks" : "checks";
+  const head = !fails.length ? `All ${checks.length} ${what} pass`
+    : `${checks.length - fails.length} of ${checks.length} ${what} pass`;
+  return h("div", { class: "checksum" },
+    h("button", { type: "button", class: "checkshead", "aria-expanded": String(!!c.showAll), "data-key": "confirm-checks",
+      onclick: () => { c.showAll = !c.showAll; drawConfirm(); } },
+      dot(!fails.length ? GREEN : hard ? CORAL : AMBER), h("span", { style: "flex:1" }, head),
+      h("span", { class: "muted small" }, c.showAll ? "Hide ▴" : "Show all ▾")),
+    fails.length && !c.showAll ? h("ul", { class: "checkfails" }, fails.map((x) => h("li", null,
+      h("b", { style: `color:${x.hard ? CORAL : AMBER}` }, x.name), x.detail ? `: ${x.detail}` : null,
+      x.hard ? null : h("span", { class: "muted" }, c.cmd === "start_plan" ? " (soft: you can start anyway)" : " (soft)"))))
+      : null,
+    c.showAll ? checkList(checks) : null);
 }
 
 // The confirmation's "Start at" list. It lives in the dialog, not on Live: Live redraws on every status event, which
 // would shut an open list, and here the choice is in view when Send is pressed.
 function startAtRow(c) {
-  const s = c.startAt, left = s.leftOff;
+  const s = c.startAt, left = s.leftOff, part = s.mode === "part";
   const day = left ? new Date(left.ended * 1000).toLocaleDateString([], { month: "short", day: "numeric" }) : "";
-  const text = (v) => (v === 0 ? "The beginning" : left && v === left.pct ? `${v}% (last run, ${day})` : `${v}%`);
-  return h("label", { class: "row gap small", style: "margin:0 0 8px",
-    title: "Start part-way through the plan, to finish a mow that was stopped." },
-    h("span", { class: "muted", style: "white-space:nowrap" }, "Start at"),
-    h("select", { class: "field slim", style: "flex:1;min-width:0", "data-key": "confirm-from",
-      disabled: c.sending || null,
-      onchange: (e) => pickStartPoint(c, Number(e.target.value)) },
-      startPoints(left && left.pct, s.pct).map((v) =>
-        h("option", { value: v, selected: v === s.pct || null }, text(v)))));
+  const typed = (text) => {
+    if (c.sending) return;
+    s.typed = text;
+    const v = startPct(text);
+    if (v === null) { s.invalid = true; c.preview = null; drawConfirm(); return; }
+    if (v !== s.pct || s.invalid) pickStartPoint(c, v);
+  };
+  const seg = (mode, label, key) => h("button", { type: "button", class: s.mode === mode ? "on" : null,
+    "aria-pressed": String(s.mode === mode), "data-key": key, disabled: c.sending || null,
+    onclick: () => {
+      if (s.mode === mode) return;
+      s.mode = mode;
+      if (mode === "begin") { s.invalid = false; pickStartPoint(c, 0); return; }
+      typed(s.typed ?? (left ? String(left.pct) : ""));
+    } }, label);
+  return h("div", { class: "startat" },
+    h("span", { class: "muted small" }, "Start at"),
+    h("div", { class: "seg fullseg", role: "group", "aria-label": "Start at" },
+      seg("begin", "The beginning", "confirm-begin"), seg("part", "Part-way", "confirm-part")),
+    part ? [
+      h("label", { class: "row gap", style: "align-items:center;margin:8px 0 0" },
+        h("span", null, "From"),
+        h("input", { class: "field pctbox", type: "text", inputmode: "numeric", maxlength: "2", "data-key": "confirm-from",
+          value: s.typed ?? "", disabled: c.sending || null,
+          "aria-invalid": s.invalid && String(s.typed ?? "").trim() ? "true" : null,      // empty: not wrong yet
+          oninput: (e) => typed(e.target.value) }),
+        h("span", null, "% of the plan")),
+      h("p", { class: "muted small", style: "margin:4px 0 0" },
+        s.invalid ? "A whole number from 1 to 99."
+        : left && s.pct === left.pct ? `Filled in from the last run: it stopped at ${left.pct}% (${day}).`
+        : left ? `The last run stopped at ${left.pct}% (${day}).` : "A whole number from 1 to 99.")] : null);
 }
 
 function refreshLive() {
@@ -1065,11 +1138,13 @@ function patchBlock(off, runningWhy) {
     const last = v.last && Date.now() / 1000 - v.last.at < 86400 && v.last.problems?.length
       ? h("p", { class: "small", style: `color:${AMBER};margin:6px 0 0` },
           `The map was accepted as it is after the last patch: ${v.last.problems.join("; ")}.`) : null;
-    return h("div", { style: "margin-top:10px" },
-      h("button", { type: "button", class: "btn wide", "data-key": "ctl-patch", disabled: off || !!why || null,
-        title: why ? `Mow a patch: ${why}` : "Mow a small rectangle inside an area, along the last mow's lines",
-        onclick: startPlacing }, "Mow a patch…"),
-      why && !off ? h("p", { class: "whyline muted tiny" }, `Mow a patch: ${why}.`) : null,
+    if (runningWhy) return null;                              // a run is going: nothing to place now
+    return h("div", { class: "patchrow" },
+      h("div", { class: "row gap", style: "justify-content:space-between;align-items:center" },
+        h("span", { class: "muted small" }, why && !off ? `Mow a patch: ${why}.` : "Just a small spot?"),
+        h("button", { type: "button", class: "btn slim", "data-key": "ctl-patch", disabled: off || !!why || null,
+          title: why ? `Mow a patch: ${why}` : "Mow a small rectangle inside an area, along the last mow's lines",
+          onclick: startPlacing }, "Mow a patch")),
       last);
   }
   const ready = p.stage === "ready", stuck = p.stage === "stuck";
