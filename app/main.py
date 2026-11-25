@@ -499,6 +499,18 @@ async def _ha_start_check(request: Request, plan_id) -> dict:
     return start
 
 
+def json_finite(v):
+    """v with every NaN or infinite float as null: json.dumps would write them bare, which is not JSON, and the
+    browser's JSON.parse would drop the whole event (#177)."""
+    if isinstance(v, float):
+        return v if math.isfinite(v) else None
+    if isinstance(v, dict):
+        return {k: json_finite(x) for k, x in v.items()}
+    if isinstance(v, (list, tuple)):
+        return [json_finite(x) for x in v]
+    return v
+
+
 @app.get("/api/stream")
 async def stream(request: Request):
     r = rec(request)
@@ -511,11 +523,12 @@ async def stream(request: Request):
             now = time.monotonic()
             if now >= next_status:
                 next_status = now + 1.5
-                yield f"event: status\ndata: {json.dumps(full_status(request))}\n\n"
+                yield f"event: status\ndata: {json.dumps(json_finite(full_status(request)), allow_nan=False)}\n\n"
             poses = r.poses_since(seq)
             if poses:
                 seq = poses[-1]["seq"]
-                yield f"event: pose\ndata: {json.dumps([{k: v for k, v in p.items() if k != 'seq'} for p in poses])}\n\n"
+                out = [{k: v for k, v in p.items() if k != "seq"} for p in poses]
+                yield f"event: pose\ndata: {json.dumps(json_finite(out), allow_nan=False)}\n\n"
             await asyncio.sleep(0.25)
 
     return StreamingResponse(events(), media_type="text/event-stream",

@@ -106,3 +106,27 @@ def test_a_head_type_that_is_not_a_whole_number_is_no_head(tmp_path):
         r._ingest({"HeadMsg": {"head_type": 1}}, 1000.0, full=True)
         r._ingest({"HeadMsg": {"head_type": junk}}, 1001.0, full=True)
         assert (r.head_type, r.head_at) == (None, 1001.0), f"{junk!r} was taken for a head type"
+
+
+def test_non_finite_values_never_reach_the_pose_event(tmp_path):
+    """#177: a NaN or infinite lon or lat is no position; a non-finite tilt, speed or heading goes out as null, and
+    /api/stream's events are strict JSON."""
+    import json
+    import math
+    from app.main import json_finite
+    r = _recorder(tmp_path)
+    bad = (math.nan, math.inf, -math.inf)
+    for i, v in enumerate(bad):
+        r._note_pose({"lon": v, "lat": 40.0}, 1000.0 + i, None)
+        r._note_pose({"lon": -90.0, "lat": v}, 1000.0 + i, None)
+    assert r.poses_since(0) == []
+    for i, v in enumerate(bad):
+        r._note_pose({"lon": -90.0, "lat": 40.0, "pitch": v, "roll": v, "phi": v, "speed_l": v, "speed_r": 0.4},
+                     2000.0 + i, None)
+    kept = r.poses_since(0)
+    assert len(kept) == 3
+    assert all(p["pitch"] is None and p["roll"] is None and p["heading"] is None and p["speed"] == 0.4 for p in kept)
+    json.dumps(kept, allow_nan=False)
+    status = {"robot": {"position": {"lon": math.nan}, "speed": [math.inf, 0.1]}, "n": 1, "ok": True}
+    assert json.loads(json.dumps(json_finite(status), allow_nan=False)) == {
+        "robot": {"position": {"lon": None}, "speed": [None, 0.1]}, "n": 1, "ok": True}
