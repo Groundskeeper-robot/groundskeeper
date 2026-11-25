@@ -261,7 +261,7 @@ Write rules that follow from the robot's behaviour (details in [`map-writes.md`]
 Live's Control card can mow one rectangle inside an area once (`app/patch.py`). It is placed by two opposite corners
 (`PatchMower.check_corners`): the rectangle between them in the frame of the lines (`span`), grown to 1.5 m a side if
 smaller, then trimmed (`trim`): the side with the largest share of outline points outside the area, or within 0.55 m
-of its edge, moves in by 5 cm at a time until none are; the result goes through the same `check` as set-up. The panel adds an area of its own
+of its edge plus half a stripe gap (room for set-up's shift onto the lines), moves in by 5 cm at a time until none are; the result goes through the same `check` as set-up. The panel adds an area of its own
 (`save_clean_area` without an id, the surrounding area's `ref`), copies the surrounding area's settings with
 `edge_circles` 0, `buffer_dis` 0 and one pass (`current_index` 0, `clean_times` 1, both pass angles the same), and adds a plan holding only it. The line direction and position come from the
 newest recorded run with stripes over the patch, else from the surrounding area's route preview. The robot measures

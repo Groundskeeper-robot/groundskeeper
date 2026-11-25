@@ -882,3 +882,20 @@ def test_lines_that_never_agree_are_refused(tmp_path):
     _lines_that_turn(p, [30.0, 120.0, 30.0, 120.0, 30.0, 120.0, 30.0])
     r = asyncio.run(p.check_corners(lonlat(9.0, 11.0), lonlat(12.7, 16.6)))
     assert not r["ok"] and "run two ways" in r["problems"][0]
+
+
+def test_a_trimmed_patch_keeps_room_for_the_shift_onto_the_lines(tmp_path):
+    _, _, p, _, _ = setup(tmp_path)
+    r = asyncio.run(p.check_corners(lonlat(14.0, 11.0), lonlat(22.0, 15.0)))    # trimmed at the edge x = 20
+    gap = r["target"]["gap"]
+    ring = [_local(c) for c in r["corners"]]
+    assert patch.ring_gap(ring, [(0, 0), (20, 0), (20, 20), (0, 20)]) >= patch.EDGE_CLEAR_M + gap / 2
+
+
+def test_the_handles_sit_on_the_returned_rectangle_when_its_lines_differ_a_little(tmp_path):
+    _, _, p, _, _ = setup(tmp_path)
+    _lines_that_turn(p, [30.0, 30.6])                          # within the angle tolerance: no rebuild
+    r = asyncio.run(p.check_corners(lonlat(9.0, 11.0), lonlat(12.7, 16.6)))
+    ring = [_local(c) for c in r["corners"]]
+    for hnd in r["handles"]:
+        assert min(math.dist(_local(hnd), c) for c in ring) < 0.01

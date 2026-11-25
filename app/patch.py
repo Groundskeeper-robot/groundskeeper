@@ -564,7 +564,9 @@ class PatchMower:
             if length > MAX_SIDE_M or width > MAX_SIDE_M:
                 return {"ok": False, "area": named, "problems": [f"at most {MAX_SIDE_M:.0f} m each way"]}
             ring_parent = mapstudio.local(parent, gps_ref)
-            final = trim(asked, tgt["angle"], ring_parent, EDGE_CLEAR_M + TRIM_STEP_M)   # a step to spare for set-up
+            # Set-up then shifts the patch across the lines by up to half a gap to sit on the last mow's: room for
+            # that, and a trim step, so a patch trimmed to fit here still fits after the shift.
+            final = trim(asked, tgt["angle"], ring_parent, EDGE_CLEAR_M + gap / 2 + TRIM_STEP_M)
             if final is None:
                 return {"ok": False, "area": named, "problems": [
                     f"too little of it is inside “{parent.get('name') or parent['id']}” to mow"],
@@ -584,7 +586,8 @@ class PatchMower:
         else:
             return {"ok": False, "area": named, "problems": [
                 "the stripes here run two ways: tap a little further into one mow's stripes"]}
-        u, n = axes(tgt["angle"])
+        # The handles sit on the corners of the rectangle returned, in its own frame (within ANGLE_TOL_DEG of tgt).
+        u, n = axes((out.get("target") or tgt)["angle"])
         su = 1 if (pts[0][0] - center[0]) * u[0] + (pts[0][1] - center[1]) * u[1] >= 0 else -1
         sn = 1 if (pts[0][0] - center[0]) * n[0] + (pts[0][1] - center[1]) * n[1] >= 0 else -1
         handle = [(center[0] + s * su * u[0] * length / 2 + s * sn * n[0] * width / 2,
