@@ -24,7 +24,9 @@ const sandbox = {
   stateColor: () => "g", num: (v) => String(v), dur: (v) => `${v}s`,     // Mow a patch has its own tests (tests/test_patch.py)
 };
 vm.createContext(sandbox);
-vm.runInContext(src.slice(at, end) + "\nthis.controlCard = controlCard;", sandbox);
+const sk = src.indexOf("function stateKnown("), skEnd = src.indexOf("\n}\n", sk) + 3;
+if (sk < 0) throw new Error("stateKnown not found in web/ops.js");
+vm.runInContext(src.slice(sk, skEnd) + src.slice(at, end) + "\nthis.controlCard = controlCard;", sandbox);
 
 const find = (n, test) => (n && test(n) ? [n] : []).concat(...((n && n.kids) || []).map((k) => find(k, test)));
 const keyed = (card, key) => find(card, (n) => n.attrs && n.attrs["data-key"] === key)[0];

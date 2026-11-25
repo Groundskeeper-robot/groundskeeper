@@ -5,7 +5,8 @@ The robot now: where it is, what it is doing, and the last 24 hours of its track
 
 **Map / Camera** (beside the title) switches the layout; this browser remembers the choice. **Camera** puts the
 follow-cam where the map was, with the camera chips top left, the yard check top right and the robot's state along
-the foot; the map becomes a small card in the panel. The panel then starts with the emergency buttons:
+the foot; the map becomes a small card in the panel (the map's legend and imagery line are left out there). While a
+run is going (or the robot's state is not known), the panel then starts with the emergency buttons:
 a big red **Pause** (it turns into **Resume** while the plan is paused), with **Stop** and **Return to dock** under
 it, and the small map right under them. Each needs two taps: the first arms it for 4 seconds (it turns amber and says "Tap again"), the second sends. They go through the same checks as the
 Control card and need control on. Once a button is armed, keyboard focus leaves it, so a stray Space or Enter cannot
@@ -16,10 +17,15 @@ they last. When no camera's coverage holds the robot (it has driven out of every
 the big slot shows the map again and the camera comes back when the robot drives into view; both changes wait 10 s so
 one stray position does not flip the picture. Pinning a camera with its chip keeps the camera up regardless.
 
-On a phone in the **Map** layout, while a run is going, the same emergency buttons are pinned to the bottom of the
-screen in one row (**Pause** or **Resume**, **Stop**, **Dock**), so they stay one tap away wherever you have scrolled;
-the Control card then leaves its own run buttons out. Docked or idle, there is no bar and the panel starts with the
-status as before.
+Docked or idle there are no emergency buttons in either layout: none of them would do anything, and the Control card
+has Start (and, for a robot stopped out in the yard, Return to dock).
+
+On a phone, in either layout, while a run is going the emergency buttons are pinned to the foot of the screen in one
+row (**Pause** or **Resume**, **Stop**, **Dock**), just above the page bar, so they stay one tap away wherever you
+have scrolled; the Control card then has nothing left to show and steps aside (unless a patch is going). Docked or
+idle there is no bar. At rest there is no status card either: the robot's state and battery are in the top bar and
+the Control card's header. **Lawn conditions** folds to one line on a phone (the state and what it means); tap it for
+the rules and readings.
 
 The bar at the top of every page: problems first, tinted in their colour (a robot error, a guard, a run waiting
 for you). Then the switches, **Control** (and **Map writing** in Map Studio): click to switch one off; switching it

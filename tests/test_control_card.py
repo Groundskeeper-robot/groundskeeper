@@ -49,3 +49,13 @@ def test_a_robot_stopped_in_the_yard_can_still_be_sent_home():
 
 def test_resume_stays_when_the_state_is_unknown_and_the_emergency_card_cannot_offer_it():
     assert card_keys()["unknownWithEmergency"] == ["ctl-plan", "ctl-start_plan", "ctl-resume"]
+
+
+def test_the_emergency_card_shows_only_while_a_run_goes():
+    """Docked or idle none of its buttons would do anything; the camera layout keeps it while the state is unknown."""
+    assert card_keys()["emergency"] == {"cameraDocked": False, "cameraMowing": True, "cameraUnknown": True,
+                                        "mapPhoneDocked": False, "mapPhoneMowing": True, "mapDesktopMowing": False}
+
+
+def test_a_run_behind_the_emergency_card_has_no_control_card():
+    assert card_keys()["mowingWithEmergency"] == []          # no card at all: the pinned bar and the status card say it

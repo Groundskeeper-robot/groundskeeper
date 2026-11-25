@@ -127,10 +127,12 @@ async function liveExtras(s) {
   if (ops.mode === "camera") {
     const away = !fc.pinned && (!fc.cam || fc.covered === false);
     if (away !== ops.camAway) { ops.camAway = away; syncLiveMode(); }
-    document.body.classList.remove("ecpinned");
-    if (away) return [emergencyCard(s), camAwayCard(fc), statusCard(s), ...rest];
+    const show = emergencyShown(s), pinned = show && PHONE_LIVE.matches;
+    document.body.classList.toggle("ecpinned", pinned);
+    const ecard = show ? emergencyCard(s, pinned) : null;
+    if (away) return [ecard, camAwayCard(fc), statusCard(s), ...rest];
     drawCamStage(fc, s);
-    return [emergencyCard(s), miniMapCard(), statusCard(s), ...rest];
+    return [ecard, miniMapCard(), statusCard(s), ...rest];
   }
   const pinned = PHONE_LIVE.matches && runGoing(s);
   document.body.classList.toggle("ecpinned", pinned);
@@ -364,7 +366,9 @@ function drawReadiness(el, c, full, planId) {
   // The reasons beyond "control is off" (that one is said on its own when it is the only one).
   const reasons = (r.why || []).filter((x) => x.code !== "control_off");
   const [color, text] = r.would_send ? [GREEN, "Every start check passes"]
-    : reasons.length ? [reasons.some((x) => x.severity === "block") ? CORAL : AMBER, `Can't start: ${whyHead(reasons)}`]
+    : reasons.length ? [reasons.some((x) => x.severity === "block") ? CORAL : AMBER,
+        full ? (reasons.length > 1 ? `Can't start, for ${reasons.length} reasons:` : "Can't start:")   // the list says them
+        : `Can't start: ${whyHead(reasons)}`]
     : !r.enabled && r.reason === "ok" ? [MUTED, "Every start check passes (control is off, so nothing would be sent)"]
     : [hard ? CORAL : AMBER, `A start would be refused: ${r.reason}`];
   const head = h("span", { class: "readyhead small" }, dot(color), h("span", null, text));
@@ -516,12 +520,14 @@ function controlCard(s) {
     openConfirm("start_plan", p ? `Start ${p.name}` : "Start plan", { plan_id: ops.planId });
   };
   const disabled = !on || !routeOk(o);
-  const why = !on ? ["Control is switched off. ", h("a", { href: "#settings/safety" }, "Switch it on in Settings"), "."]
-            : !routeOk(o) ? noRouteWhy(o) : null;
   // Only what makes sense in the robot's state is offered; when the state is unknown, everything is (the server's
   // interlocks still decide).
-  const act = s.activity, known = !!act && !s.lost_contact && s.state !== "waiting for data";
+  const act = s.activity, known = stateKnown(s);
   const running = !!s.run || !["docked", "idle"].includes(act);
+  // A missing route is said once: by the start checks under Start when they are shown, else here.
+  const checksShown = (!known || !running) && !patchUI.view?.patch && plans.length;
+  const why = !on ? ["Control is switched off. ", h("a", { href: "#settings/safety" }, "Switch it on in Settings"), "."]
+            : !routeOk(o) && !checksShown ? noRouteWhy(o) : null;
   const no = (ok, text) => (known && !ok ? text : null);
   const idle = {
     start_plan: no(!running, "A run is already going."),
@@ -552,11 +558,16 @@ function controlCard(s) {
         btn("stop", "Stop", "stopbtn"))]
     : [h("div", { class: "ctlgrid" }, btn("pause", "Pause"), btn("cmd_recharge", "Return to dock"),
         known ? null : btn("resume", "Resume")), btn("stop", "Stop", "stopbtn wide")];
+  // During a run with the emergency card on screen, the run's buttons are there (with what is in their way: control
+  // off, no route) and its progress is in the status card: this card has nothing left unless a patch is going.
+  if (known && running && emergencyShown(s) && !patchSet) return null;
+  const batt = s.robot?.battery;
   return h("div", { class: `card${held ? " attention" : ""}` },
     h("div", { class: "row gap", style: "justify-content:space-between;align-items:baseline" },
       h("p", { class: "label", style: "margin:0" }, "Control"),
-      known ? h("span", { class: "small", style: `color:${stateColor(s)}` }, s.pause_reason ? `paused: ${s.pause_reason}`
-        : s.state) : null),
+      known ? h("span", { class: "small", "data-key": "control-state" },
+        h("span", { style: `color:${stateColor(s)}` }, s.pause_reason ? `paused: ${s.pause_reason}` : s.state),
+        typeof batt === "number" ? h("span", { class: "muted" }, ` · ${num(batt)}%`) : null) : null),
     why ? h("p", { class: "muted small" }, why) : null,
     showStart ? (plans.length ? [
       h("label", { for: "ctlplan", class: "muted small" }, "Plan"),
@@ -578,10 +589,17 @@ function controlCard(s) {
     patchBlock(disabled, idle.start_plan));
 }
 
-// The emergency card (two-tap Pause, Stop, Return to dock) is on screen: always in the camera layout, and on a phone
-// while a run goes, where it is pinned to the bottom of the screen.
+// The emergency card (two-tap Pause, Stop, Return to dock) is on screen: in the camera layout while a run goes (or the
+// state is unknown), and on a phone while a run goes, where it is pinned to the bottom of the screen in both layouts.
+// Docked or idle none of its buttons would do anything, so it is not shown then (the Control card has Start and, out in
+// the yard, Return to dock). The camera layout keeps it while the state is unknown: everything is offered then.
 function emergencyShown(s) {
-  return ops.mode === "camera" || (PHONE_LIVE.matches && runGoing(s));
+  if (ops.mode === "camera") return runGoing(s) || !stateKnown(s);
+  return PHONE_LIVE.matches && runGoing(s);
+}
+
+function stateKnown(s) {
+  return !!s.activity && !s.lost_contact && s.state !== "waiting for data";
 }
 
 /* A command's confirmation is a modal over the page (it used to open under the buttons, below the fold on a phone or
