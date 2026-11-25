@@ -13,4 +13,6 @@ Local rules for tests. The top-level `AGENTS.md` comes first.
 - **A bug fix starts with a failing test** that reproduces it.
 - **`test_guards.py` is not yours to change.** It encodes the rules in `AGENTS.md`. If it fails, the change is wrong;
   if the rule itself must change, say so in the issue first.
+- **A test that runs a page script in Node** gets `@pytest.mark.node` (`tests/conftest.py`): skipped without node on
+  your machine, it fails in CI. Never a `skipif` of your own.
 - Run one file with `python -m pytest -q tests/test_x.py`; everything with `python scripts/check.py`.

@@ -12,7 +12,7 @@ from app import control, why
 from tests.test_phase2 import good_ctx, make_controller, run
 
 ROOT = Path(__file__).resolve().parent.parent
-needs_node = pytest.mark.skipif(not shutil.which("node"), reason="node is not installed")
+needs_node = pytest.mark.node      # tests/conftest.py: skipped without node, fails in CI
 
 
 def test_a_start_point_goes_out_as_the_sdks_percent(tmp_path):
