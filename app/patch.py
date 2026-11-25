@@ -284,7 +284,10 @@ def snapshot(raw: dict, plans: list) -> dict:
             "refs": {str(a.get("id")): [round(v, 9) if isinstance(v, (int, float)) else v
                                         for v in (geo.ref_of(a, None) or ())] for a in raw.get("areas") or []},
             "plans": sorted([[p.get("id"), sorted(p.get("areaIds") or []), p.get("name")] for p in plans]),
-            "links": {str(p.get("id")): [p.get("start_id"), p.get("end_id")] for p in raw.get("pathways") or []}}
+            "links": {str(p.get("id")): [p.get("start_id"), p.get("end_id")] for p in raw.get("pathways") or []},
+            "paths": {str(p.get("id")): [pts(p), [round(v, 9) if isinstance(v, (int, float)) else v
+                                                  for v in (geo.ref_of(p, None) or ())]]
+                      for p in raw.get("pathways") or []}}
 
 
 def rest_differs(before: dict, raw: dict, plans: list, area_id, plan_id) -> list[str]:
@@ -310,6 +313,11 @@ def compare(before: dict, after: dict) -> list[str]:
     for k, v in before["links"].items():
         if after["links"].get(k) != v:
             out.append(f"pathway {k}'s links changed {v} → {after['links'].get(k)}")
+    for k, v in (before.get("paths") or {}).items():
+        w = (after.get("paths") or {}).get(k)
+        if w is not None and (w[1] != v[1] or len(w[0]) != len(v[0]) or any(
+                math.hypot(p[0] - q[0], p[1] - q[1]) > RANGE_TOL_M for p, q in zip(v[0], w[0]))):
+            out.append(f"pathway {k}'s outline changed")
     new = sorted(set(after["links"]) - set(before["links"]))
     if new:
         out.append(f"new pathways {', '.join(new)}")
@@ -329,6 +337,13 @@ class PatchMower:
         self._plan_lines: dict[int, tuple] = {}     # area id -> (when, its own route preview's steps)
         self._params: dict[int, tuple] = {}         # area id -> (when, its settings) for the placing checks
         self._start_lock = asyncio.Lock()
+
+    async def _send(self, cmd: str, payload: dict) -> dict:
+        """Every write of the patch's, set-up and removal alike, asks the map-writing switch first: switched off
+        part-way, the rest is refused (removal then stays stuck until it is on again)."""
+        if not self.store.setting("map_write_enabled", False):
+            raise WriteRefused("map writing is switched off (Settings → Safety)")
+        return await self.writer._send(cmd, payload)
 
     # -- state ---------------------------------------------------------------------------------------------------------
     def state(self) -> dict | None:
@@ -501,7 +516,7 @@ class PatchMower:
     async def _add(self, st, parent, read, raw, ring, plans, gps_ref) -> dict:
         w = self.writer
         ref = geo.ref_of(parent, gps_ref)
-        r = await w._send(AREA_SAVE, add_payload(parent, to_range(ring, ref, gps_ref)))
+        r = await self._send(AREA_SAVE, add_payload(parent, to_range(ring, ref, gps_ref)))
         data = r.get("data") if isinstance(r.get("data"), dict) else {}
         new_id = data.get("id") if isinstance(data.get("id"), int) and data.get("name") == NAME else None
         if new_id is None and r["sent"]:
@@ -524,12 +539,12 @@ class PatchMower:
                                    {"name": NAME, "areaIds": [new_id], "enable_self_order": True})
         st.update(plan_id=pl["id"])
         self._save(st)
-        p = await w._send(PLAN_SAVE, pl)
+        p = await self._send(PLAN_SAVE, pl)
         if not p["sent"]:
             raise RuntimeError(f"the patch's plan was not sent ({p.get('error')})")
         got = next((x for x in await self.rec.reload_plans() if x.get("id") == pl["id"]), None)
-        if not got or got.get("areaIds") != [new_id]:
-            raise RuntimeError("the robot does not list the patch's plan")
+        if not got or got.get("areaIds") != [new_id] or got.get("name") != NAME:
+            raise RuntimeError("the robot does not list the patch's plan as it was saved")
         st["log"].append(f"added plan {pl['id']}")
         after = await w.read_map()
         mine = mapstudio.find(after, "areas", new_id)
@@ -555,17 +570,17 @@ class PatchMower:
     async def _settings(self, st, read, route_angle: int) -> None:
         w, aid = self.writer, st["area_id"]
         want = patch_settings(read, aid, route_angle)
-        s = await w._send(areasettings.SAVE, want)
+        s = await self._send(areasettings.SAVE, want)
         if not s["sent"]:
             raise RuntimeError(f"the patch's settings were not sent ({s.get('error')})")
         record = (await w.read_areas()).get(aid)
         if record is None:
             raise RuntimeError("the robot has no record of the patch")
-        await w._send(AREA_SAVE, areasettings.area_record(record))       # as the app does after a settings save
+        await self._send(AREA_SAVE, areasettings.area_record(record))       # as the app does after a settings save
         got, err = await areasettings.read_settings(self.rec.read_area_params, aid)
         if got is None or got.get("id") != aid or areasettings.differs(got, want):
             raise RuntimeError(f"the robot kept other settings for the patch ({err or 'read back differs'})")
-        st["settings"] = {"route_angle": route_angle}
+        st["settings"] = {"route_angle": route_angle, "want": want}
         st["log"].append(f"settings copied, route angle {route_angle}")
 
     async def _preview(self, aid: int, gap: float, gps_ref) -> tuple[dict | None, dict]:
@@ -579,7 +594,8 @@ class PatchMower:
         pts = [geo.to_local(gps_ref, *geo.to_lonlat(ref, p["x"], p["y"])) for p in data["path"]
                if isinstance(p, dict) and "x" in p and "y" in p]
         summary = {**areasettings.route_summary(data, record["ref"]), "record": record}
-        return lines(segments(pts, 1.0, None), gap), summary
+        fit = lines(segments(pts, 1.0, None), gap)
+        return (fit if fit and fit["coherence"] >= MIN_COHERENCE else None), summary
 
     async def _align(self, st, raw, ring, route_angle: int, read, gps_ref) -> None:
         """The robot's route for the patch must run along the target lines and sit on them."""
@@ -603,7 +619,7 @@ class PatchMower:
             rec = copy.deepcopy(summary["record"])
             payload = {k: rec[k] for k in mapwrite.AREA_KEYS if k in rec}
             payload["range"] = to_range(ring, geo.ref_of(rec, gps_ref), gps_ref)
-            s = await self.writer._send(AREA_SAVE, payload)
+            s = await self._send(AREA_SAVE, payload)
             if not s["ok"]:
                 raise RuntimeError(f"moving the patch onto the lines failed ({s.get('error') or s.get('msg')})")
             st["ring"] = [list(p) for p in ring]
@@ -613,34 +629,45 @@ class PatchMower:
             if (not got or abs(_wrap_deg(got["angle"] - tgt["angle"])) > ANGLE_TOL_DEG
                     or abs(phase_shift(tgt, got, gap, at)) > SHIFT_TOL_M):
                 raise RuntimeError("the patch's lines still do not sit on the last mow's")
-        mine = mapstudio.find(await self.writer.read_map(), "areas", aid)
+        now = await self.writer.read_map()
+        mine = mapstudio.find(now, "areas", aid)
         if mine is None or not _range_matches(mine, [tuple(p) for p in st["ring"]], gps_ref):
             raise RuntimeError("the robot stored a different outline for the patch")
+        stored = problems({**now, "areas": [a for a in now.get("areas") or [] if a.get("id") != aid]},
+                          st["parent"]["id"], mapstudio.local(mine, gps_ref), gps_ref)
+        if stored:
+            raise RuntimeError("the outline the robot stored does not fit: " + "; ".join(stored))
         st["route"] = summary["route"]
         st["route_m"], st["time_s"] = summary["length_m"], summary["total_time_s"]
         st["lines"] = got
 
     # -- start ---------------------------------------------------------------------------------------------------------
-    async def preview(self) -> dict:
-        """The start's checks as the patch's own Start would meet them (nothing is sent)."""
+    def _ready(self, plan_id, patch=None) -> dict:
+        """The ready patch, if it is the one the person confirmed: its plan id AND its own mark (`created`, the time
+        its set-up began). Plan ids are reused: a patch set up after the confirmed one was removed can get its id."""
         st = self.state()
         if not st or st.get("stage") != "ready":
             raise WriteRefused("no patch is ready to start")
+        if (plan_id is not None and plan_id != st.get("plan_id")) or (patch is not None and patch != st.get("created")):
+            raise WriteRefused("that patch is gone; the patch set up now is another one: check it before starting")
+        return st
+
+    async def preview(self, plan_id: int | None = None, patch: float | None = None) -> dict:
+        """The start's checks as the patch's own Start would meet them (nothing is sent)."""
+        st = self._ready(plan_id, patch)
         token = PATCH_START.set(True)
         try:
             return await self.controller.preview("start_plan", {"plan_id": st["plan_id"]}, actor="user")
         finally:
             PATCH_START.reset(token)
 
-    async def start(self, override: bool = False) -> dict:
+    async def start(self, override: bool = False, plan_id: int | None = None, patch: float | None = None) -> dict:
         """Start the patch's plan through the controller, as a person (all the usual checks)."""
         async with self._start_lock:                 # one start per ready patch: a second press finds it started
-            return await self._start(override)
+            return await self._start(override, plan_id, patch)
 
-    async def _start(self, override: bool) -> dict:
-        st = self.state()
-        if not st or st.get("stage") != "ready":
-            raise WriteRefused("no patch is ready to start")
+    async def _start(self, override: bool, plan_id: int | None, patch: float | None) -> dict:
+        st = self._ready(plan_id, patch)
         if not self.store.setting("map_write_enabled", False):    # it has to come off again afterwards
             raise WriteRefused("map writing is switched off (Settings → Safety): the patch could not come off again")
         try:                                         # still the patch's plan? ids are reused if it went in the app
@@ -660,12 +687,13 @@ class PatchMower:
             raise WriteRefused("the patch's area is not the one that was set up any more (changed in the app?); "
                                "remove the patch and set it up again")
         rest = {**raw, "areas": [a for a in raw.get("areas") or [] if a.get("id") != st["area_id"]]}
-        moved = problems(rest, st["parent"]["id"], [tuple(p) for p in st["ring"]], self.rec.gps_ref)
+        moved = problems(rest, st["parent"]["id"], mapstudio.local(area, self.rec.gps_ref), self.rec.gps_ref)
         if moved:
             raise WriteRefused("the map changed around the patch (" + "; ".join(moved) + "); remove it and set it "
                                "up again")
         got, err = await areasettings.read_settings(self.rec.read_area_params, st["area_id"])
-        changed = settings_changed(got, st) if got is not None else [err or "could not read them"]
+        changed = (settings_changed(got, st) + areasettings.differs(got, (st.get("settings") or {}).get("want") or {})
+                   if got is not None else [err or "could not read them"])
         if changed:
             raise WriteRefused("the patch's mowing settings are not the ones that were set up any more ("
                                + ", ".join(changed) + "); remove the patch and set it up again")
@@ -722,7 +750,7 @@ class PatchMower:
         left, area = [], None
         try:
             for p in self._patch_plans(st, await self.rec.reload_plans()):
-                r = await w._send(PLAN_DELETE, {"id": p["id"]})
+                r = await self._send(PLAN_DELETE, {"id": p["id"]})
                 notes.append(f"plan {p['id']}: {'deleted' if r['ok'] else r.get('error') or r.get('msg')}")
             plans = await self.rec.reload_plans()
             left += [f"plan {p['id']} is still on the robot" for p in self._patch_plans(st, plans)]
@@ -745,7 +773,7 @@ class PatchMower:
             elif area is not None and left:
                 left.append(f"area {area['id']} kept until its plan is gone")
             elif area is not None:
-                r = await w._send(AREA_DELETE, {"id": area["id"]})
+                r = await self._send(AREA_DELETE, {"id": area["id"]})
                 notes.append(f"area {area['id']}: {'deleted' if r['ok'] else r.get('error') or r.get('msg')}")
                 raw = await w.read_map()
                 still = mapstudio.find(raw, "areas", area["id"])
