@@ -46,3 +46,13 @@ def test_the_emergency_card_holds_the_run_buttons_when_it_is_on_screen():
     assert r["mowingWithEmergency"] == []
     assert r["dockedWithEmergency"] == ["ctl-plan", "ctl-start_plan"]
     assert r["unknownWithEmergencyStop"] is False
+
+
+@needs_node
+def test_a_robot_stopped_in_the_yard_can_still_be_sent_home():
+    assert card_keys()["idleInYard"] == ["ctl-plan", "ctl-start_plan", "ctl-cmd_recharge"]
+
+
+@needs_node
+def test_resume_stays_when_the_state_is_unknown_and_the_emergency_card_cannot_offer_it():
+    assert card_keys()["unknownWithEmergency"] == ["ctl-plan", "ctl-start_plan", "ctl-resume"]

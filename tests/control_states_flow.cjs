@@ -35,10 +35,12 @@ const out = {
   held: keys(card({ activity: "paused", state: "paused", run })),
   returning: keys(card({ activity: "returning", state: "returning", run })),
   unknown: keys(card({ activity: null, state: "waiting for data", run: null })),
+  idleInYard: keys(card({ activity: "idle", state: "idle", run: null })),
 };
 sandbox.emergency = true;                        // the emergency card holds the run's buttons
 out.mowingWithEmergency = keys(card({ activity: "mowing", state: "mowing", run }));
 out.dockedWithEmergency = keys(card({ activity: "docked", state: "docked", run: null }));
+out.unknownWithEmergency = keys(card({ activity: null, state: "waiting for data", run: null }));
 const stop = find(card({ activity: "unknown", state: "waiting for data", run: null }),
   (n) => n.attrs && n.attrs["data-key"] === "ctl-stop")[0];
 sandbox.emergency = false;

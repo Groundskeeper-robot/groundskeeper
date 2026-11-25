@@ -545,7 +545,8 @@ function controlCard(s) {
     h("span", { class: "ctlrunname" }, runPlan ? runPlan.name : held ? "Plan held" : s.state),
     pct !== null && pct !== undefined ? h("span", { class: "muted small mono" },
       `${num(pct)}% of the plan${left ? ` · about ${dur(left)} left` : ""}`) : null) : null;
-  const runButtons = !showRun ? null : held
+  // The emergency card has no Resume while the state is unknown (it shows Pause then), so this card keeps it.
+  const runButtons = !showRun ? (!known && emergencyShown(s) ? [btn("resume", "Resume")] : null) : held
     ? [btn("resume", "Resume…", "pri wide"), h("div", { class: "ctlgrid" }, btn("cmd_recharge", "Return to dock"),
         btn("stop", "Stop", "stopbtn"))]
     : [h("div", { class: "ctlgrid" }, btn("pause", "Pause"), btn("cmd_recharge", "Return to dock"),
@@ -570,6 +571,9 @@ function controlCard(s) {
           h("a", { href: "#help/not-yet" }, "the panel cannot make plans yet"), ").")) : null,
     runLine,
     runButtons ? h("div", { class: "ctlrunbtns" }, runButtons) : null,
+    // Stopped out in the yard (idle, off the dock): no run, but it can still be sent home.
+    known && !running && !idle.cmd_recharge && !emergencyShown(s)
+      ? h("div", { class: "ctlrunbtns" }, btn("cmd_recharge", "Return to dock")) : null,
     patchBlock(disabled, idle.start_plan));
 }
 
@@ -694,7 +698,8 @@ function drawConfirm() {
   const canSend = p && p.enabled && !c.startAt?.invalid
     && (p.would_send || (softOnly && c.override && start));
   // A typed start point: keep the caret in the box across the redraw its own checks cause.
-  const typing = document.activeElement?.dataset?.key === "confirm-from";
+  const typing = document.activeElement?.dataset?.key === "confirm-from" ? document.activeElement : null;
+  const caret = typing ? [typing.selectionStart, typing.selectionEnd, typing.selectionDirection] : null;
   fill(c.box,
     h("h3", { id: "confirm-title" }, c.previewOnly ? `Gate check · ${c.label}`
       : start ? `${c.startAt?.base || c.label}?` : `Send “${c.label}”?`),
@@ -725,7 +730,7 @@ function drawConfirm() {
         refreshLive();
       } }, start ? (c.startAt?.pct ? `Start from ${c.startAt.pct}%` : "Start") : "Send")));
   const box = c.box.querySelector?.('[data-key="confirm-from"]');
-  if (typing && box) { box.focus(); box.setSelectionRange?.(box.value.length, box.value.length); }
+  if (typing && box) { box.focus(); box.setSelectionRange?.(...caret); }     // where the caret was, not the end
   else if (!c.box.contains(document.activeElement)) c.box.querySelector("button:not([disabled])")?.focus();  // a redraw drops focus
 }
 
