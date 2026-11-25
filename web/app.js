@@ -1222,6 +1222,9 @@ function stateColor(s) {
 // Live's first card: what the robot is doing, and while a run goes, how it goes.
 function statusCard(s) {
   const r = s.robot, run = s.run, p = (run && run.plan) || {};
+  // At rest it would only repeat the state, said in the top bar and the Control card's header; it stays for a run, an
+  // error, or a robot that is out of the dock and doing something.
+  if (!run && !r.error_code && s.state !== "error" && ["docked", "idle"].includes(s.activity)) return null;
   const held = HELD.has(s.activity);
   return h("div", { class: "card" },
     h("div", { class: "row gap", style: "align-items:baseline;flex-wrap:wrap" },
@@ -1424,7 +1427,10 @@ async function series(metric, hours, weather = false) {
 let conditionsCache = { at: 0, data: null };
 async function conditionsCard() {
   if (Date.now() - conditionsCache.at > 30000) {
-    try { conditionsCache = { at: Date.now(), data: await getJSON("/api/conditions") }; } catch { /* keep */ }
+    try {
+      const data = await getJSON("/api/conditions");
+      conditionsCache = { ...conditionsCache, at: Date.now(), data };   // read after the wait: a toggle meanwhile stays
+    } catch { /* keep */ }
   }
   const c = conditionsCache.data;
   if (!c || !c.state) {
@@ -1432,10 +1438,14 @@ async function conditionsCard() {
   }
   const i = c.inputs;
   const summary = c.raining ? "raining now" : c.dry_by ? `dry by about ${clock(c.dry_by)}` : c.state === "Dry" ? "good to mow" : "";
+  // One line (the state and what it means) that opens for the rules and readings; open by default where there is
+  // room, folded on a phone. A toggle holds for this page load.
+  const open = conditionsCache.open ?? !STACKED.matches;
   return h("div", { class: "card" },
     h("div", { class: "row gap", style: "justify-content:space-between" }, h("p", { class: "label", style: "margin:0" }, "Lawn conditions"),
       h("span", { class: "muted small" }, `Tempest · ${dur(i.obs_age_s)} ago`)),
-    h("div", { class: "row gap", style: "align-items:baseline;flex-wrap:wrap;margin-top:6px" },
+    h("details", { class: "condfold", open: open || null, ontoggle: (e) => { conditionsCache.open = e.target.open; } },
+    h("summary", { class: "row gap", "data-key": "cond-summary", style: "align-items:baseline;flex-wrap:wrap;margin-top:6px" },
       h("span", { class: "big", style: `color:${STATE_COLOR[c.state]}` }, c.state),
       h("span", { class: "muted" }, summary)),
     h("ul", { class: "rules" }, c.rules.map((r) => h("li", null, dot(STATE_COLOR[r.state]),
@@ -1445,7 +1455,7 @@ async function conditionsCard() {
     kv("Humidity · sun", `${num(i.rh)}% · ${num(i.solar)} W/m²`),
     kv(`Rain last hour · last ${num(c.config?.lookback_h ?? 6, 0)} h`, c.units === "us" ? `${num(i.rain_last_h_mm / 25.4, 2)} · ${num(i.rain_lookback_mm / 25.4, 2)} in`
                                                   : `${num(i.rain_last_h_mm, 2)} · ${num(i.rain_lookback_mm, 1)} mm`),
-    i.soil_pct != null ? kv("Soil moisture", `${num(i.soil_pct, 0)} %`) : null);
+    i.soil_pct != null ? kv("Soil moisture", `${num(i.soil_pct, 0)} %`) : null));
 }
 
 async function renderLive(s) {

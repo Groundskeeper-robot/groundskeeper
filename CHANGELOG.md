@@ -33,6 +33,12 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ### Changed
 
+- **Live on a phone, tidied** (an audit of the phone layout). The pinned run controls sit above the page bar instead
+  of over it, and the camera layout pins them too. Docked or idle there are no emergency buttons (none would do
+  anything) and no status card (the state and battery are in the top bar and the Control card's header). During a
+  run the Control card steps aside when the pinned controls and the status card already say everything. A missing
+  route is said once on Live, and Schedule's "Right now" names the reasons once. The map's imagery line no longer
+  shows over the camera picture. Lawn conditions folds to one line on a phone.
 - **The Control card shows only what the robot can do now.** Docked: the plan and Start, with Mow a patch as a quiet
   row under it. During a run: Pause (or Resume, then the main button) and Return to dock, with Stop on a row of its
   own in the refusal colour, never next to Start. Buttons the state rules out are left out instead of greyed. On a

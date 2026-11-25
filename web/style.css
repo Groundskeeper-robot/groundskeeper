@@ -808,7 +808,9 @@ button.subtab { border: 0; background: none; font: inherit; font-size: 13px; cur
 @media (max-width: 700px) { .cathead { flex-direction: column; align-items: stretch; } }
 
 /* ------------------------------------------------------- live: camera layout */
-.layout.cam .maptools, .layout.cam .legend { display: none; }
+/* The map's own overlays stay in the big slot when the map moves to the small card: hidden there, or they would sit over
+   the camera picture (the imagery line too: the small map is an overview, like its hidden controls). */
+.layout.cam .maptools, .layout.cam .legend, .layout.cam .imgcredit { display: none; }
 .camstage { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: #000; }
 .camstage[hidden] { display: none; }
 .camstage img { width: 100%; height: 100%; object-fit: contain; }
@@ -991,4 +993,16 @@ button.subtab { border: 0; background: none; font: inherit; font-size: 13px; cur
   .ecard.pinned .btn.huge, .ecard.pinned .ehalf .btn { min-height: 52px; font-size: 15px; margin: 0; }
   .ecard.pinned .ehint, .ecard.pinned .armhint { grid-column: 1 / -1; margin: 0 !important; }
   body.ecpinned .shell[data-view="live"] { padding-bottom: 130px; }
+}
+
+/* ---- mobile audit ---- */
+.condfold > summary { list-style: none; cursor: pointer; }
+.condfold > summary::-webkit-details-marker { display: none; }
+.condfold > summary::after { content: "▾"; color: var(--muted); font-size: 13px; margin-left: auto; }
+.condfold[open] > summary::after { content: "▴"; }
+@media (max-width: 700px) {
+  /* The phone's nav bar is at the foot of the screen: the pinned run controls sit on top of it, not over it. */
+  .ecard.pinned { bottom: calc(61px + env(safe-area-inset-bottom)); border-radius: 12px; left: 6px; right: 6px; }
+  body.ecpinned .shell[data-view="live"] { padding-bottom: calc(200px + env(safe-area-inset-bottom)); }
+  body.ecpinned:has(.shell[data-view="live"]) .toast { bottom: calc(210px + env(safe-area-inset-bottom)); }
 }
