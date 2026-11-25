@@ -10,7 +10,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 
 
-@pytest.mark.skipif(not shutil.which("node"), reason="node is not installed")
+@pytest.mark.node      # tests/conftest.py: skipped without node, fails in CI
 def test_the_metrics_switch_shows_with_sign_in_off_and_on():
     out = subprocess.run([shutil.which("node"), str(ROOT / "tests" / "access_flow.cjs"), str(ROOT / "web" / "settings.js")],
                          capture_output=True, encoding="utf-8", timeout=60, check=True).stdout

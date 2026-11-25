@@ -96,6 +96,9 @@ reviews:
       instructions: |
         Follow tests/AGENTS.md: offline and synthetic, reuse the fakes, one test per behaviour named for it.
         Flag any edit to tests/test_guards.py, a loosened assertion, or an added skip.
+        A test that runs a page script in Node uses `@pytest.mark.node` (tests/conftest.py): skipped without node on
+        a contributor's machine, it fails in CI. That marker is the house rule, not an added skip; a `skipif` of its
+        own is.
     - path: "catalog/**"
       instructions: |
         Follow catalog/AGENTS.md and catalog/README.md: one JSON file per source with its coverage outline; the

@@ -12,7 +12,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 SRC = (ROOT / "web" / "cameras.js").read_text(encoding="utf-8")
 CODE = re.sub(r"/\*.*?\*/|//[^\n]*", "", SRC, flags=re.S)             # without comments
-needs_node = pytest.mark.skipif(not shutil.which("node"), reason="node is not installed")
+needs_node = pytest.mark.node      # tests/conftest.py: skipped without node, fails in CI
 
 
 def run_flow() -> list:
