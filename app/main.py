@@ -645,6 +645,75 @@ async def remove_plan(request: Request, pid: int, force: bool = False):
         raise HTTPException(409, str(exc))
 
 
+# -- mow a patch (ADR 0013, app/patch.py) ------------------------------------------------------------------------------
+@app.get("/api/patch")
+async def patch_state(request: Request):
+    """The patch set up now (if any), why one cannot be set up now, and how the last one was removed."""
+    return ops(request).patch.view()
+
+
+@app.post("/api/patch/check")
+async def patch_check(request: Request, body: dict = Body(...)):
+    """Where a patch centred at {lon, lat} with {length, width} would go and whether it can: read-only."""
+    try:
+        return await ops(request).patch.check(body.get("lon"), body.get("lat"), body.get("length"), body.get("width"))
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(400, str(exc))
+    except mapwrite.WriteRefused as exc:
+        raise HTTPException(409, str(exc))
+
+
+@app.post("/api/patch")
+async def patch_prepare(request: Request, body: dict = Body(...)):
+    """Add the patch to the robot (area, settings, plan), lined up with the last mow. Needs confirm: true."""
+    if body.get("confirm") is not True:
+        raise HTTPException(400, "confirm: true is required")
+    try:
+        return await ops(request).patch.prepare(body.get("lon"), body.get("lat"), body.get("length"), body.get("width"))
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(400, str(exc))
+    except mapwrite.WriteRefused as exc:
+        raise HTTPException(409, str(exc))
+
+
+def _override(body: dict) -> bool:
+    """A soft check is overridden only by a JSON true: "false", 1 or "yes" are refused, never read as true."""
+    v = body.get("override", False)
+    if not isinstance(v, bool):
+        raise HTTPException(400, "override must be true or false")
+    return v
+
+
+@app.post("/api/patch/preview")
+async def patch_preview(request: Request):
+    """The checks the patch's start would meet now; nothing is sent."""
+    try:
+        return await ops(request).patch.preview()
+    except mapwrite.WriteRefused as exc:
+        raise HTTPException(409, str(exc))
+
+
+@app.post("/api/patch/start")
+async def patch_start(request: Request, body: dict = Body(...)):
+    """Start the patch's plan: the same checks as any start (control.check), as a person."""
+    if body.get("confirm") is not True:
+        raise HTTPException(400, "confirm: true is required")
+    try:
+        return await ops(request).patch.start(override=_override(body))
+    except mapwrite.WriteRefused as exc:
+        raise HTTPException(409, str(exc))
+
+
+@app.delete("/api/patch")
+async def patch_remove(request: Request, accept: bool = False):
+    """Take the patch off the robot now (docked, idle): its plan and area, then compare with before. accept=true:
+    the person has seen what differs from before and lets the patch go anyway."""
+    try:
+        return await ops(request).patch.remove("accepted by hand" if accept else "removed by hand", accept=accept)
+    except mapwrite.WriteRefused as exc:
+        raise HTTPException(409, str(exc))
+
+
 @app.get("/api/cfd")
 async def cfd(request: Request):
     return rec(request).cfd or {}
@@ -1796,7 +1865,7 @@ async def control_send(request: Request, body: dict = Body(...)):
     if body.get("confirm") is not True:
         raise HTTPException(400, "confirm: true is required")
     return await ops(request).controller.send(body.get("cmd", ""), body.get("args") or {}, actor=_actor(request),
-                                              override=bool(body.get("override")), wait="background")
+                                              override=_override(body), wait="background")
 
 
 @app.get("/api/control/log")

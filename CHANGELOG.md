@@ -27,6 +27,19 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 - **The start confirmation names the plan it sends.** After another plan was picked on Live, a click on Start before
   the page had redrawn opened "Start" with the old plan's name while the new plan was the one sent. The plan is now
   read once, at the click, for both.
+### Added
+
+- **Mow a patch** (#183, ADR 0013): a button in Live's Control card mows one small rectangle inside an area, once.
+  Pan the map under the rectangle and set its length and width; the panel lays it along the last mow's lines, adds
+  it to the robot as a temporary area with its own plan (the surrounding area's settings, no boundary laps), lines
+  its stripes up with the last mow's and shows the robot's route. Start it with the usual checks. Once the robot is
+  back on its charger the panel deletes the patch and checks the rest of the map is as it was. Needs control and map
+  writing on. Not yet tried on a robot.
+
+### Changed
+
+- **`override` on `/api/control/send` must be `true` or `false`.** Any other value (`"false"`, `1`) was read as true,
+  so a program could override a soft check by mistake; it now gets a 400.
 
 ## 0.20.3 — 2026-11-23
 

@@ -127,6 +127,17 @@ are pink, edge passes violet.
   stopped or ended plan needs this: a paused one has **Resume**.
   Needs control switched on ([Safety](#help/safety)). Hover a button that is off to see why; on a phone or a narrow
   window a line under the buttons says it instead.
+- **Mow a patch:** mows one small rectangle inside an area, once, along the last mow's lines. Tap **Mow a patch…**:
+  a rectangle appears in the middle of the map, already turned along the stripes on the lawn. Pan the map under it
+  and set its length and width (1.5 to 30 m); it turns red with the reason if it does not fit (it must be inside one
+  area, 0.5 m from its edge, and 1 m from where pathways join it and from the charger). **Set up patch** adds it to
+  the robot as a temporary area named "Patch (temporary)" with its own plan, using the surrounding area's settings
+  without boundary laps, and shifts it a few centimetres so its stripes land on the last mow's; the robot's route
+  for it then shows on the map. **Start patch…** goes through the same checks as any start. Once the robot is back
+  on its charger the panel deletes the patch and its plan and checks that the rest of the map and the plans are as
+  they were (Events says so). A patch not started within 30 minutes is removed too; **Remove** takes it off at once.
+  Needs control and map writing on ([Safety](#help/safety)), the robot on its charger and no plan running. Don't
+  change the patch in the Yarbo app while it exists.
 - **Ready to start:** runs every check a start would face and sends nothing. When a start would be refused it says
   why and what fixes it ("Can't start: the lawn is not dry"), with every check one click further.
 - **Why it stopped:** when the robot paused itself (bumper, emergency stop, rain, a fault) or the last run ended

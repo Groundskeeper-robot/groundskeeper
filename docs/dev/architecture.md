@@ -418,7 +418,7 @@ Map Studio: `GET /api/studio` · `/api/studio/geojson?ref=` · `/api/studio/diff
 
 Interlocks without sending: `POST /api/control/preview {cmd, args}`
 
-Can command the robot: `POST /api/control/send {cmd, args, confirm: true, override}` ·
+Can command the robot: `POST /api/control/send {cmd, args, confirm: true, override}` (override: a JSON boolean, else 400) ·
 `POST /api/schedule/pending/confirm` (`/dismiss` only clears it) · `POST /api/studio/draft/apply {confirm: true, base}`
 (map writes, see Map Studio)
 
