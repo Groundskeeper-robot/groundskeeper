@@ -133,10 +133,14 @@ are pink, edge passes violet.
   The checks show as one line: a green dot and "All 12 start checks pass", or how many pass, with each one that fails
   spelled out under it with its reason (a soft one says you can start anyway). **Show all** opens the full list.
   Needs control switched on ([Safety](#help/safety)).
-- **Mow a patch:** mows one small rectangle inside an area, once, along the last mow's lines. Tap **Mow a patch…**:
-  a rectangle appears in the middle of the map, already turned along the stripes on the lawn. Pan the map under it
-  and set its length and width (1.5 to 30 m); it turns red with the reason if it does not fit (it must be inside one
-  area, 0.5 m from its edge, and 1 m from where pathways join it and from the charger). **Set up patch** adds it to
+- **Mow a patch:** mows one small rectangle inside an area, once, along the last mow's lines. Tap **Mow a patch**,
+  then tap one corner of the spot on the map and then the opposite corner: the rectangle between them is laid along
+  the stripes on the lawn, with a round handle on each of the two corners to drag. Two taps close together make the
+  smallest patch (1.5 m each way); at most 30 m each way. If part of it is outside the area, or closer than 0.5 m to
+  its edge, it is trimmed back along the lines and the bar says so ("Trimmed to 3.4 × 3 m to stay inside Side yard");
+  what you asked for stays drawn dashed. One that reaches into another area is refused: mow each side as its own
+  patch. It turns red with the reason if it still does not fit (1 m from where pathways join the area and from the
+  charger). **Start over** clears the corners. **Set up patch** adds it to
   the robot as a temporary area named "Patch (temporary)" with its own plan, using the surrounding area's settings
   without boundary laps, and shifts it a few centimetres so its stripes land on the last mow's; the robot's route
   for it then shows on the map. **Start patch…** goes through the same checks as any start. Once the robot is back

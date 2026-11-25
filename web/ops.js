@@ -534,7 +534,8 @@ function controlCard(s) {
   // Pause (or Resume when held) and Return to dock, with Stop on a row of its own, never next to Start. A button the
   // state rules out is left out rather than shown greyed. Where the emergency card is on screen (the camera layout, a
   // phone during a run) it holds the run's buttons, so this card does not repeat them.
-  const showStart = !known || !running;
+  const patchSet = !!patchUI.view?.patch;                     // a patch set up takes the plan's place
+  const showStart = (!known || !running) && !patchSet;
   const showRun = (!known || running) && !emergencyShown(s);
   const held = known && HELD.has(act);
   const btn = (cmd, label, cls = "") => (idle[cmd] ? null : h("button", { type: "button", class: `btn ${cls}`.trim(),
@@ -969,9 +970,12 @@ function opsMapInit() {
   map.addSource("patch", { type: "geojson", data: EMPTY });
   map.addLayer({ id: "patch-route", type: "line", source: "patch", filter: ["==", ["geometry-type"], "LineString"],
                  paint: { "line-color": MAP.route, "line-width": 1.5, "line-opacity": 0.9 } });
-  map.addLayer({ id: "patch-fill", type: "fill", source: "patch", filter: ["==", ["geometry-type"], "Polygon"],
+  const patchPoly = ["all", ["==", ["geometry-type"], "Polygon"], ["!=", ["get", "kind"], "asked"]];
+  map.addLayer({ id: "patch-asked", type: "line", source: "patch", filter: ["==", ["get", "kind"], "asked"],
+                 paint: { "line-color": AMBER, "line-width": 2, "line-dasharray": [2, 2] } });
+  map.addLayer({ id: "patch-fill", type: "fill", source: "patch", filter: patchPoly,
                  paint: { "fill-color": ["case", ["get", "ok"], SKY, CORAL], "fill-opacity": 0.18 } });
-  map.addLayer({ id: "patch-line", type: "line", source: "patch", filter: ["==", ["geometry-type"], "Polygon"],
+  map.addLayer({ id: "patch-line", type: "line", source: "patch", filter: patchPoly,
                  paint: { "line-color": ["case", ["get", "ok"], SKY, CORAL], "line-width": 2.5 } });
   loadCameraPolygons();
 }
@@ -1091,11 +1095,10 @@ startFollowTimer();
 
 /* ------------------------------------------------------------- mow a patch (ADR 0013) */
 /* A rectangle inside one area, mowed once along the last mow's lines; the server adds it to the robot, starts it with
-   the usual checks and takes it off again once the robot is back on its charger (app/patch.py). Placing it: the
-   rectangle stays in the middle of the map and the map pans under it, with steppers for its size, so nothing is
-   dragged by touch. The server lays it along the lines and says whether it fits. */
-const patchUI = { view: null, fetchedAt: 0, place: null, timer: null };
-const PATCH_STEP = 0.5, PATCH_MIN = 1.5, PATCH_MAX = 30;
+   the usual checks and takes it off again once the robot is back on its charger (app/patch.py). Placing it: tap one
+   corner of the spot, then the opposite one; two round handles then move those corners. The server lays the rectangle
+   between them along the lines, trims it back if part of it is outside the area, and says whether it fits. */
+const patchUI = { view: null, fetchedAt: 0, place: null };
 const PATCH_SETTLING = new Set(["adding", "aligning", "started", "removing"]);
 
 async function patchRefresh(force = false) {
@@ -1117,7 +1120,7 @@ function patchStageLine(p) {
   return {
     adding: "Setting up the patch on the robot…",
     aligning: "Lining the patch up with the last mow…",
-    ready: `Patch ready: ${size}${mins}.`,
+    ready: `Patch ready: ${size}, lined up with the last mow${mins}. Its route is on the map.`,
     started: p.running_seen
       ? `Mowing the patch (${size}). It comes off the robot once the robot is back on its charger.`
       : `Start sent for the patch (${size}); waiting for the robot to show it running…`,
@@ -1151,23 +1154,25 @@ function patchBlock(off, runningWhy) {
   // Taking it off needs what any map write needs; say what is in the way (map writing off strands it otherwise).
   const held = v.blocked && (ready || stuck || (p.stage === "started" && !/plan is running/.test(v.blocked)))
     ? v.blocked : null;
+  const remove = h("button", { type: "button", class: ready ? "linkbtn small" : "btn", "data-key": "ctl-patch-remove",
+    disabled: held || null, title: held ? `Remove: ${held}` : null, onclick: () => removePatch(false, !!p.differs?.length) },
+    stuck ? (p.differs?.length ? "Check again" : "Try again") : "Remove");
   return h("div", { class: "patchbox" },
-    h("p", { class: "small", style: `margin:0 0 8px;color:${stuck ? CORAL : "inherit"}` }, patchStageLine(p)),
+    h("p", { class: "small", style: `margin:0 0 10px;color:${stuck ? CORAL : "inherit"}` }, patchStageLine(p)),
     held ? h("p", { class: "whyline muted tiny", style: "margin:0 0 8px" },
       `It can't come off the robot right now: ${held}.`) : null,
-    ready || stuck ? h("div", { class: "row gap" },
-      ready ? h("button", { type: "button", class: "btn pri", "data-key": "ctl-patch-start", disabled: off || null,
+    ready ? [
+      h("button", { type: "button", class: "btn pri wide ctlstart", "data-key": "ctl-patch-start", disabled: off || null,
         onclick: () => openConfirm("start_plan", "Start the patch", { plan_id: p.plan_id }, false, {
           preview: () => postJSON("/api/patch/preview", { plan_id: p.plan_id, patch: p.created }),
           send: (override) => postJSON("/api/patch/start", { confirm: true, override, plan_id: p.plan_id,
                                                              patch: p.created })
             .finally(() => patchRefresh(true)),
-        })
-      }, "Start patch…") : null,
-      h("button", { type: "button", class: "btn", "data-key": "ctl-patch-remove", disabled: held || null,
-        title: held ? `Remove: ${held}` : null, onclick: () => removePatch(false, !!p.differs?.length) },
-        stuck ? (p.differs?.length ? "Check again" : "Try again") : "Remove"),
-      stuck && p.differs?.length ? h("button", { type: "button", class: "btn", "data-key": "ctl-patch-accept",
+        }) }, "Start patch…"),
+      h("div", { class: "row gap", style: "justify-content:space-between;align-items:center" },
+        h("span", { class: "muted small" }, "Comes off the robot once it is back on the dock."), remove)] : null,
+    stuck ? h("div", { class: "row gap" }, remove,
+      p.differs?.length ? h("button", { type: "button", class: "btn", "data-key": "ctl-patch-accept",
         disabled: held || null, onclick: () => removePatch(true) }, "Accept the map") : null) : null);
 }
 
@@ -1189,7 +1194,8 @@ async function removePatch(accept = false, recheck = false) {
 function startPlacing() {
   const map = state.map;
   if (!map || patchUI.place) return;                           // a second tap before the card redraws
-  const pl = patchUI.place = { length: 6, width: 3, check: null, center: null, seq: 0, busy: false, error: null };
+  const pl = patchUI.place = { a: null, b: null, check: null, seq: 0, busy: false, error: null, pending: false,
+                               markers: [] };
   // In the camera layout the map is the small locked overview: bring the big map back first, once it has settled.
   const small = MAP_EL.parentElement !== $(".mapwrap");
   ops.patchPlacing = true;
@@ -1202,26 +1208,21 @@ function beginPlacing() {
   const map = state.map;
   $(".mapwrap")?.classList.add("placing");
   if (STACKED.matches) $(".mapwrap")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  map.on("move", drawPatchMap);
-  map.on("moveend", patchCheckSoon);
+  map.on("click", patchTap);
+  map.getCanvas().style.cursor = "crosshair";
   drawPatchBar();
-  // The patch sits in the middle of what the bar leaves visible: the bar's height is the map's bottom padding, which
-  // moves the map's centre (getCenter) up with it.
   map.resize();
-  map.setPadding({ top: 0, left: 0, right: 0, bottom: ($("#patchbar")?.offsetHeight || 0) + 20 });
-  if (map.getZoom() < 20) map.easeTo({ zoom: 20, duration: 300 });     // close enough to place a few metres
-  patchCheck();
+  if (map.getZoom() < 19) map.easeTo({ zoom: 19, duration: 300 });     // close enough to tap a few metres apart
   refreshLive();
 }
 
 function stopPlacing() {
-  const map = state.map;
+  const map = state.map, pl = patchUI.place;
   if (map) {
-    map.off("move", drawPatchMap);
-    map.off("moveend", patchCheckSoon);
-    map.setPadding({ top: 0, left: 0, right: 0, bottom: 0 });
+    map.off("click", patchTap);
+    map.getCanvas().style.cursor = "";
   }
-  clearTimeout(patchUI.timer);
+  for (const m of pl?.markers || []) m.remove();
   patchUI.place = null;
   ops.patchPlacing = false;
   $(".mapwrap")?.classList.remove("placing");
@@ -1232,34 +1233,71 @@ function stopPlacing() {
   refreshLive();
 }
 
-function patchCheckSoon() {
-  clearTimeout(patchUI.timer);
-  patchUI.timer = setTimeout(patchCheck, 250);
+// A tap on the map: the first corner, then the opposite one. After that the round handles move them; taps do nothing
+// (a stray tap while panning must not move the patch).
+function patchTap(e) {
+  const pl = patchUI.place;
+  if (!pl || pl.busy || pl.b) return;
+  const at = [e.lngLat.lng, e.lngLat.lat];
+  if (!pl.a) pl.a = at; else pl.b = at;
+  placeHandles();
+  if (pl.b) patchCheck(); else drawPatchBar();
 }
 
-async function patchCheck() {
+// Big round handles on the two corners (maplibre markers: they drag by touch and by mouse alike).
+function placeHandles() {
   const pl = patchUI.place;
-  if (!pl || pl.busy || state.view !== "live") return;
-  const c = state.map.getCenter(), seq = ++pl.seq;
-  pl.pending = true;
-  drawPatchBar();
-  let r;
-  try { r = await postJSON("/api/patch/check", { lon: c.lng, lat: c.lat, length: pl.length, width: pl.width }); }
-  catch (e) { r = { ok: false, problems: [e.message] }; }
-  if (patchUI.place !== pl || seq !== pl.seq) return;          // a newer check is on its way
-  Object.assign(pl, { check: r, center: [c.lng, c.lat], pending: false });
+  for (const m of pl.markers) m.remove();
+  pl.markers = [pl.a, pl.b].map((at, i) => {
+    if (!at) return null;
+    const el = h("div", { class: "patchhandle", role: "img", "aria-label": i ? "Second corner" : "First corner" });
+    const m = new maplibregl.Marker({ element: el, draggable: true }).setLngLat(at).addTo(state.map);
+    m.on("dragend", () => {
+      const ll = m.getLngLat();
+      pl[i ? "b" : "a"] = [ll.lng, ll.lat];
+      if (pl.a && pl.b) patchCheck();
+    });
+    return m;
+  }).filter(Boolean);
+}
+
+function restartPlacing() {
+  const pl = patchUI.place;
+  if (!pl || pl.busy) return;
+  for (const m of pl.markers) m.remove();
+  Object.assign(pl, { a: null, b: null, check: null, markers: [], error: null, pending: false, seq: pl.seq + 1 });
   drawPatchMap();
   drawPatchBar();
 }
 
-// While placing, the rectangle follows the map's centre (corners kept as offsets from where they were checked).
+async function patchCheck() {
+  const pl = patchUI.place;
+  if (!pl || !pl.a || !pl.b || pl.busy || state.view !== "live") return;
+  const seq = ++pl.seq;
+  pl.pending = true;
+  drawPatchBar();
+  let r;
+  try { r = await postJSON("/api/patch/check", { a: pl.a, b: pl.b }); }
+  catch (e) { r = { ok: false, problems: [e.message] }; }
+  if (patchUI.place !== pl || seq !== pl.seq) return;          // a newer check is on its way
+  Object.assign(pl, { check: r, pending: false });
+  // The handles move onto the rectangle's own corners (trimmed or grown), so the next drag starts from what is drawn.
+  if (r.handles) {
+    [pl.a, pl.b] = r.handles;
+    pl.markers.forEach((m, i) => m.setLngLat(r.handles[i]));
+  }
+  drawPatchMap();
+  drawPatchBar();
+}
+
+// While placing: the rectangle as checked, and the part that was asked for but trimmed away, dashed.
 function drawPatchMap() {
   const pl = patchUI.place, p = patchUI.view?.patch, feats = [];
   const ring = (cs) => ({ type: "Polygon", coordinates: [[...cs, cs[0]]] });
-  if (pl && pl.check?.corners && pl.center && state.map) {
-    const c = state.map.getCenter();
-    const moved = pl.check.corners.map(([x, y]) => [x - pl.center[0] + c.lng, y - pl.center[1] + c.lat]);
-    feats.push({ type: "Feature", properties: { ok: !!pl.check.ok && !pl.pending }, geometry: ring(moved) });
+  if (pl && pl.check) {
+    if (pl.check.requested) feats.push({ type: "Feature", properties: { kind: "asked" }, geometry: ring(pl.check.requested) });
+    if (pl.check.corners) feats.push({ type: "Feature", properties: { ok: !!pl.check.ok && !pl.pending },
+                                       geometry: ring(pl.check.corners) });
   } else if (!pl && p?.corners && ["ready", "started", "aligning"].includes(p.stage)) {
     feats.push({ type: "Feature", properties: { ok: true }, geometry: ring(p.corners) });
     if (p.route) feats.push({ ...p.route, properties: {} });
@@ -1273,46 +1311,44 @@ function drawPatchBar() {
   let bar = $("#patchbar");
   if (!bar) { bar = h("div", { id: "patchbar", class: "patchbar", role: "group", "aria-label": "Place the patch" }); wrap.append(bar); }
   const r = pl.check;
-  const step = (key, d) => () => { pl[key] = Math.min(PATCH_MAX, Math.max(PATCH_MIN, pl[key] + d)); patchCheck(); };
-  const size = (key, label) => h("span", { class: "patchsize" },
-    h("span", { class: "muted tiny" }, label),
-    h("button", { type: "button", class: "btn", "data-key": `patch-${key}-less`, "aria-label": `${label} shorter`,
-      disabled: pl.busy || pl[key] <= PATCH_MIN || null, onclick: step(key, -PATCH_STEP) }, "−"),
-    h("b", null, `${pl[key]} m`),
-    h("button", { type: "button", class: "btn", "data-key": `patch-${key}-more`, "aria-label": `${label} longer`,
-      disabled: pl.busy || pl[key] >= PATCH_MAX || null, onclick: step(key, PATCH_STEP) }, "+"));
-  const lines = r?.target ? (r.target.source === "run" ? "along the last mow" : "along the area's plan") : null;
+  const lines = r?.target ? (r.target.source === "run" ? "along the last mow's lines" : "along the area's own lines") : "";
   const blocked = patchUI.view?.blocked;
+  const head = r?.ok ? h("div", { class: "row gap", style: "justify-content:space-between;align-items:baseline" },
+      h("b", null, `Patch in ${r.area.name || "the area"}`),
+      h("span", { class: "mono small" }, `${r.length} × ${r.width} m · ${r.area_m2} m²`)) : null;
   const status = pl.busy ? h("span", null, "Setting up on the robot… about a minute")
     : pl.error ? h("span", { style: `color:${CORAL}` }, pl.error)
+    : !pl.a ? h("span", null, "Tap one corner of the spot on the map.")
+    : !pl.b ? h("span", null, "Now tap the opposite corner.")
     : pl.pending || !r ? h("span", { class: "muted" }, "Checking…")
     : r.ok && blocked ? h("span", { style: `color:${AMBER}` }, `Fits here, but can't be set up now: ${blocked}`)
-    : r.ok ? h("span", null, `${r.area.name || "Area"} · ${r.area_m2} m² · ${lines}`)
+    : r.ok ? h("span", { class: "muted" }, `${lines[0].toUpperCase()}${lines.slice(1)}. Drag a round handle to change it.`)
     : h("span", { style: `color:${CORAL}` }, (r.problems || []).join("; "));
+  const notes = r?.notes?.length && !pl.pending ? h("p", { class: "small", style: `color:${AMBER};margin:4px 0 0` },
+    `${r.notes.join("; ")}.`.replace(/^./, (c) => c.toUpperCase())) : null;
   fill(bar,
-    h("div", { class: "row gap wrap" }, size("length", "Length"), size("width", "Width")),
-    h("p", { class: "small", style: "margin:6px 0" }, status),
-    h("div", { class: "row gap", style: "justify-content:flex-end" },
+    head,
+    h("p", { class: "small", style: "margin:4px 0 0" }, status),
+    notes,
+    h("div", { class: "row gap", style: "justify-content:flex-end;margin-top:8px" },
+      pl.a ? h("button", { type: "button", class: "btn", disabled: pl.busy || null, onclick: restartPlacing }, "Start over")
+        : null,
       h("button", { type: "button", class: "btn", disabled: pl.busy || null, onclick: stopPlacing }, "Cancel"),
       h("button", { type: "button", class: "btn pri", "data-key": "patch-setup",
         disabled: pl.busy || pl.pending || !r?.ok || !!blocked || null, onclick: setUpPatch }, "Set up patch")));
 }
 
 async function setUpPatch() {
-  const pl = patchUI.place;
-  if (!pl?.check?.ok) return;
-  const c = state.map.getCenter();
-  if (!pl.center || Math.abs(c.lng - pl.center[0]) > 1e-7 || Math.abs(c.lat - pl.center[1]) > 1e-7) {
-    patchCheck();                                              // moved since the last check: check where it is now
-    return;
-  }
-  if (!confirm(`Add a ${pl.length} × ${pl.width} m patch to the robot's map, with its own plan? `
+  const pl = patchUI.place, r = pl?.check;
+  if (!r?.ok || pl.pending) return;
+  if (!confirm(`Add a ${r.length} × ${r.width} m patch to the robot's map, with its own plan? `
                + "It is taken off again once it has been mowed.")) return;
   Object.assign(pl, { busy: true, error: null });
   drawPatchBar();
   try {
-    const r = await postJSON("/api/patch", { confirm: true, lon: pl.center[0], lat: pl.center[1], length: pl.length, width: pl.width });
-    if (!r.ok) throw new Error(r.error || "not set up");
+    const out = await postJSON("/api/patch", { confirm: true, lon: r.center[0], lat: r.center[1], length: r.length,
+                                               width: r.width });
+    if (!out.ok) throw new Error(out.error || "not set up");
     toast("The patch is ready: check its route on the map, then start it.");
     stopPlacing();
   } catch (e) {

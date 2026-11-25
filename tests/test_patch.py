@@ -788,3 +788,114 @@ def test_the_patch_routes_need_the_patch_mark():
     for bad in ({}, {"patch": "1"}, {"patch": True}, {"patch": None}, {"patch": float("nan")}):
         with pytest.raises(HTTPException):
             _patch_mark(bad)
+
+
+# -- placing by two corners ------------------------------------------------------------------------------------------
+def _local(p):
+    return geo.to_local(REF, *p)
+
+
+def _frame(ring, angle):
+    u, n = patch.axes(angle)
+    us = [x * u[0] + y * u[1] for x, y in ring]
+    ns = [x * n[0] + y * n[1] for x, y in ring]
+    return max(us) - min(us), max(ns) - min(ns)
+
+
+def test_two_corners_make_the_rectangle_between_them_along_the_lines(tmp_path):
+    robot, _, p, _, _ = setup(tmp_path)
+    a, b = (9.0, 11.0), (12.7, 16.6)                          # 6 m along 30° lines, 3 m across
+    r = asyncio.run(p.check_corners(lonlat(*a), lonlat(*b)))
+    assert r["ok"], r
+    ring = [_local(c) for c in r["corners"]]
+    want = patch.span(a, b, r["target"]["angle"])
+    assert _frame(ring, r["target"]["angle"]) == pytest.approx((want[1] - want[0], want[3] - want[2]), abs=0.02)
+    assert (r["length"], r["width"]) == pytest.approx((want[1] - want[0], want[3] - want[2]), abs=0.02)
+    assert r["notes"] == [] and r["requested"] is None and robot.sent == []
+    hs = [_local(h) for h in r["handles"]]                    # the handles sit on the corners nearest the taps
+    assert min(math.dist(hs[0], c) for c in ring) < 0.01 and math.dist(hs[0], a) < math.dist(hs[1], a)
+
+
+def test_a_patch_that_sticks_out_is_trimmed_to_fit_and_says_so(tmp_path):
+    robot, _, p, _, _ = setup(tmp_path)
+    r = asyncio.run(p.check_corners(lonlat(14.0, 11.0), lonlat(22.0, 15.0)))    # the area ends at x = 20
+    assert r["ok"], r
+    ring = [_local(c) for c in r["corners"]]
+    assert all(ms.point_in(c, [(0, 0), (20, 0), (20, 20), (0, 20)]) for c in ring)
+    assert patch.ring_gap(ring, [(0, 0), (20, 0), (20, 20), (0, 20)]) >= patch.EDGE_CLEAR_M
+    assert r["requested"] and any("trimmed" in x for x in r["notes"])
+    assert asyncio.run(p.prepare(*r["center"], r["length"], r["width"]))["ok"]   # set-up takes what was shown
+
+
+def test_a_patch_mostly_outside_the_area_is_refused(tmp_path):
+    _, _, p, _, _ = setup(tmp_path)
+    r = asyncio.run(p.check_corners(lonlat(19.2, 11.0), lonlat(19.6, 13.0)))   # at the edge: no room
+    assert not r["ok"] and "too little of it" in r["problems"][0] and r["requested"]
+
+
+def test_a_patch_reaching_into_another_area_is_refused(tmp_path):
+    _, _, p, _, _ = setup(tmp_path)
+    r = asyncio.run(p.check_corners(lonlat(5.0, 8.0), lonlat(33.0, 9.0)))       # front to inside back
+    assert not r["ok"] and "reaches into “back”" in r["problems"][0]
+
+
+def test_two_taps_close_together_make_the_smallest_patch(tmp_path):
+    _, _, p, _, _ = setup(tmp_path)
+    r = asyncio.run(p.check_corners(lonlat(12.0, 13.0), lonlat(12.3, 13.2)))
+    assert r["ok"] and r["length"] == pytest.approx(patch.MIN_SIDE_M) and r["width"] == pytest.approx(patch.MIN_SIDE_M)
+    assert any("smallest" in x for x in r["notes"])
+
+
+@pytest.mark.parametrize("bad", [None, [1], ["x", 2], [float("nan"), 1], [True, 1]])
+def test_corners_must_be_lon_lat_pairs(tmp_path, bad):
+    _, _, p, _, _ = setup(tmp_path)
+    with pytest.raises(ValueError):
+        asyncio.run(p.check_corners(bad, lonlat(12.0, 13.0)))
+
+
+def _lines_that_turn(p, angles):
+    """target() answering with the given line angles in turn (then the last one), the rest of its answer kept."""
+    real, seen = p.target, []
+
+    async def turning(*a, **k):
+        got = await real(*a, **k)
+        ang = angles[min(len(seen), len(angles) - 1)]
+        seen.append(ang)
+        return {**got, "angle": ang} if got else got
+    p.target = turning
+    return seen
+
+
+def test_lines_that_differ_around_the_final_rectangle_rebuild_it_from_the_taps(tmp_path):
+    _, _, p, _, _ = setup(tmp_path)
+    seen = _lines_that_turn(p, [30.0, 120.0])                   # the taps' lines, then other lines around the result
+    a, b = (9.0, 11.0), (12.7, 16.6)
+    r = asyncio.run(p.check_corners(lonlat(*a), lonlat(*b)))
+    assert r["ok"] and r["target"]["angle"] == 120.0 and seen[:3] == [30.0, 120.0, 120.0]
+    want = patch.span(a, b, 120.0)                              # built along the lines set-up will use
+    assert _frame([_local(c) for c in r["corners"]], 120.0) == pytest.approx(
+        (want[1] - want[0], want[3] - want[2]), abs=0.02)
+
+
+def test_lines_that_never_agree_are_refused(tmp_path):
+    _, _, p, _, _ = setup(tmp_path)
+    _lines_that_turn(p, [30.0, 120.0, 30.0, 120.0, 30.0, 120.0, 30.0])
+    r = asyncio.run(p.check_corners(lonlat(9.0, 11.0), lonlat(12.7, 16.6)))
+    assert not r["ok"] and "run two ways" in r["problems"][0]
+
+
+def test_a_trimmed_patch_keeps_room_for_the_shift_onto_the_lines(tmp_path):
+    _, _, p, _, _ = setup(tmp_path)
+    r = asyncio.run(p.check_corners(lonlat(14.0, 11.0), lonlat(22.0, 15.0)))    # trimmed at the edge x = 20
+    gap = r["target"]["gap"]
+    ring = [_local(c) for c in r["corners"]]
+    assert patch.ring_gap(ring, [(0, 0), (20, 0), (20, 20), (0, 20)]) >= patch.EDGE_CLEAR_M + gap / 2
+
+
+def test_the_handles_sit_on_the_returned_rectangle_when_its_lines_differ_a_little(tmp_path):
+    _, _, p, _, _ = setup(tmp_path)
+    _lines_that_turn(p, [30.0, 30.6])                          # within the angle tolerance: no rebuild
+    r = asyncio.run(p.check_corners(lonlat(9.0, 11.0), lonlat(12.7, 16.6)))
+    ring = [_local(c) for c in r["corners"]]
+    for hnd in r["handles"]:
+        assert min(math.dist(_local(hnd), c) for c in ring) < 0.01
