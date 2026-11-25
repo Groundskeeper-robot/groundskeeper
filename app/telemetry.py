@@ -198,8 +198,8 @@ def heading_deg(phi) -> float | None:
     """The robot's heading as a compass bearing (degrees clockwise from north) from CombinedOdom.phi: radians, the
     direction of travel in the robot's x/y frame, where x points west and y north (checked on run 4, 2026-10-10:
     phi matched the driven direction over 8,020 samples, R 0.99, and x/lon correlate -1, y/lat +1)."""
-    if phi is None:
-        return None
+    if isinstance(phi, bool) or not isinstance(phi, (int, float)) or not math.isfinite(phi):
+        return None                     # math.cos raises on infinity, and NaN would go out as a bare NaN (#177)
     return round(math.degrees(math.atan2(-math.cos(phi), math.sin(phi))), 1) % 360.0      # round first: north is 0, not 360
 
 

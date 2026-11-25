@@ -116,6 +116,11 @@ PLAN_JOIN_MAX_S = 36 * 3600   # a resume of the same plan session this long afte
 FIRMWARE_SETTLE_S = 60    # a new firmware version counts once it has been reported this long without a break
 
 
+
+def _finite(v):
+    """v when it is a finite number, else None (bools are not numbers here)."""
+    return v if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) else None
+
 class Recorder:
     sn: str | None = None            # the robot followed (set in __init__; a bare object made in a test has none)
     received, last_message_at = 0, 0.0
@@ -666,8 +671,9 @@ class Recorder:
         (rt: this message's own odom_ts, not the merged snapshot's) than the newest kept is dropped: drawn, it
         would send the robot back on a detour. The same time again is the same pose. An older one is taken after
         POSE_RESET_S without anything newer (the robot's clock was set back). Samples without a time are kept in
-        arrival order."""
-        if t.get("lon") is None or t.get("lat") is None:
+        arrival order. A lon or lat that is not a finite number is no position; a non-finite tilt, speed or heading is
+        kept as null (#177: NaN and infinity are not JSON, and /api/stream's pose event would not parse)."""
+        if _finite(t.get("lon")) is None or _finite(t.get("lat")) is None:
             return
         last = self._pose_rt
         if rt is not None and last is not None and (rt == last or rt < last and ts - self._pose_at < POSE_RESET_S):
@@ -676,10 +682,10 @@ class Recorder:
             self._pose_rt = rt
         self._pose_at = ts
         self.pose_seq += 1
-        sp = [v for v in (t.get("speed_l"), t.get("speed_r")) if isinstance(v, (int, float))]
+        sp = [v for v in (_finite(t.get("speed_l")), _finite(t.get("speed_r"))) if v is not None]
         self.poses.append({"seq": self.pose_seq, "t": rt, "lon": t["lon"], "lat": t["lat"],
-                           "heading": telemetry.heading_deg(t.get("phi")), "pitch": t.get("pitch"),
-                           "roll": t.get("roll"), "speed": round(sum(sp) / len(sp), 3) if sp else None})
+                           "heading": telemetry.heading_deg(_finite(t.get("phi"))), "pitch": _finite(t.get("pitch")),
+                           "roll": _finite(t.get("roll")), "speed": round(sum(sp) / len(sp), 3) if sp else None})
 
     def poses_since(self, seq: int) -> list[dict]:
         """The kept position samples after `seq` (pose_seq when the caller last looked), oldest first."""

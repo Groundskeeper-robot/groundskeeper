@@ -13,6 +13,7 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   after a person or pet left the yard cameras. Something on camera at that moment was still seen. The window now
   comes only from Settings; the guard's own resume keeps its longer one, held on the server. Starts from the panel,
   the scheduler and an AI assistant never sent `yard_minutes` and work as before.
+
 ### Added
 
 - **Start a plan part-way through**: the start confirmation on Live has **Start at**, to finish a mow that was stopped
@@ -21,13 +22,6 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   Yarbo's SDK sends it and faces every start check plus one of its own (a whole number from 0 to 99). Scheduled starts
   and the AI assistant's command tool still start at the beginning; a program with an API token can ask for a start
   point through `POST /api/control/send` (`args.start_percent`), under the same strict checks as any start it asks for.
-
-### Fixed
-
-- **The start confirmation names the plan it sends.** After another plan was picked on Live, a click on Start before
-  the page had redrawn opened "Start" with the old plan's name while the new plan was the one sent. The plan is now
-  read once, at the click, for both.
-### Added
 
 - **Mow a patch** (#183, ADR 0013): a button in Live's Control card mows one small rectangle inside an area, once.
   Pan the map under the rectangle and set its length and width; the panel lays it along the last mow's lines, adds
@@ -40,6 +34,17 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 - **`override` on `/api/control/send` must be `true` or `false`.** Any other value (`"false"`, `1`) was read as true,
   so a program could override a soft check by mistake; it now gets a 400.
+
+### Fixed
+
+- **The start confirmation names the plan it sends.** After another plan was picked on Live, a click on Start before
+  the page had redrawn opened "Start" with the old plan's name while the new plan was the one sent. The plan is now
+  read once, at the click, for both.
+
+- **The panel's live feed keeps NaN and infinity out of its events** (#177). A position sample whose longitude or
+  latitude was not a finite number was kept, and a non-finite tilt, speed or heading went out as a bare `NaN` or
+  `Infinity`, which is not JSON: the browser dropped that whole `pose` event of `/api/stream`. Such a sample is now no
+  position, the other values go out as null, and the `status` event is cleaned the same way.
 
 ## 0.20.3 — 2026-11-23
 
