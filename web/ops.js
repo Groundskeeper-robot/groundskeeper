@@ -1083,8 +1083,9 @@ function patchBlock(off, runningWhy) {
     ready || stuck ? h("div", { class: "row gap" },
       ready ? h("button", { type: "button", class: "btn pri", "data-key": "ctl-patch-start", disabled: off || null,
         onclick: () => openConfirm("start_plan", "Start the patch", { plan_id: p.plan_id }, false, {
-          preview: () => postJSON("/api/patch/preview", {}),
-          send: (override) => postJSON("/api/patch/start", { confirm: true, override }).finally(() => patchRefresh(true)),
+          preview: () => postJSON("/api/patch/preview", { plan_id: p.plan_id }),
+          send: (override) => postJSON("/api/patch/start", { confirm: true, override, plan_id: p.plan_id })
+            .finally(() => patchRefresh(true)),
         })
       }, "Start patch…") : null,
       h("button", { type: "button", class: "btn", "data-key": "ctl-patch-remove", disabled: held || null,
