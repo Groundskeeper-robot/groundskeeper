@@ -642,30 +642,32 @@ class PatchMower:
         st["lines"] = got
 
     # -- start ---------------------------------------------------------------------------------------------------------
-    def _ready(self, plan_id) -> dict:
+    def _ready(self, plan_id, patch=None) -> dict:
+        """The ready patch, if it is the one the person confirmed: its plan id AND its own mark (`created`, the time
+        its set-up began). Plan ids are reused: a patch set up after the confirmed one was removed can get its id."""
         st = self.state()
         if not st or st.get("stage") != "ready":
             raise WriteRefused("no patch is ready to start")
-        if plan_id is not None and plan_id != st.get("plan_id"):
+        if (plan_id is not None and plan_id != st.get("plan_id")) or (patch is not None and patch != st.get("created")):
             raise WriteRefused("that patch is gone; the patch set up now is another one: check it before starting")
         return st
 
-    async def preview(self, plan_id: int | None = None) -> dict:
+    async def preview(self, plan_id: int | None = None, patch: float | None = None) -> dict:
         """The start's checks as the patch's own Start would meet them (nothing is sent)."""
-        st = self._ready(plan_id)
+        st = self._ready(plan_id, patch)
         token = PATCH_START.set(True)
         try:
             return await self.controller.preview("start_plan", {"plan_id": st["plan_id"]}, actor="user")
         finally:
             PATCH_START.reset(token)
 
-    async def start(self, override: bool = False, plan_id: int | None = None) -> dict:
+    async def start(self, override: bool = False, plan_id: int | None = None, patch: float | None = None) -> dict:
         """Start the patch's plan through the controller, as a person (all the usual checks)."""
         async with self._start_lock:                 # one start per ready patch: a second press finds it started
-            return await self._start(override, plan_id)
+            return await self._start(override, plan_id, patch)
 
-    async def _start(self, override: bool, plan_id: int | None) -> dict:
-        st = self._ready(plan_id)
+    async def _start(self, override: bool, plan_id: int | None, patch: float | None) -> dict:
+        st = self._ready(plan_id, patch)
         if not self.store.setting("map_write_enabled", False):    # it has to come off again afterwards
             raise WriteRefused("map writing is switched off (Settings → Safety): the patch could not come off again")
         try:                                         # still the patch's plan? ids are reused if it went in the app

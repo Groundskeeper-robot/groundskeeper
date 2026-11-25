@@ -763,3 +763,28 @@ def test_the_patch_routes_need_the_plan_id():
     for bad in ({}, {"plan_id": "2"}, {"plan_id": True}, {"plan_id": None}):
         with pytest.raises(HTTPException):
             _patch_plan_id(bad)
+
+
+def test_a_confirmation_never_starts_a_later_patch_that_reused_its_plan_id(tmp_path):
+    robot, store, p, ctl, _ = setup(tmp_path)
+    asyncio.run(p.prepare(*CENTER, 6.0, 3.0))
+    first = p.state()
+    asyncio.run(p.remove("test"))
+    first_mark = first["created"] - 5                          # an earlier set-up than the next one
+    asyncio.run(p.prepare(*CENTER, 6.0, 3.0))
+    assert p.state()["plan_id"] == first["plan_id"]            # the robot handed out the same plan id again
+    with pytest.raises(mw.WriteRefused, match="another one"):
+        asyncio.run(p.start(plan_id=first["plan_id"], patch=first_mark))
+    with pytest.raises(mw.WriteRefused, match="another one"):
+        asyncio.run(p.preview(plan_id=first["plan_id"], patch=first_mark))
+    assert ctl.sent == []
+    assert asyncio.run(p.start(plan_id=first["plan_id"], patch=p.state()["created"]))["sent"]
+
+
+def test_the_patch_routes_need_the_patch_mark():
+    from fastapi import HTTPException
+    from app.main import _patch_mark
+    assert _patch_mark({"patch": 1795574000.25}) == 1795574000.25
+    for bad in ({}, {"patch": "1"}, {"patch": True}, {"patch": None}, {"patch": float("nan")}):
+        with pytest.raises(HTTPException):
+            _patch_mark(bad)

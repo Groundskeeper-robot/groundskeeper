@@ -705,11 +705,19 @@ def _patch_plan_id(body: dict) -> int:
     return v
 
 
+def _patch_mark(body: dict) -> float:
+    """The confirmed patch's own mark (its `created`, as /api/patch shows it): plan ids are reused, this is not."""
+    v = body.get("patch")
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
+        raise HTTPException(400, "patch: the patch's `created`, as /api/patch shows it, is required")
+    return float(v)
+
+
 @app.post("/api/patch/preview")
 async def patch_preview(request: Request, body: dict = Body(...)):
     """The checks the patch's start would meet now; nothing is sent."""
     try:
-        return await ops(request).patch.preview(plan_id=_patch_plan_id(body))
+        return await ops(request).patch.preview(plan_id=_patch_plan_id(body), patch=_patch_mark(body))
     except mapwrite.WriteRefused as exc:
         raise HTTPException(409, str(exc))
 
@@ -720,7 +728,8 @@ async def patch_start(request: Request, body: dict = Body(...)):
     if body.get("confirm") is not True:
         raise HTTPException(400, "confirm: true is required")
     try:
-        return await ops(request).patch.start(override=_override(body), plan_id=_patch_plan_id(body))
+        return await ops(request).patch.start(override=_override(body), plan_id=_patch_plan_id(body),
+                                              patch=_patch_mark(body))
     except mapwrite.WriteRefused as exc:
         raise HTTPException(409, str(exc))
 
