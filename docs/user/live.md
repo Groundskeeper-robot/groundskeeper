@@ -16,9 +16,10 @@ they last. When no camera's coverage holds the robot (it has driven out of every
 the big slot shows the map again and the camera comes back when the robot drives into view; both changes wait 10 s so
 one stray position does not flip the picture. Pinning a camera with its chip keeps the camera up regardless.
 
-On a phone the **Map** layout's panel sits under the map, so while a run is going it starts with the same emergency
-buttons; the Control card's own buttons are a screen further down. Docked or idle, the panel starts with the status
-as before.
+On a phone in the **Map** layout, while a run is going, the same emergency buttons are pinned to the bottom of the
+screen in one row (**Pause** or **Resume**, **Stop**, **Dock**), so they stay one tap away wherever you have scrolled;
+the Control card then leaves its own run buttons out. Docked or idle, there is no bar and the panel starts with the
+status as before.
 
 The bar at the top of every page: problems first, tinted in their colour (a robot error, a guard, a run waiting
 for you). Then the switches, **Control** (and **Map writing** in Map Studio): click to switch one off; switching it
@@ -116,17 +117,22 @@ are pink, edge passes violet.
       ([AgoraIO/agora-rtc-web#15](https://github.com/AgoraIO/agora-rtc-web/issues/15)).
     - Not yet looked at on a phone.
     - Tried with one robot and one viewer at a time.
-- **Control card:** pick a plan and see its areas. Only the buttons that make sense in the robot's state are on.
-  The start confirmation has **Start at**, to start the plan part-way through and finish a mow that was stopped: the
-  beginning (the default), every 5%, and, when the newest run was this plan and ended early, how far it got ("last
-  run", with its date). That figure is the robot's own last progress reading (area done of the plan's area, read once
-  a minute), rounded down. Whether the robot measures a start point the same way has not been checked on a robot yet,
-  so pick a step lower for more overlap. It is not offered after a run this panel started part-way, or one the panel
-  stopped watching before it ended. Picking a start point runs the checks again for it, and it holds for that one
+- **Control card:** shows only what the robot can do now. Docked or idle: the plan, its areas, **Start** and the
+  start checks, with **Mow a patch** under a rule. During a run: the plan's progress, **Pause** (or **Resume** while it
+  is paused, then the main button) and **Return to dock**, and **Stop** on a row of its own. A button the state rules
+  out is left out, not greyed; when the robot's state is not known, every button shows and the checks decide. Where
+  the emergency buttons are on screen (the Camera layout, a phone during a run), the card leaves its run buttons out.
+  The start confirmation has **Start at**, to start the plan part-way through and finish a mow that was stopped:
+  **The beginning** (the default) or **Part-way**, which opens a box for the percentage, a whole number from 1 to 99.
+  When the newest run was this plan and ended early, the box is filled in with how far it got. That figure is the
+  robot's own last progress reading (area done of the plan's area, read once a minute), rounded down. Whether the robot measures a start point the same way has not been checked on a robot yet,
+  so type a little less for more overlap. It is not offered after a run this panel started part-way, or one the panel
+  stopped watching before it ended. Typing a start point runs the checks again for it, and it holds for that one
   start: the next confirmation is back at the beginning. Scheduled starts always begin at the beginning. Only a
   stopped or ended plan needs this: a paused one has **Resume**.
-  Needs control switched on ([Safety](#help/safety)). Hover a button that is off to see why; on a phone or a narrow
-  window a line under the buttons says it instead.
+  The checks show as one line: a green dot and "All 12 start checks pass", or how many pass, with each one that fails
+  spelled out under it with its reason (a soft one says you can start anyway). **Show all** opens the full list.
+  Needs control switched on ([Safety](#help/safety)).
 - **Mow a patch:** mows one small rectangle inside an area, once, along the last mow's lines. Tap **Mow a patch…**:
   a rectangle appears in the middle of the map, already turned along the stripes on the lawn. Pan the map under it
   and set its length and width (1.5 to 30 m); it turns red with the reason if it does not fit (it must be inside one

@@ -17,8 +17,8 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 ### Added
 
 - **Start a plan part-way through**: the start confirmation on Live has **Start at**, to finish a mow that was stopped
-  (Stop and Return to dock end the plan, so Resume no longer applies). It offers the beginning, every 5% and, when the
-  newest run was that plan and ended early, how far the robot said it got. The start point goes to the robot the way
+  (Stop and Return to dock end the plan, so Resume no longer applies): the beginning, or a percentage you type, filled
+  in with how far the robot said it got when the newest run was that plan and ended early. The start point goes to the robot the way
   Yarbo's SDK sends it and faces every start check plus one of its own (a whole number from 0 to 99). Scheduled starts
   and the AI assistant's command tool still start at the beginning; a program with an API token can ask for a start
   point through `POST /api/control/send` (`args.start_percent`), under the same strict checks as any start it asks for.
@@ -31,6 +31,14 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   writing on. Not yet tried on a robot.
 
 ### Changed
+
+- **The Control card shows only what the robot can do now.** Docked: the plan and Start, with Mow a patch as a quiet
+  row under it. During a run: Pause (or Resume, then the main button) and Return to dock, with Stop on a row of its
+  own in the refusal colour, never next to Start. Buttons the state rules out are left out instead of greyed. On a
+  phone during a run the emergency buttons are pinned to the bottom of the screen in one row.
+- **The start confirmation's checks are one line**: a green dot when they all pass, or how many pass with each failed
+  one spelled out; Show all opens the list. **Start at** is now The beginning or Part-way, a box you type the
+  percentage into, filled in from where the last run stopped. The button says what it sends ("Start from 62%").
 
 - **`override` on `/api/control/send` must be `true` or `false`.** Any other value (`"false"`, `1`) was read as true,
   so a program could override a soft check by mistake; it now gets a 400.
