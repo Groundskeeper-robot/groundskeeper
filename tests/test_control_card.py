@@ -1,11 +1,13 @@
-"""Live's Control card offers only what the robot can do in its state (web/ops.js controlCard). Needs node, as CI has:
-never skipped."""
+"""Live's Control card offers only what the robot can do in its state (web/ops.js controlCard). Run in node."""
 import json
 import shutil
 import subprocess
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parent.parent
+pytestmark = pytest.mark.node      # tests/conftest.py: skipped without node, fails in CI
 
 
 def card_keys() -> dict:
