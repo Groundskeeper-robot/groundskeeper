@@ -2108,12 +2108,15 @@ def _write_checks(request: Request, d: dict, issues: list, plan: dict) -> list[d
     on = bool(r.store.setting("map_write_enabled", False))
     cloud, no_write = ops(request).cloud.state, ops(request).link.why_no_writes()
     starting = ops(request).controller.start_settling()
+    # As the writer's own check (app/ops.py): only a planning value above 0 is a plan going. A negative one is the
+    # last plan's error code (WP005 is -12), which stays after the error is cleared in the app.
+    running = bool(r.run_id) or (t.get("planning") or 0) > 0
     checks = [
         ("Map writing switched on", on, "on" if on else "off (switch it on below)"),
         ("Yarbo cloud connected", not no_write, no_write or cloud),
         ("Robot online", snap_age is not None and snap_age < 120, f"last snapshot {snap_age} s ago" if snap_age else "no data"),
         ("Docked", (t.get("charging") or 0) > 0, "on the charger" if (t.get("charging") or 0) > 0 else "not on the charger"),
-        ("Idle", not (r.run_id or t.get("planning")), "a plan is running" if (r.run_id or t.get("planning")) else "idle"),
+        ("Idle", not running, "a plan is running" if running else "idle"),
         ("No start just sent", not starting, starting or "none"),
         ("Draft is valid", not errors, f"{len(errors)} error(s)" if errors else "no errors"),
         ("Draft starts from the robot's current map", not _draft_meta(request, d)["stale"],

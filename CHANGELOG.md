@@ -52,6 +52,11 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 ### Fixed
 
+- **Map Studio no longer says "a plan is running" after a failed start.** The robot keeps the last plan's error
+  (such as WP005, "Failed to calculate route") in its plan state after the error is cleared in the app, and Map
+  Studio's Idle row read any value there as a running plan, so nothing could be written until the robot ran or
+  re-docked. It now reads that value as the map writer already did: only a plan going holds writes back.
+
 - **The start confirmation names the plan it sends.** After another plan was picked on Live, a click on Start before
   the page had redrawn opened "Start" with the old plan's name while the new plan was the one sent. The plan is now
   read once, at the click, for both.
