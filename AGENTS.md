@@ -13,7 +13,8 @@ Folders have their own short `AGENTS.md` with local rules: `app/AGENTS.md`, `web
 A change is ready for review when all of these are true:
 
 1. `python scripts/check.py` prints **all checks passed**. It runs the tests, the guard tests, the imagery catalog
-   checks, the privacy check and the front-end syntax check: the same as CI.
+   checks, the privacy check and the front-end syntax check, the same as CI, and checks this branch's own changes
+   for an added test skip or an edit to `tests/test_guards.py` (`scripts/check_diff.py`).
 2. New behaviour has a test, written with synthetic data.
 3. `CHANGELOG.md` has a line under **Unreleased** for anything a user would notice, and the matching `docs/user/`
    page says how it works now. A feature that `docs/user/not-yet.md` lists loses its line there.
