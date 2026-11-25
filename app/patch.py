@@ -32,6 +32,7 @@ STATE = "patch_mow"
 NAME = "Patch (temporary)"
 AREA_DELETE = "del_clean_area"                 # {"id": N}, captured (docs/dev/map-writes.md → Areas → Delete)
 MIN_SIDE_M, MAX_SIDE_M = 1.5, 30.0
+TRIM_STEP_M = 0.05                             # a trimmed side moves in by this much at a time
 EDGE_CLEAR_M = 0.5                             # inside the surrounding area's outline by at least this
 LINE_CLEAR_M = 1.0                             # away from pathway and dead-end ends, and from the charger
 RANGE_TOL_M = 0.05                             # a read-back outline may differ by this much (as in-place area saves)
@@ -102,6 +103,61 @@ def rectangle(center, length: float, width: float, angle_deg: float) -> list[tup
           center[1] + su * u[1] * length / 2 + sn * n[1] * width / 2) for su, sn in corners]
     east_north = sum(-x1 * y2 + x2 * y1 for (x1, y1), (x2, y2) in zip(c, c[1:] + c[:1]))   # x is west: flip it
     return c if east_north > 0 else c[::-1]
+
+
+def axes(angle_deg: float):
+    """Unit vectors along the lines (u) and across them (n), in the panel's frame."""
+    t = math.radians(angle_deg)
+    return (math.cos(t), math.sin(t)), (-math.sin(t), math.cos(t))
+
+
+def span(a, b, angle_deg: float) -> list[float]:
+    """Two opposite corners as the rectangle between them, along the lines: [lo_u, hi_u, lo_n, hi_n]."""
+    u, n = axes(angle_deg)
+    au, an = a[0] * u[0] + a[1] * u[1], a[0] * n[0] + a[1] * n[1]
+    bu, bn = b[0] * u[0] + b[1] * u[1], b[0] * n[0] + b[1] * n[1]
+    return [min(au, bu), max(au, bu), min(an, bn), max(an, bn)]
+
+
+def span_rect(sp, angle_deg: float):
+    """(center, length along the lines, width across) of a span."""
+    u, n = axes(angle_deg)
+    cu, cn = (sp[0] + sp[1]) / 2, (sp[2] + sp[3]) / 2
+    return (cu * u[0] + cn * n[0], cu * u[1] + cn * n[1]), sp[1] - sp[0], sp[3] - sp[2]
+
+
+def trim(sp, angle_deg: float, parent_ring, clear: float) -> list[float] | None:
+    """Move the sides of a span inward until every point of its outline is inside parent_ring and `clear` from its
+    edge: each step moves the side with the largest share of points that are not, so a rectangle that sticks out
+    one side loses only that side. None when it would get smaller than MIN_SIDE_M either way."""
+    sp = list(sp)
+    u, n = axes(angle_deg)
+
+    def at(pu, pn):
+        return (pu * u[0] + pn * n[0], pu * u[1] + pn * n[1])
+
+    def bad_share(side) -> float:
+        lo_u, hi_u, lo_n, hi_n = sp
+        if side < 2:                                  # 0: lo_u, 1: hi_u (the short sides, across the lines)
+            cu, a0, a1 = (lo_u if side == 0 else hi_u), lo_n, hi_n
+            pts = [at(cu, a0 + (a1 - a0) * k / max(1, math.ceil((a1 - a0) / 0.25)))
+                   for k in range(max(1, math.ceil((a1 - a0) / 0.25)) + 1)]
+        else:                                         # 2: lo_n, 3: hi_n (the long sides, along the lines)
+            cn, a0, a1 = (lo_n if side == 2 else hi_n), lo_u, hi_u
+            pts = [at(a0 + (a1 - a0) * k / max(1, math.ceil((a1 - a0) / 0.25)), cn)
+                   for k in range(max(1, math.ceil((a1 - a0) / 0.25)) + 1)]
+        bad = [p for p in pts if not mapstudio.point_in(p, parent_ring) or dist_to_ring(p, parent_ring) < clear]
+        return len(bad) / len(pts)
+
+    for _ in range(4000):
+        shares = [bad_share(k) for k in range(4)]
+        worst = max(range(4), key=lambda k: shares[k])
+        if shares[worst] == 0:
+            return sp
+        sp[worst] += TRIM_STEP_M if worst in (0, 2) else -TRIM_STEP_M
+        if sp[1] - sp[0] < MIN_SIDE_M or sp[3] - sp[2] < MIN_SIDE_M:
+            return None
+    return None
 
 
 def shifted(ring, angle_deg: float, d: float) -> list[tuple[float, float]]:
@@ -461,6 +517,71 @@ class PatchMower:
         return {"ok": not probs, "problems": probs, "area": {"id": parent["id"], "name": parent.get("name")},
                 "target": tgt, "corners": [geo.to_lonlat(gps_ref, x, y) for x, y in ring],
                 "length": length, "width": width, "area_m2": round(length * width, 1)}
+
+    async def check_corners(self, a, b) -> dict:
+        """The patch between two corners a person tapped ([lon, lat] each), laid along the lines: the rectangle whose
+        opposite corners they are in the lines' own frame. Part of it outside the area, or closer than EDGE_CLEAR_M
+        to its edge: trimmed back along the lines, and said so. Too small: grown to MIN_SIDE_M around its middle. Then
+        the same check() as any centre and size, so set-up gets exactly what was shown. Nothing is written."""
+        gps_ref = self.rec.gps_ref
+        raw = self.rec.map_raw or {}
+        if not gps_ref or not raw:
+            raise WriteRefused("the robot's map has not been read yet")
+        pts = []
+        for v in (a, b):
+            if (not isinstance(v, (list, tuple)) or len(v) != 2
+                    or not all(isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x) for x in v)):
+                raise ValueError("a and b: [lon, lat] each")
+            pts.append(geo.to_local(gps_ref, float(v[0]), float(v[1])))
+        mid = ((pts[0][0] + pts[1][0]) / 2, (pts[0][1] + pts[1][1]) / 2)
+        parent = area_at(raw, mid, gps_ref)
+        if parent is None:
+            return {"ok": False, "problems": ["put the patch inside a mowing area"]}
+        named = {"id": parent["id"], "name": parent.get("name")}
+        others = [x for x in (area_at(raw, p, gps_ref) for p in pts) if x is not None and x.get("id") != parent["id"]]
+        if others:
+            return {"ok": False, "area": named, "problems": [
+                f"the patch reaches into “{others[0].get('name') or others[0].get('id')}”: mow each area's side as "
+                "its own patch"]}
+        read = await self._parent_settings(parent["id"])
+        gap = float(read.get("gap") or 0)
+        half = math.hypot(pts[0][0] - pts[1][0], pts[0][1] - pts[1][1]) / 2
+        tgt = await self.target(parent, mid, half + 1.0, gap, gps_ref) if gap > 0 else None
+        if tgt is None:
+            return {"ok": False, "area": named, "problems": ["no mowing lines to line up with here yet"]}
+        asked = span(pts[0], pts[1], tgt["angle"])
+        notes = []
+        for lo, hi in ((0, 1), (2, 3)):                          # grown to the smallest patch around its middle
+            if asked[hi] - asked[lo] < MIN_SIDE_M:
+                mid_s = (asked[lo] + asked[hi]) / 2
+                asked[lo], asked[hi] = mid_s - MIN_SIDE_M / 2, mid_s + MIN_SIDE_M / 2
+                notes.append(f"made {MIN_SIDE_M:g} m, the smallest a patch can be")
+        _, length, width = span_rect(asked, tgt["angle"])
+        if length > MAX_SIDE_M or width > MAX_SIDE_M:
+            return {"ok": False, "area": named, "problems": [f"at most {MAX_SIDE_M:.0f} m each way"]}
+        ring_parent = mapstudio.local(parent, gps_ref)
+        final = trim(asked, tgt["angle"], ring_parent, EDGE_CLEAR_M + TRIM_STEP_M)   # a step to spare for set-up
+        if final is None:
+            return {"ok": False, "area": named, "problems": [
+                f"too little of it is inside “{parent.get('name') or parent['id']}” to mow"],
+                "requested": [geo.to_lonlat(gps_ref, x, y) for x, y in rectangle(*span_rect(asked, tgt["angle"]),
+                                                                                  tgt["angle"])]}
+        center, length, width = span_rect(final, tgt["angle"])
+        length, width = round(length, 2), round(width, 2)
+        trimmed = final != asked
+        if trimmed:
+            notes.append(f"trimmed to {length:g} × {width:g} m to stay inside “{parent.get('name') or parent['id']}”")
+        out = await self.check(*geo.to_lonlat(gps_ref, *center), length, width, raw)
+        u, n = axes(tgt["angle"])
+        su = 1 if (pts[0][0] - center[0]) * u[0] + (pts[0][1] - center[1]) * u[1] >= 0 else -1
+        sn = 1 if (pts[0][0] - center[0]) * n[0] + (pts[0][1] - center[1]) * n[1] >= 0 else -1
+        handle = [(center[0] + s * su * u[0] * length / 2 + s * sn * n[0] * width / 2,
+                   center[1] + s * su * u[1] * length / 2 + s * sn * n[1] * width / 2) for s in (1, -1)]
+        return {**out, "center": list(geo.to_lonlat(gps_ref, *center)), "notes": notes,
+                "handles": [list(geo.to_lonlat(gps_ref, x, y)) for x, y in handle],
+                "requested": ([geo.to_lonlat(gps_ref, x, y) for x, y in rectangle(*span_rect(asked, tgt["angle"]),
+                                                                                  tgt["angle"])]
+                              if trimmed else None)}
 
     # -- set up --------------------------------------------------------------------------------------------------------
     async def prepare(self, lon: float, lat: float, length: float, width: float) -> dict:

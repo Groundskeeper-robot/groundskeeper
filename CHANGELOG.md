@@ -24,7 +24,8 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   point through `POST /api/control/send` (`args.start_percent`), under the same strict checks as any start it asks for.
 
 - **Mow a patch** (#183, ADR 0013): a button in Live's Control card mows one small rectangle inside an area, once.
-  Pan the map under the rectangle and set its length and width; the panel lays it along the last mow's lines, adds
+  Tap two opposite corners of the spot and drag their handles; the panel lays it along the last mow's lines, trims
+  back a part outside the area (and says so), adds
   it to the robot as a temporary area with its own plan (the surrounding area's settings, no boundary laps), lines
   its stripes up with the last mow's and shows the robot's route. Start it with the usual checks. Once the robot is
   back on its charger the panel deletes the patch and checks the rest of the map is as it was. Needs control and map

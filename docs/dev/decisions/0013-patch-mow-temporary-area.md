@@ -20,9 +20,11 @@ commands, the map-writing switch, docked with no plan, read back) apply to every
   keeps the long side, and so the route angle, unambiguous; other shapes can come later.
 - It starts from a **"Mow a patch" button in the Live page's Control card**, beside the plan picker, not from Map
   Studio. This is the first map write outside Studio: it goes through the same `MapWriter`, needs the same
-  map-writing switch and is read back the same way. The rectangle sits fixed in the middle of the map, already
-  turned along the last mow's lines; the user pans the map under it and sizes it with steppers, so it works on a
-  phone without dragging shapes by touch.
+  map-writing switch and is read back the same way. The user taps two opposite corners and can drag a round
+  handle on each; the panel lays the rectangle between them along the last mow's lines and trims back, along the
+  lines, any part outside the area or closer than 0.5 m to its edge, saying so. Two taps and two big handles work
+  the same with a mouse or a finger. (It first shipped as a fixed rectangle the user panned the map under, sized
+  with steppers; that was hard to aim.)
 - Its settings are a copy of the surrounding area's, with the boundary extension at 0, the boundary laps off
   (`edge_circles` 0), one pass and its own route angle. The robot measures that angle from the outline's long side and turns
   its lines 90° from one mow to the next, so the panel computes it from the last recorded run over the patch and

@@ -589,7 +589,7 @@ function applyLayerVisibility() {
   const pbox = $("#problembox");
   if (pbox) pbox.hidden = !state.layers.trouble;
   set("signal-fill", on("signal"));
-  for (const id of ["patch-fill", "patch-line", "patch-route"]) set(id, state.view === "live");   // ops.js: a patch
+  for (const id of ["patch-fill", "patch-line", "patch-route", "patch-asked"]) set(id, state.view === "live");   // ops.js: a patch
   const box = $("#signalbox");
   if (box) box.hidden = !state.layers.signal;
   set("cameras-fill", camerasVisible());

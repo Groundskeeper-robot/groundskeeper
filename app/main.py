@@ -667,8 +667,11 @@ async def patch_state(request: Request):
 
 @app.post("/api/patch/check")
 async def patch_check(request: Request, body: dict = Body(...)):
-    """Where a patch centred at {lon, lat} with {length, width} would go and whether it can: read-only."""
+    """Where a patch would go and whether it can: read-only. {a, b}: two opposite corners a person tapped, [lon, lat]
+    each (laid along the lines, trimmed to fit); else {lon, lat, length, width}: a centre and size."""
     try:
+        if "a" in body or "b" in body:
+            return await ops(request).patch.check_corners(body.get("a"), body.get("b"))
         return await ops(request).patch.check(body.get("lon"), body.get("lat"), body.get("length"), body.get("width"))
     except (ValueError, TypeError) as exc:
         raise HTTPException(400, str(exc))
