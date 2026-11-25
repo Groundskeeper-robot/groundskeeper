@@ -65,7 +65,7 @@ session. It is git-ignored; keep it that way.
 Run this before you open a PR. CI runs the same command:
 
 ```bash
-.venv/bin/python scripts/check.py            # tests, guard tests, imagery catalog, privacy check, JS syntax
+.venv/bin/python scripts/check.py            # tests, guard tests, catalog, privacy, JS syntax, the branch's changes
 .venv/bin/python scripts/check.py --quick    # the same without the full test suite, while you work
 ```
 

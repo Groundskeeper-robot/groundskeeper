@@ -4,7 +4,8 @@ and AI agents alike: when this prints "all checks passed", the change is ready f
     python scripts/check.py            # everything
     python scripts/check.py --quick    # skip the full test suite (the guard tests still run)
 
-Node.js is optional: without it the front-end syntax check is skipped with a note, and CI still runs it."""
+Node.js is optional: without it the front-end syntax check is skipped with a note, and CI still runs it. The check of
+this branch's changes needs a main branch to compare with; a shallow CI checkout has none and skips it."""
 import argparse
 import shutil
 import subprocess
@@ -22,6 +23,7 @@ def steps(quick: bool) -> list[tuple[str, list[list[str]]]]:
                              [PY, "-m", "app.imagery", "schema", "--check"],
                              [PY, "-m", "app.imagery", "table", "--check"]]),
         ("nothing private in tracked files", [[PY, "scripts/check_public.py"]]),
+        ("this branch's changes (no added skips, guard tests untouched)", [[PY, "scripts/check_diff.py"]]),
     ]
     if not quick:
         out.insert(1, ("all tests", [[PY, "-m", "pytest", "-q"]]))
