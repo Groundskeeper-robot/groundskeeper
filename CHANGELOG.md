@@ -42,6 +42,12 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 - **`override` on `/api/control/send` must be `true` or `false`.** Any other value (`"false"`, `1`) was read as true,
   so a program could override a soft check by mistake; it now gets a 400.
 
+### Removed
+
+- **Mow a patch** (ADR 0013, rejected), which edge and nightly builds showed in Live's Control card. On a robot the
+  patch's route never got past Yarbo's own check (WP005, "make sure the map is drawn according to the guide"),
+  however the area around it was drawn, so the temporary-area design was dropped. It was never in a release.
+
 ### Fixed
 
 - **Map Studio no longer says "a plan is running" after a failed start.** The robot keeps the last plan's error
