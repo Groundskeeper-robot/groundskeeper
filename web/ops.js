@@ -121,7 +121,7 @@ async function liveExtras(s) {
   const o = s.ops || {};
   // Live can render before the map's plan list arrives; an empty picker would send plan_id 0.
   if (!state.plansCache.length) { try { state.plansCache = (await getJSON("/api/plans")).plans || []; } catch { /* none yet */ } }
-  const [fc, robotCams] = await Promise.all([followCamData(), camerasCard(s), patchRefresh()]);   // cameras.js: the robot's own cameras
+  const [fc, robotCams] = await Promise.all([followCamData(), camerasCard(s)]);   // cameras.js: the robot's own cameras
   const rest = [whyCard(o.why), o.pending ? pendingCard(o.pending, o.control_enabled) : null, controlCard(s),
                 robotCams];
   if (ops.mode === "camera") {
@@ -154,10 +154,9 @@ function setLiveMode(mode) {
 }
 
 function syncLiveMode() {
-  // Drawing camera coverage, aligning imagery and placing a patch need the big map, so they show the map layout
-  // while they last.
+  // Drawing camera coverage and aligning imagery need the big map, so they show the map layout while they last.
   const live = state.view === "live", cam = live && ops.mode === "camera" && !ops.camAway && !ops.drawing
-    && !state.align && !ops.patchPlacing;
+    && !state.align;
   const bar = $("#liveview");
   bar.hidden = !live;
   for (const b of $$("[data-mode]", bar)) {
@@ -507,8 +506,7 @@ function startFollowTimer() {
 function controlCard(s) {
   const o = s.ops || {};
   const on = o.control_enabled;
-  const patchPlan = patchUI.view?.patch?.plan_id;
-  const plans = (state.plansCache || []).filter((p) => p.id !== patchPlan);     // the patch has its own buttons
+  const plans = state.plansCache || [];
   // Live re-renders on every status event, so the picked plan lives in ops.planId, not in the <select>.
   if (!plans.some((p) => p.id === ops.planId)) ops.planId = plans[0]?.id ?? null;
   const plan = plans.find((p) => p.id === ops.planId);
@@ -528,8 +526,7 @@ function controlCard(s) {
   // Only when those checks, as last asked (they are cached for 30 s), already show a refusal: a pass from before the
   // route dropped would leave Start off with nothing saying why.
   const shownChecks = plan ? ready.cache.get(String(plan.id))?.r : null;
-  const checksShown = (!known || !running) && !patchUI.view?.patch && plans.length && shownChecks
-    && !shownChecks.would_send;
+  const checksShown = (!known || !running) && plans.length && shownChecks && !shownChecks.would_send;
   const why = !on ? ["Control is switched off. ", h("a", { href: "#settings/safety" }, "Switch it on in Settings"), "."]
             : !routeOk(o) && !checksShown ? noRouteWhy(o) : null;
   const no = (ok, text) => (known && !ok ? text : null);
@@ -544,8 +541,7 @@ function controlCard(s) {
   // Pause (or Resume when held) and Return to dock, with Stop on a row of its own, never next to Start. A button the
   // state rules out is left out rather than shown greyed. Where the emergency card is on screen (the camera layout, a
   // phone during a run) it holds the run's buttons, so this card does not repeat them.
-  const patchSet = !!patchUI.view?.patch;                     // a patch set up takes the plan's place
-  const showStart = (!known || !running) && !patchSet;
+  const showStart = !known || !running;
   const showRun = (!known || running) && !emergencyShown(s);
   const held = known && HELD.has(act);
   const btn = (cmd, label, cls = "") => (idle[cmd] ? null : h("button", { type: "button", class: `btn ${cls}`.trim(),
@@ -563,8 +559,8 @@ function controlCard(s) {
     : [h("div", { class: "ctlgrid" }, btn("pause", "Pause"), btn("cmd_recharge", "Return to dock"),
         known ? null : btn("resume", "Resume")), btn("stop", "Stop", "stopbtn wide")];
   // During a run with the emergency card on screen, the run's buttons are there (with what is in their way: control
-  // off, no route) and its progress is in the status card: this card has nothing left unless a patch is going.
-  if (known && running && emergencyShown(s) && !patchSet) return null;
+  // off, no route) and its progress is in the status card: this card has nothing left.
+  if (known && running && emergencyShown(s)) return null;
   const batt = s.robot?.battery;
   return h("div", { class: `card${held ? " attention" : ""}` },
     h("div", { class: "row gap", style: "justify-content:space-between;align-items:baseline" },
@@ -589,8 +585,7 @@ function controlCard(s) {
     runButtons ? h("div", { class: "ctlrunbtns" }, runButtons) : null,
     // Stopped out in the yard (idle, off the dock): no run, but it can still be sent home.
     known && !running && !idle.cmd_recharge && !emergencyShown(s)
-      ? h("div", { class: "ctlrunbtns" }, btn("cmd_recharge", "Return to dock")) : null,
-    patchBlock(disabled, idle.start_plan));
+      ? h("div", { class: "ctlrunbtns" }, btn("cmd_recharge", "Return to dock")) : null);
 }
 
 // The emergency card (two-tap Pause, Stop, Return to dock) is on screen: in the camera layout while a run goes (or the
@@ -670,25 +665,23 @@ function pickStartPoint(c, pct) {
 async function previewConfirm(c) {
   const args = c.args;
   let preview = null, error = null;
-  try { preview = await (c.own ? c.own.preview() : postJSON("/api/control/preview", { cmd: c.cmd, args })); }
+  try { preview = await postJSON("/api/control/preview", { cmd: c.cmd, args }); }
   catch (e) { error = e.message; }
   if (ops.confirm !== c || c.args !== args) return;
   c.preview = preview; c.error = error;
   drawConfirm();
 }
 
-// own: {preview(), send(override)} for a start that has its own routes (the patch's), else
-// /api/control/*. Such a start always runs from the beginning: no start point is offered.
-async function openConfirm(cmd, label, args = {}, previewOnly = false, own = null) {
+async function openConfirm(cmd, label, args = {}, previewOnly = false) {
   closeConfirm();
   const opener = document.activeElement;
   const box = h("div", { class: "imgdialogbox confirmbox", role: "dialog", "aria-modal": "true", "aria-labelledby": "confirm-title" });
   const overlay = h("div", { class: "imgdialog", onclick: (e) => { if (e.target === overlay) closeConfirm(); } });
   const onKey = (e) => { if (e.key === "Escape") closeConfirm(); };
   // A start a person is about to send can begin part-way through the plan: picked here, for this one start.
-  const startAt = cmd === "start_plan" && !previewOnly && !own
+  const startAt = cmd === "start_plan" && !previewOnly
     ? { base: label, planId: args.plan_id, pct: 0, leftOff: null, mode: "begin", typed: null, invalid: false } : null;
-  const c = ops.confirm = { cmd, label, args, previewOnly, preview: null, override: false, box, startAt, own,
+  const c = ops.confirm = { cmd, label, args, previewOnly, preview: null, override: false, box, startAt,
     close: () => {
       overlay.remove();
       document.removeEventListener("keydown", onKey);
@@ -744,9 +737,8 @@ function drawConfirm() {
         c.sending = true;
         drawConfirm();
         try {
-          reportSend(await (c.own ? c.own.send(c.override)
-            : postJSON("/api/control/send", { cmd: c.cmd, args: c.args, confirm: true, override: c.override })),
-          c.label);
+          reportSend(await postJSON("/api/control/send", { cmd: c.cmd, args: c.args, confirm: true,
+                                                            override: c.override }), c.label);
         }
         catch (err) { toast(err.message); }
         if (ops.confirm === c) closeConfirm();
@@ -989,16 +981,6 @@ function opsMapInit() {
   map.addLayer({ id: "draw-pts", type: "circle", source: "draw", filter: ["==", ["geometry-type"], "Point"],
                  paint: { "circle-radius": ["case", ["get", "first"], 8, 5], "circle-color": "#F2F5F3",
                           "circle-stroke-color": SKY, "circle-stroke-width": 2 } });
-  map.addSource("patch", { type: "geojson", data: EMPTY });
-  map.addLayer({ id: "patch-route", type: "line", source: "patch", filter: ["==", ["geometry-type"], "LineString"],
-                 paint: { "line-color": MAP.route, "line-width": 1.5, "line-opacity": 0.9 } });
-  const patchPoly = ["all", ["==", ["geometry-type"], "Polygon"], ["!=", ["get", "kind"], "asked"]];
-  map.addLayer({ id: "patch-asked", type: "line", source: "patch", filter: ["==", ["get", "kind"], "asked"],
-                 paint: { "line-color": AMBER, "line-width": 2, "line-dasharray": [2, 2] } });
-  map.addLayer({ id: "patch-fill", type: "fill", source: "patch", filter: patchPoly,
-                 paint: { "fill-color": ["case", ["get", "ok"], SKY, CORAL], "fill-opacity": 0.18 } });
-  map.addLayer({ id: "patch-line", type: "line", source: "patch", filter: patchPoly,
-                 paint: { "line-color": ["case", ["get", "ok"], SKY, CORAL], "line-width": 2.5 } });
   loadCameraPolygons();
 }
 
@@ -1114,269 +1096,3 @@ function startDraw(camera, back = null) {
 }
 
 startFollowTimer();
-
-/* ------------------------------------------------------------- mow a patch (ADR 0013) */
-/* A rectangle inside one area, mowed once along the last mow's lines; the server adds it to the robot, starts it with
-   the usual checks and takes it off again once the robot is back on its charger (app/patch.py). Placing it: tap one
-   corner of the spot, then the opposite one; two round handles then move those corners. The server lays the rectangle
-   between them along the lines, trims it back if part of it is outside the area, and says whether it fits. */
-const patchUI = { view: null, fetchedAt: 0, place: null };
-const PATCH_SETTLING = new Set(["adding", "aligning", "started", "removing"]);
-
-async function patchRefresh(force = false) {
-  const settling = PATCH_SETTLING.has(patchUI.view?.patch?.stage);
-  if (!force && Date.now() - patchUI.fetchedAt < (settling ? 5000 : 20000)) return patchUI.view;
-  patchUI.fetchedAt = Date.now();
-  const seq = patchUI.seq = (patchUI.seq || 0) + 1;
-  try {
-    const v = await getJSON("/api/patch");
-    if (seq === patchUI.seq) patchUI.view = v;              // an older answer arriving late never replaces a newer one
-  } catch { /* keep the last answer */ }
-  drawPatchMap();
-  return patchUI.view;
-}
-
-function patchStageLine(p) {
-  const size = `${p.length} × ${p.width} m in ${p.parent?.name || "the area"}`;
-  const mins = p.time_s ? `, about ${Math.max(1, Math.round(p.time_s / 60))} min` : "";
-  return {
-    adding: "Setting up the patch on the robot…",
-    aligning: "Lining the patch up with the last mow…",
-    ready: `Patch ready: ${size}, lined up with the last mow${mins}. Its route is on the map.`,
-    started: p.running_seen
-      ? `Mowing the patch (${size}). It comes off the robot once the robot is back on its charger.`
-      : `Start sent for the patch (${size}); waiting for the robot to show it running…`,
-    removing: "Taking the patch off the robot…",
-    stuck: p.differs?.length
-      ? `The patch is off the robot, but the map differs from before: ${p.differs.join("; ")}. Check the map in the `
-        + "Yarbo app, then check again or accept the map as it is."
-      : `The patch could not be taken off the robot (${(p.log || []).slice(-1)[0] || "see Events"}). `
-        + "Try again, or delete “Patch (temporary)” in the Yarbo app.",
-  }[p.stage] || `Patch: ${p.stage}`;
-}
-
-function patchBlock(off, runningWhy) {
-  const v = patchUI.view || {}, p = v.patch;
-  if (patchUI.place) return h("p", { class: "muted small", style: "margin-top:10px" }, "Placing a patch on the map…");
-  if (!p) {
-    const why = runningWhy || v.blocked || null;
-    const last = v.last && Date.now() / 1000 - v.last.at < 86400 && v.last.problems?.length
-      ? h("p", { class: "small", style: `color:${AMBER};margin:6px 0 0` },
-          `The map was accepted as it is after the last patch: ${v.last.problems.join("; ")}.`) : null;
-    if (runningWhy) return null;                              // a run is going: nothing to place now
-    return h("div", { class: "patchrow" },
-      h("div", { class: "row gap", style: "justify-content:space-between;align-items:center" },
-        h("span", { class: "muted small" }, why && !off ? `Mow a patch: ${why}.` : "Just a small spot?"),
-        h("button", { type: "button", class: "btn slim", "data-key": "ctl-patch", disabled: off || !!why || null,
-          title: why ? `Mow a patch: ${why}` : "Mow a small rectangle inside an area, along the last mow's lines",
-          onclick: startPlacing }, "Mow a patch")),
-      last);
-  }
-  const ready = p.stage === "ready", stuck = p.stage === "stuck";
-  // Taking it off needs what any map write needs; say what is in the way (map writing off strands it otherwise).
-  const held = v.blocked && (ready || stuck || (p.stage === "started" && !/plan is running/.test(v.blocked)))
-    ? v.blocked : null;
-  const remove = h("button", { type: "button", class: ready ? "linkbtn small" : "btn", "data-key": "ctl-patch-remove",
-    disabled: held || null, title: held ? `Remove: ${held}` : null, onclick: () => removePatch(false, !!p.differs?.length) },
-    stuck ? (p.differs?.length ? "Check again" : "Try again") : "Remove");
-  return h("div", { class: "patchbox" },
-    h("p", { class: "small", style: `margin:0 0 10px;color:${stuck ? CORAL : "inherit"}` }, patchStageLine(p)),
-    held ? h("p", { class: "whyline muted tiny", style: "margin:0 0 8px" },
-      `It can't come off the robot right now: ${held}.`) : null,
-    ready ? [
-      h("button", { type: "button", class: "btn pri wide ctlstart", "data-key": "ctl-patch-start", disabled: off || null,
-        onclick: () => openConfirm("start_plan", "Start the patch", { plan_id: p.plan_id }, false, {
-          preview: () => postJSON("/api/patch/preview", { plan_id: p.plan_id, patch: p.created }),
-          send: (override) => postJSON("/api/patch/start", { confirm: true, override, plan_id: p.plan_id,
-                                                             patch: p.created })
-            .finally(() => patchRefresh(true)),
-        }) }, "Start patch…"),
-      h("div", { class: "row gap", style: "justify-content:space-between;align-items:center" },
-        h("span", { class: "muted small" }, "Comes off the robot once it is back on the dock."), remove)] : null,
-    stuck ? h("div", { class: "row gap" }, remove,
-      p.differs?.length ? h("button", { type: "button", class: "btn", "data-key": "ctl-patch-accept",
-        disabled: held || null, onclick: () => removePatch(true) }, "Accept the map") : null) : null);
-}
-
-async function removePatch(accept = false, recheck = false) {
-  const ask = accept ? "Accept the robot's map as it is now? The differences stay; the panel stops tracking the patch."
-    : recheck ? "Check the robot's map against how it was before the patch again?"
-    : "Take the patch off the robot now? Its area and plan are deleted; the rest of the map is checked.";
-  if (!confirm(ask)) return;
-  try {
-    const r = await fetch(accept ? "/api/patch?accept=true" : "/api/patch", { method: "DELETE" });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d.detail || `${r.status}`);
-    toast(d.ok ? "The patch is off the robot." : `The patch is off, but: ${(d.problems || [d.error]).join("; ")}`);
-  } catch (e) { toast(`Not removed: ${e.message}`); }
-  await patchRefresh(true);
-  refreshLive();
-}
-
-function startPlacing() {
-  const map = state.map;
-  if (!map || patchUI.place) return;                           // a second tap before the card redraws
-  const pl = patchUI.place = { a: null, b: null, check: null, seq: 0, busy: false, error: null, pending: false,
-                               markers: [] };
-  // In the camera layout the map is the small locked overview: bring the big map back first, once it has settled.
-  const small = MAP_EL.parentElement !== $(".mapwrap");
-  ops.patchPlacing = true;
-  syncLiveMode();
-  if (small) requestAnimationFrame(() => requestAnimationFrame(() => { if (patchUI.place === pl) beginPlacing(); }));
-  else beginPlacing();
-}
-
-function beginPlacing() {
-  const map = state.map;
-  $(".mapwrap")?.classList.add("placing");
-  if (STACKED.matches) $(".mapwrap")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  map.on("click", patchTap);
-  map.getCanvas().style.cursor = "crosshair";
-  drawPatchBar();
-  map.resize();
-  if (map.getZoom() < 19) map.easeTo({ zoom: 19, duration: 300 });     // close enough to tap a few metres apart
-  refreshLive();
-}
-
-function stopPlacing() {
-  const map = state.map, pl = patchUI.place;
-  if (map) {
-    map.off("click", patchTap);
-    map.getCanvas().style.cursor = "";
-  }
-  for (const m of pl?.markers || []) m.remove();
-  patchUI.place = null;
-  ops.patchPlacing = false;
-  $(".mapwrap")?.classList.remove("placing");
-  $("#patchbar")?.remove();
-  map?.resize();
-  drawPatchMap();
-  if (state.view === "live") syncLiveMode();                   // back to the camera layout if that was on
-  refreshLive();
-}
-
-// A tap on the map: the first corner, then the opposite one. After that the round handles move them; taps do nothing
-// (a stray tap while panning must not move the patch).
-function patchTap(e) {
-  const pl = patchUI.place;
-  if (!pl || pl.busy || pl.b) return;
-  const at = [e.lngLat.lng, e.lngLat.lat];
-  if (!pl.a) pl.a = at; else pl.b = at;
-  placeHandles();
-  if (pl.b) patchCheck(); else drawPatchBar();
-}
-
-// Big round handles on the two corners (maplibre markers: they drag by touch and by mouse alike).
-function placeHandles() {
-  const pl = patchUI.place;
-  for (const m of pl.markers) m.remove();
-  pl.markers = [pl.a, pl.b].map((at, i) => {
-    if (!at) return null;
-    const el = h("div", { class: "patchhandle", role: "img", "aria-label": i ? "Second corner" : "First corner" });
-    const m = new maplibregl.Marker({ element: el, draggable: true }).setLngLat(at).addTo(state.map);
-    m.on("dragend", () => {
-      const ll = m.getLngLat();
-      pl[i ? "b" : "a"] = [ll.lng, ll.lat];
-      if (pl.a && pl.b) patchCheck();
-    });
-    return m;
-  }).filter(Boolean);
-}
-
-function restartPlacing() {
-  const pl = patchUI.place;
-  if (!pl || pl.busy) return;
-  for (const m of pl.markers) m.remove();
-  Object.assign(pl, { a: null, b: null, check: null, markers: [], error: null, pending: false, seq: pl.seq + 1 });
-  drawPatchMap();
-  drawPatchBar();
-}
-
-async function patchCheck() {
-  const pl = patchUI.place;
-  if (!pl || !pl.a || !pl.b || pl.busy || state.view !== "live") return;
-  const seq = ++pl.seq;
-  pl.pending = true;
-  drawPatchBar();
-  let r;
-  try { r = await postJSON("/api/patch/check", { a: pl.a, b: pl.b }); }
-  catch (e) { r = { ok: false, problems: [e.message] }; }
-  if (patchUI.place !== pl || seq !== pl.seq) return;          // a newer check is on its way
-  Object.assign(pl, { check: r, pending: false });
-  // The handles move onto the rectangle's own corners (trimmed or grown), so the next drag starts from what is drawn.
-  if (r.handles) {
-    [pl.a, pl.b] = r.handles;
-    pl.markers.forEach((m, i) => m.setLngLat(r.handles[i]));
-  }
-  drawPatchMap();
-  drawPatchBar();
-}
-
-// While placing: the rectangle as checked, and the part that was asked for but trimmed away, dashed.
-function drawPatchMap() {
-  const pl = patchUI.place, p = patchUI.view?.patch, feats = [];
-  const ring = (cs) => ({ type: "Polygon", coordinates: [[...cs, cs[0]]] });
-  if (pl && pl.check) {
-    if (pl.check.requested) feats.push({ type: "Feature", properties: { kind: "asked" }, geometry: ring(pl.check.requested) });
-    if (pl.check.corners) feats.push({ type: "Feature", properties: { ok: !!pl.check.ok && !pl.pending },
-                                       geometry: ring(pl.check.corners) });
-  } else if (!pl && p?.corners && ["ready", "started", "aligning"].includes(p.stage)) {
-    feats.push({ type: "Feature", properties: { ok: true }, geometry: ring(p.corners) });
-    if (p.route) feats.push({ ...p.route, properties: {} });
-  }
-  setSource("patch", { type: "FeatureCollection", features: feats });
-}
-
-function drawPatchBar() {
-  const pl = patchUI.place, wrap = $(".mapwrap");
-  if (!pl || !wrap) return;
-  let bar = $("#patchbar");
-  if (!bar) { bar = h("div", { id: "patchbar", class: "patchbar", role: "group", "aria-label": "Place the patch" }); wrap.append(bar); }
-  const r = pl.check;
-  const lines = r?.target ? (r.target.source === "run" ? "along the last mow's lines" : "along the area's own lines") : "";
-  const blocked = patchUI.view?.blocked;
-  const head = r?.ok ? h("div", { class: "row gap", style: "justify-content:space-between;align-items:baseline" },
-      h("b", null, `Patch in ${r.area.name || "the area"}`),
-      h("span", { class: "mono small" }, `${r.length} × ${r.width} m · ${r.area_m2} m²`)) : null;
-  const status = pl.busy ? h("span", null, "Setting up on the robot… about a minute")
-    : pl.error ? h("span", { style: `color:${CORAL}` }, pl.error)
-    : !pl.a ? h("span", null, "Tap one corner of the spot on the map.")
-    : !pl.b ? h("span", null, "Now tap the opposite corner.")
-    : pl.pending || !r ? h("span", { class: "muted" }, "Checking…")
-    : r.ok && blocked ? h("span", { style: `color:${AMBER}` }, `Fits here, but can't be set up now: ${blocked}`)
-    : r.ok ? h("span", { class: "muted" }, `${lines[0].toUpperCase()}${lines.slice(1)}. Drag a round handle to change it.`)
-    : h("span", { style: `color:${CORAL}` }, (r.problems || []).join("; "));
-  const notes = r?.notes?.length && !pl.pending ? h("p", { class: "small", style: `color:${AMBER};margin:4px 0 0` },
-    `${r.notes.join("; ")}.`.replace(/^./, (c) => c.toUpperCase())) : null;
-  fill(bar,
-    head,
-    h("p", { class: "small", style: "margin:4px 0 0" }, status),
-    notes,
-    h("div", { class: "row gap", style: "justify-content:flex-end;margin-top:8px" },
-      pl.a ? h("button", { type: "button", class: "btn", disabled: pl.busy || null, onclick: restartPlacing }, "Start over")
-        : null,
-      h("button", { type: "button", class: "btn", disabled: pl.busy || null, onclick: stopPlacing }, "Cancel"),
-      h("button", { type: "button", class: "btn pri", "data-key": "patch-setup",
-        disabled: pl.busy || pl.pending || !r?.ok || !!blocked || null, onclick: setUpPatch }, "Set up patch")));
-}
-
-async function setUpPatch() {
-  const pl = patchUI.place, r = pl?.check;
-  if (!r?.ok || pl.pending) return;
-  if (!confirm(`Add a ${r.length} × ${r.width} m patch to the robot's map, with its own plan? `
-               + "It is taken off again once it has been mowed.")) return;
-  Object.assign(pl, { busy: true, error: null });
-  drawPatchBar();
-  try {
-    const out = await postJSON("/api/patch", { confirm: true, lon: r.center[0], lat: r.center[1], length: r.length,
-                                               width: r.width });
-    if (!out.ok) throw new Error(out.error || "not set up");
-    toast("The patch is ready: check its route on the map, then start it.");
-    stopPlacing();
-  } catch (e) {
-    Object.assign(pl, { busy: false, error: `Not set up: ${e.message}` });
-    drawPatchBar();
-  }
-  await patchRefresh(true);
-  refreshLive();
-}

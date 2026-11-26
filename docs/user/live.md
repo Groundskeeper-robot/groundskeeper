@@ -22,7 +22,7 @@ has Start (and, for a robot stopped out in the yard, Return to dock).
 
 On a phone, in either layout, while a run is going the emergency buttons are pinned to the foot of the screen in one
 row (**Pause** or **Resume**, **Stop**, **Dock**), just above the page bar, so they stay one tap away wherever you
-have scrolled; the Control card then has nothing left to show and steps aside (unless a patch is going). Docked or
+have scrolled; the Control card then has nothing left to show and steps aside. Docked or
 idle there is no bar. At rest there is no status card either: the robot's state and battery are in the top bar and
 the Control card's header. **Lawn conditions** folds to one line on a phone (the state and what it means); tap it for
 the rules and readings.
@@ -124,7 +124,7 @@ are pink, edge passes violet.
     - Not yet looked at on a phone.
     - Tried with one robot and one viewer at a time.
 - **Control card:** shows only what the robot can do now. Docked or idle: the plan, its areas, **Start** and the
-  start checks, with **Mow a patch** under a rule. During a run: the plan's progress, **Pause** (or **Resume** while it
+  start checks. During a run: the plan's progress, **Pause** (or **Resume** while it
   is paused, then the main button) and **Return to dock**, and **Stop** on a row of its own. A button the state rules
   out is left out, not greyed; when the robot's state is not known, every button shows and the checks decide. Where
   the emergency buttons are on screen (the Camera layout, a phone during a run), the card leaves its run buttons out.
@@ -139,21 +139,6 @@ are pink, edge passes violet.
   The checks show as one line: a green dot and "All 12 start checks pass", or how many pass, with each one that fails
   spelled out under it with its reason (a soft one says you can start anyway). **Show all** opens the full list.
   Needs control switched on ([Safety](#help/safety)).
-- **Mow a patch:** mows one small rectangle inside an area, once, along the last mow's lines. Tap **Mow a patch**,
-  then tap one corner of the spot on the map and then the opposite corner: the rectangle between them is laid along
-  the stripes on the lawn, with a round handle on each of the two corners to drag. Two taps close together make the
-  smallest patch (1.5 m each way); at most 30 m each way. If part of it is outside the area, or closer than 0.5 m to
-  its edge, it is trimmed back along the lines and the bar says so ("Trimmed to 3.4 × 3 m to stay inside Side yard");
-  what you asked for stays drawn dashed. One that reaches into another area is refused: mow each side as its own
-  patch. It turns red with the reason if it still does not fit (1 m from where pathways join the area and from the
-  charger). **Start over** clears the corners. **Set up patch** adds it to
-  the robot as a temporary area named "Patch (temporary)" with its own plan, using the surrounding area's settings
-  without boundary laps, and shifts it a few centimetres so its stripes land on the last mow's; the robot's route
-  for it then shows on the map. **Start patch…** goes through the same checks as any start. Once the robot is back
-  on its charger the panel deletes the patch and its plan and checks that the rest of the map and the plans are as
-  they were (Events says so). A patch not started within 30 minutes is removed too; **Remove** takes it off at once.
-  Needs control and map writing on ([Safety](#help/safety)), the robot on its charger and no plan running. Don't
-  change the patch in the Yarbo app while it exists.
 - **Ready to start:** runs every check a start would face and sends nothing. When a start would be refused it says
   why and what fixes it ("Can't start: the lawn is not dry"), with every check one click further.
 - **Why it stopped:** when the robot paused itself (bumper, emergency stop, rain, a fault) or the last run ended

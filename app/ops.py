@@ -16,7 +16,6 @@ from .control import Controller
 from .backups import Backups
 from .mapwrite import BOOKKEEPING, MapWriter
 from .network import Network
-from .patch import PatchMower
 from .frigate import Frigate
 from .ha import presence_from
 from .notify import Notifier
@@ -89,8 +88,6 @@ class Ops:
         # A start and a write never overlap (#57, #69): each side asks the other right before it sends.
         self.controller.writing = self.map_writer.lock.locked
         self.map_writer.start_block = self.write_hold
-        self.patch = PatchMower(self.store, self.map_writer, rec, self.controller, self.link)    # ADR 0013
-        self.controller.patch_plan = self.patch.plan_id
         self.phone_app_at = 0.0
         self._follow, self._follow_next = None, (None, 0.0)  # follow-cam: shown, and a new pick and since when
         self.presence_cache = (0.0, None)
@@ -158,7 +155,7 @@ class Ops:
             self.cloud.start()
         if self.frigate.enabled:
             await self.frigate.cameras()  # prime the list so status() reports a real count
-        await asyncio.gather(self._scheduler_loop(), self._guard_loop(), self._alert_loop(), self._patch_loop())
+        await asyncio.gather(self._scheduler_loop(), self._guard_loop(), self._alert_loop())
 
     async def close(self) -> None:
         tasks = list(self.controller._tasks)
@@ -727,16 +724,6 @@ class Ops:
                 await self._guard_tick()
             except Exception:
                 log.exception("guard check failed")
-
-    async def _patch_loop(self) -> None:
-        """Remove a patch once its run is over (ADR 0013). Its own loop: a removal waits on the robot's replies, and
-        the guards must not wait with it."""
-        while True:
-            await asyncio.sleep(10)
-            try:
-                await self.patch.tick()
-            except Exception:
-                log.exception("patch check failed")
 
     def guard_status(self) -> list[dict]:
         return [{"key": k, "active": st["active"], "why": st["why"], "acted": st["acted"],

@@ -20,8 +20,8 @@ const sandbox = {
   openConfirm: (cmd, label, args) => { opened.push([cmd, label, args]); },
   closeConfirm() {},
   refreshLive() {},        // the redraw is on its way and has not landed: the card on screen stays the old one
-  patchUI: { view: null }, patchBlock: () => null, ready: { cache: new Map() }, emergencyShown: () => false, HELD: new Set(["paused"]),
-  stateColor: () => "g", num: (v) => String(v), dur: (v) => `${v}s`,     // Mow a patch has its own tests (tests/test_patch.py)
+  ready: { cache: new Map() }, emergencyShown: () => false, HELD: new Set(["paused"]),
+  stateColor: () => "g", num: (v) => String(v), dur: (v) => `${v}s`,
 };
 vm.createContext(sandbox);
 const sk = src.indexOf("function stateKnown("), skEnd = src.indexOf("\n}\n", sk) + 3;

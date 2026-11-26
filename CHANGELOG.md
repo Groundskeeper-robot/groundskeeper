@@ -23,14 +23,6 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   and the AI assistant's command tool still start at the beginning; a program with an API token can ask for a start
   point through `POST /api/control/send` (`args.start_percent`), under the same strict checks as any start it asks for.
 
-- **Mow a patch** (#183, ADR 0013): a button in Live's Control card mows one small rectangle inside an area, once.
-  Tap two opposite corners of the spot and drag their handles; the panel lays it along the last mow's lines, trims
-  back a part outside the area (and says so), adds
-  it to the robot as a temporary area with its own plan (the surrounding area's settings, no boundary laps), lines
-  its stripes up with the last mow's and shows the robot's route. Start it with the usual checks. Once the robot is
-  back on its charger the panel deletes the patch and checks the rest of the map is as it was. Needs control and map
-  writing on. Not yet tried on a robot.
-
 ### Changed
 
 - **Live on a phone, tidied** (an audit of the phone layout). The pinned run controls sit above the page bar instead
@@ -39,9 +31,9 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
   run the Control card steps aside when the pinned controls and the status card already say everything. A missing
   route is said once on Live, and Schedule's "Right now" names the reasons once. The map's imagery line no longer
   shows over the camera picture. Lawn conditions folds to one line on a phone.
-- **The Control card shows only what the robot can do now.** Docked: the plan and Start, with Mow a patch as a quiet
-  row under it. During a run: Pause (or Resume, then the main button) and Return to dock, with Stop on a row of its
-  own in the refusal colour, never next to Start. Buttons the state rules out are left out instead of greyed. On a
+- **The Control card shows only what the robot can do now.** Docked: the plan and Start. During a run: Pause (or
+  Resume, then the main button) and Return to dock, with Stop on a row of its own in the refusal colour, never next
+  to Start. Buttons the state rules out are left out instead of greyed. On a
   phone during a run the emergency buttons are pinned to the bottom of the screen in one row.
 - **The start confirmation's checks are one line**: a green dot when they all pass, or how many pass with each failed
   one spelled out; Show all opens the list. **Start at** is now The beginning or Part-way, a box you type the
@@ -49,6 +41,12 @@ robot card. Before 0.9.0 the panel had no version numbers; those changes are lis
 
 - **`override` on `/api/control/send` must be `true` or `false`.** Any other value (`"false"`, `1`) was read as true,
   so a program could override a soft check by mistake; it now gets a 400.
+
+### Removed
+
+- **Mow a patch** (ADR 0013, rejected), which edge and nightly builds showed in Live's Control card. On a robot the
+  patch's route never got past Yarbo's own check (WP005, "make sure the map is drawn according to the guide"),
+  however the area around it was drawn, so the temporary-area design was dropped. It was never in a release.
 
 ### Fixed
 

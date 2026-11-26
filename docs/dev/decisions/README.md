@@ -66,4 +66,4 @@ The code and tests that hold the decision in place.
 | [0010](0010-robot-video-through-yarbos-agora.md) | Robot video through Yarbo's Agora channel, as a host that publishes nothing | Accepted |
 | [0011](0011-bluetooth-local-control-open.md) | Bluetooth local control: open to contributors, not planned | Accepted |
 | [0012](0012-start-part-way-through-a-plan.md) | A start may begin part-way through the plan | Accepted |
-| [0013](0013-patch-mow-temporary-area.md) | Mow a patch through a temporary area the panel adds and removes | Proposed |
+| [0013](0013-patch-mow-temporary-area.md) | Mow a patch through a temporary area the panel adds and removes | Rejected |
