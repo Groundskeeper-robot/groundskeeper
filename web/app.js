@@ -589,7 +589,6 @@ function applyLayerVisibility() {
   const pbox = $("#problembox");
   if (pbox) pbox.hidden = !state.layers.trouble;
   set("signal-fill", on("signal"));
-  for (const id of ["patch-fill", "patch-line", "patch-route", "patch-asked"]) set(id, state.view === "live");   // ops.js: a patch
   const box = $("#signalbox");
   if (box) box.hidden = !state.layers.signal;
   set("cameras-fill", camerasVisible());
@@ -2410,8 +2409,6 @@ function showView(hash) {
   sub = sub ? decodeURIComponent(sub) : null;
   const wide = isWide(name, sub);
   if (state.view !== name) window.scrollTo(0, 0);
-  // The map is shared: placing a patch (ops.js) stops on leaving Live, so no listeners or padding follow it elsewhere.
-  if (name !== "live" && typeof patchUI !== "undefined" && patchUI.place) stopPlacing();
   state.view = name;
   for (const a of $$(".nav[data-view]")) {
     if (a.dataset.view === (group || name)) a.setAttribute("aria-current", "page");

@@ -17,7 +17,7 @@ const sandbox = {
   HELD: new Set(["paused", "charging_break"]),
   routeOk: () => true, noRouteWhy: () => "", planAreas: () => "Front lawn", readinessView: () => null,
   openConfirm() {}, closeConfirm() {}, refreshLive() {},
-  patchUI: { view: null }, patchBlock: () => null, ready: { cache: new Map() }, stateColor: () => "g", num: (v) => String(v), dur: (v) => `${v}s`,
+  ready: { cache: new Map() }, stateColor: () => "g", num: (v) => String(v), dur: (v) => `${v}s`,
 };
 sandbox.emergencyShown = () => sandbox.emergency;
 vm.createContext(sandbox);

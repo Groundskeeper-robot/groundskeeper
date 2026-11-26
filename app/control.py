@@ -51,9 +51,6 @@ KEEP_AWAKE_ENDS_ON = ("Robot online", "Route to the robot", "Within the time lim
 # Set only while Controller.keep_awake is sending (per task): a keep-awake from anywhere else (/api/control/send, say)
 # has no window, so it is refused, and every beat gets the rate limit and the jitter.
 _IN_BEAT = contextvars.ContextVar("keep_awake_beat", default=False)
-# ADR 0013: set only inside PatchMower.start, so the temporary patch's plan starts from its own button and nowhere else
-# (not the plan picker, a token, the MCP server, the scheduler or Home Assistant).
-PATCH_START = contextvars.ContextVar("patch_start", default=False)
 
 GATE_DEFAULTS = {
     "min_battery_pct": 30,
@@ -212,11 +209,6 @@ def check(cmd: str, args: dict, ctx: dict, cfg: dict, actor: str) -> list[dict]:
         add("Start point", pct is not None,
             "from the beginning" if pct == 0 else f"from {pct}% of the plan" if pct
             else f"{repr(args['start_percent'])[:40]} refused: a whole number from 0 to {START_PERCENT_MAX}")
-    pp = ctx.get("patch_plan")
-    if pp is not None and pid == pp:
-        add("Started from Mow a patch", ctx.get("patch_start") is True and actor == "user",
-            "the patch's own Start" if ctx.get("patch_start") is True and actor == "user"
-            else "this is the temporary patch's plan: start it from Mow a patch on Live")
     add("No active error", not ctx["error_code"], f"error code {ctx['error_code'] or 'none'}")
     batt = ctx["battery"]
     add("Battery", batt is not None and batt >= cfg["min_battery_pct"],
@@ -313,7 +305,6 @@ class Controller:
         self.last: dict | None = None     # the last background-confirmed command, for the status stream
         self.start_out: dict | None = None  # the last start or resume this panel sent: {"cmd", "at"} (#69)
         self.writing = lambda: False      # a write to the robot holds the writer's lock; set by Ops
-        self.patch_plan = lambda: None    # the temporary patch's plan id (ADR 0013); set by Ops
         self._tasks: set = set()
         self._beat_at = None              # monotonic time of the last keep-awake attempt (the rate limit), any viewer
         self._beat_ok_at = None           # monotonic time of the last one that went out; None = none since it stopped
@@ -451,7 +442,7 @@ class Controller:
             self._beat_stopped(self._beat_ok_at)
 
     async def preview(self, cmd: str, args: dict, actor: str = "user") -> dict:
-        ctx = {**await self._context(args), "patch_plan": self.patch_plan(), "patch_start": PATCH_START.get()}
+        ctx = await self._context(args)
         checks = check(cmd, args, ctx, gates(self.store), actor)
         ok, reason = verdict(checks, override=False)
         return {"cmd": cmd, "enabled": self.enabled(), "would_send": ok and self.enabled(), "reason": reason,
@@ -496,7 +487,6 @@ class Controller:
                     ctx = dict(self.light_context())
                 else:
                     ctx = await self._context(args)
-                ctx = {**ctx, "patch_plan": self.patch_plan(), "patch_start": PATCH_START.get()}
                 if cmd == KEEP_AWAKE:           # the window is the server's own record, never the request's
                     since = self._awake_since if _IN_BEAT.get() else None
                     ctx["awake_for_s"] = None if since is None else time.monotonic() - since

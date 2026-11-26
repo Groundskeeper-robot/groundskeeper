@@ -74,9 +74,8 @@ app's intended flow or an app bug is not known; the panel never replicates it.
 
 ### Delete: `del_clean_area {"id": N}`
 
-Drops the plans that use the area and its mow settings. Never use it as part of an edit. The panel sends it only to
-take off a patch it added itself (ADR 0013, `app/patch.py`), after checking the area's name and that it was not on the robot before the
-patch (ids are reused), and only once the patch's plan is gone.
+Drops the plans that use the area and its mow settings. Never use it as part of an edit. The panel never sends it
+(ADR 0013, which would have used it for a temporary patch area, was rejected).
 
 ### Area mow settings: `save_mower_area_params`
 

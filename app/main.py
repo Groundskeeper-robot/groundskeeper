@@ -658,40 +658,6 @@ async def remove_plan(request: Request, pid: int, force: bool = False):
         raise HTTPException(409, str(exc))
 
 
-# -- mow a patch (ADR 0013, app/patch.py) ------------------------------------------------------------------------------
-@app.get("/api/patch")
-async def patch_state(request: Request):
-    """The patch set up now (if any), why one cannot be set up now, and how the last one was removed."""
-    return ops(request).patch.view()
-
-
-@app.post("/api/patch/check")
-async def patch_check(request: Request, body: dict = Body(...)):
-    """Where a patch would go and whether it can: read-only. {a, b}: two opposite corners a person tapped, [lon, lat]
-    each (laid along the lines, trimmed to fit); else {lon, lat, length, width}: a centre and size."""
-    try:
-        if "a" in body or "b" in body:
-            return await ops(request).patch.check_corners(body.get("a"), body.get("b"))
-        return await ops(request).patch.check(body.get("lon"), body.get("lat"), body.get("length"), body.get("width"))
-    except (ValueError, TypeError) as exc:
-        raise HTTPException(400, str(exc))
-    except mapwrite.WriteRefused as exc:
-        raise HTTPException(409, str(exc))
-
-
-@app.post("/api/patch")
-async def patch_prepare(request: Request, body: dict = Body(...)):
-    """Add the patch to the robot (area, settings, plan), lined up with the last mow. Needs confirm: true."""
-    if body.get("confirm") is not True:
-        raise HTTPException(400, "confirm: true is required")
-    try:
-        return await ops(request).patch.prepare(body.get("lon"), body.get("lat"), body.get("length"), body.get("width"))
-    except (ValueError, TypeError) as exc:
-        raise HTTPException(400, str(exc))
-    except mapwrite.WriteRefused as exc:
-        raise HTTPException(409, str(exc))
-
-
 def _override(body: dict) -> bool:
     """A soft check is overridden only by a JSON true: "false", 1 or "yes" are refused, never read as true."""
     v = body.get("override", False)
@@ -699,52 +665,6 @@ def _override(body: dict) -> bool:
         raise HTTPException(400, "override must be true or false")
     return v
 
-
-def _patch_plan_id(body: dict) -> int:
-    """The patch the person is looking at: Start and its checks act on that one only, never on whichever is current."""
-    v = body.get("plan_id")
-    if isinstance(v, bool) or not isinstance(v, int):
-        raise HTTPException(400, "plan_id: the patch's plan id is required")
-    return v
-
-
-def _patch_mark(body: dict) -> float:
-    """The confirmed patch's own mark (its `created`, as /api/patch shows it): plan ids are reused, this is not."""
-    v = body.get("patch")
-    if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
-        raise HTTPException(400, "patch: the patch's `created`, as /api/patch shows it, is required")
-    return float(v)
-
-
-@app.post("/api/patch/preview")
-async def patch_preview(request: Request, body: dict = Body(...)):
-    """The checks the patch's start would meet now; nothing is sent."""
-    try:
-        return await ops(request).patch.preview(plan_id=_patch_plan_id(body), patch=_patch_mark(body))
-    except mapwrite.WriteRefused as exc:
-        raise HTTPException(409, str(exc))
-
-
-@app.post("/api/patch/start")
-async def patch_start(request: Request, body: dict = Body(...)):
-    """Start the patch's plan: the same checks as any start (control.check), as a person."""
-    if body.get("confirm") is not True:
-        raise HTTPException(400, "confirm: true is required")
-    try:
-        return await ops(request).patch.start(override=_override(body), plan_id=_patch_plan_id(body),
-                                              patch=_patch_mark(body))
-    except mapwrite.WriteRefused as exc:
-        raise HTTPException(409, str(exc))
-
-
-@app.delete("/api/patch")
-async def patch_remove(request: Request, accept: bool = False):
-    """Take the patch off the robot now (docked, idle): its plan and area, then compare with before. accept=true:
-    the person has seen what differs from before and lets the patch go anyway."""
-    try:
-        return await ops(request).patch.remove("accepted by hand" if accept else "removed by hand", accept=accept)
-    except mapwrite.WriteRefused as exc:
-        raise HTTPException(409, str(exc))
 
 
 @app.get("/api/cfd")

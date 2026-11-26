@@ -502,8 +502,6 @@ textarea.field { min-height: 80px; padding: 8px 10px; font: 12px/1.4 var(--mono)
   .layout { grid-template-columns: 1fr; }
   .mapwrap { height: 46vh; border-right: 0; border-bottom: 1px solid var(--line); }
   .shell[data-view="studio"] .mapwrap { height: 62vh; }      /* editing needs the room */
-  .mapwrap.placing { height: 72vh; }                          /* placing a patch: room above its bar */
-  .patchbar { padding: 8px 10px; bottom: 10px; }
   /* the legend is one scrolling row clear of the scale bar; the imagery credit sits above it (app.js keeps
      --legend-top in step with the legend's height), so nothing at the foot of the map overlaps */
   .legend { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; bottom: 8px; max-width: calc(100% - 118px); gap: 10px; padding: 6px 10px; }
@@ -950,19 +948,6 @@ button.subtab { border: 0; background: none; font: inherit; font-size: 13px; cur
 .login code { font-family: var(--mono); font-size: 12px; }
 .loginerr { margin: 0; min-height: 1em; color: var(--bad); font-size: 13px; }
 
-/* Mow a patch (ops.js): the placing bar over the map; the legend steps aside meanwhile */
-.patchbar { position: absolute; left: 10px; right: 10px; bottom: 28px; max-width: 520px; padding: 10px 12px;
-            border-radius: 10px; background: color-mix(in srgb, var(--bg) 92%, transparent);
-            border: 1px solid var(--line); z-index: 3; }
-/* The two corners of a patch: big enough to grab with a finger (a 44 px target around a 22 px dot). */
-.patchhandle { width: 44px; height: 44px; display: grid; place-items: center; cursor: grab; touch-action: none; }
-.patchhandle::after { content: ""; width: 22px; height: 22px; border-radius: 50%; background: var(--robot-light);
-  border: 4px solid var(--robot); box-shadow: 0 0 0 2px rgba(0, 0, 0, .35); }
-.patchhandle:active { cursor: grabbing; }
-.mapwrap.placing .legend { display: none; }
-.shell:not([data-view="live"]) .patchbar { display: none; }
-.patchbox { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
-
 /* ---- Control card by state, the start dialog's checks line ---- */
 .ctlstart { width: 100%; min-height: 48px; font-size: 15px; margin-bottom: 8px; }
 .ctlrun { display: flex; flex-direction: column; gap: 2px; margin: 4px 0 10px; }
@@ -971,7 +956,6 @@ button.subtab { border: 0; background: none; font: inherit; font-size: 13px; cur
 .ctlrunbtns > .btn.wide { width: 100%; }
 .btn.stopbtn { background: transparent; color: var(--bad); border-color: var(--bad); }
 .btn.stopbtn:hover:not(:disabled) { background: color-mix(in srgb, var(--bad) 12%, transparent); }
-.patchrow { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--rule); }
 .startat { margin: 0 0 12px; display: flex; flex-direction: column; gap: 6px; }
 .seg.fullseg { display: flex; }
 .seg.fullseg button { flex: 1; }

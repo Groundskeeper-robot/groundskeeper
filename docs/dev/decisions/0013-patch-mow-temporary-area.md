@@ -1,6 +1,6 @@
 # 0013. Mow a patch through a temporary area the panel adds and removes
 
-- **Status:** Proposed
+- **Status:** Rejected
 - **Date:** 2026-11-24
 - **Links:** 0004, #183; `docs/dev/map-writes.md`
 
@@ -46,6 +46,15 @@ It is built only if a capture on a docked robot shows that an area inside anothe
 come back unchanged after the removal. Previews already showed that a patch's route keeps out of no-go zones, that
 its lines move with the outline, and that `edge_circles` 0 leaves stripes only.
 
+## Outcome
+Rejected after it was built and tried on a robot. The robot took the patch's area, settings and plan, and its own
+stripe preview of the patch looked right, but its route preview for the patch's plan failed every time with WP005
+("make sure the map is drawn according to the guide"): with the patch inside its area, with the area cut back
+around it and a pathway in, and with a gap all round and a pathway in. A plan of the existing areas still routed
+with the area cut back. Yarbo documents no rule the patch broke, so an area made by command rather than in the app
+looks like something the robot will not route to. The code was taken out. Reshaping the real area in place (see
+Context) is the option left if this comes back.
+
 ## Consequences
 - Between the add and the removal the map holds an extra area and plan, which the app shows too. A panel that
   stays down leaves them there until it is back or the user deletes them in the app.
@@ -54,11 +63,4 @@ its lines move with the outline, and that `edge_circles` 0 leaves stripes only.
 - If the capture fails either check, this ADR is marked Rejected and reshaping is looked at again.
 
 ## Enforced by
-`app/patch.py` (`PatchMower.block`, `_remove_locked`, `compare`); `app/control.py` (`PATCH_START`, the "Started
-from Mow a patch" check); `tests/test_patch.py`
-`test_nothing_is_sent_unless_docked_idle_and_switched_on`, `test_a_failure_after_the_add_removes_what_was_added`,
-`test_an_area_that_reused_the_patch_id_is_never_deleted`, `test_a_set_up_cut_short_by_a_restart_is_cleaned_up`,
-`test_a_plan_that_would_not_go_keeps_its_area_and_the_patch_tracked`, `test_the_patch_plan_starts_only_from_its_own_button`,
-`test_start_refuses_a_plan_that_is_not_the_patch_any_more`,
-`test_only_the_patch_deletes_areas` and `test_the_routes_are_closed_to_api_tokens`; `tests/test_guards.py`
-`test_only_the_map_writer_gets_the_write_door`.
+Nothing: the code and its tests were removed when this was rejected.
